@@ -1,0 +1,48 @@
+---
+
+parameters:
+  n: 100
+
+paths:
+  some_file: /home/rasmus/indata/file.csv
+  some_dir: indata/some/directory
+
+tasks:
+
+  - name: Generate line numbers
+    python: numpy.arange(5, n)
+    returns: some_numbers
+    format: json
+    dump: file.json
+
+  - name: Check contents of directory
+    shell: ls @some_dir > contents.txt
+    creates:
+      - contents.txt
+
+  - name: Extract lines
+    python: mymodule.extract_lines(contents.txt, some_numbers)
+    returns: list_of_lines
+
+  - name: Jumble lines
+    r: my_r_module.randomize_order(list_of_lines)
+    returns: jumbled_lines
+
+  - name: dump jumbled_lines
+    python: 
+
+  - name: Compute large matrix
+    r: do_something()
+    source: some.module
+    returns: mega_matrix
+    format: rdz
+
+  - name: Make all the figures
+    r: make_figs(mega_matrix, n, "string literal", [5,[1,2]])
+    creates:
+      figs: figs/
+
+
+  - name: dump the mega matrix
+    r: dump_matrix(@mega_matrix)
+
