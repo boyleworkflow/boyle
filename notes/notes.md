@@ -57,3 +57,57 @@ sumatra har sync för att merga log-filer
 smt version
 gpc --version
 
+# 2015-09-03
+
+
+    gpc make [output]:
+        find out what is needed in directory, current state of system, etc
+        from that, calculate hash/id of the requested output
+        if not cached output exists:
+            setup working directory
+            start separate process to run the task that directory
+            wait
+            save record
+            cache output
+            clean/remove working directory
+            
+        when output exists:
+            present it to user
+
+
+
+# 2015-09-04
+
+    
+    - File id (fid): hash of contents
+    - Target id (tgtid): relpath and fid
+    - Task id (tskid): hash of procedure, significant context, etc
+    - Execution id (eid): tskid, [tgtid for each target]
+
+## Get tgtid:
+
+* Get T, the Task that produces the Target
+* Get all Targets the Task T depends on
+* For all inputs, get tgtid
+* Compute eid for T
+* Check in execution database for eid:
+    * If it exists, we can get the tgtid of all outputs and return the requested one.
+    * Else, the execution has never before been done.
+        * Return tgtid of requested target.
+
+## Execute:
+* Prepare execution folder.
+* Execute.
+* Compute fids of newly produced files and save files under their fids.
+* Save a record in the execution database: eid --> tgtids
+* Save files under their fids.
+
+
+
+## Get target:
+
+* get tgtid
+* from target database, get fid and path
+* check in file storage if file is there
+    - if not, execute
+* get file from storage and put it at path

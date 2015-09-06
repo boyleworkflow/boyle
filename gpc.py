@@ -1,88 +1,64 @@
 # -*- coding: utf-8 -*-
 
-import sys
-import os
-import tempfile
-import importlib
-import re
-from modulefinder import ModuleFinder
+cache = {} # maps data digests to data
+previous_executions = {} # maps task executions to (output name, data_digest) tuples
 
-class PythonTask(object):
-    """docstring for PythonTask"""
-    def __init__(self, depends, creates, func_name):
-        for target in creates:
-            target.task = self
-        self.depends = depends
-        self.creates = creates
-        self.func_name = func_name
+class Output(object):
+    """docstring for Output"""
+    def __init__(self, name, task):
+        super(Output, self).__init__()
+        self.name = name
+        self.task = task
 
-    def __str__(self):
-        return '{} ({})'.format(repr(self), self.func_name)
+    def vid(self):
+        eid = self.task.eid()
+        if not eid in previous_executions:
+            self.task.run()
+        return previous_executions[eid][self.name]
 
-    @property
-    def modules(self):
-        # We can and should probably just steal Sumatra's implementation instead,
-        # but the following catches the gist of it:
+    def value(self):
+        vid = self.vid()
+        if not vid in cache:
+            self.task.run()
+        return cache[vid]
+
+class Task(object):
+    """docstring for Task"""
+    def __init__(self, func, inputs, output_names):
+        super(Task, self).__init__()
+        self.func = func
+        self.inputs = inputs
+        self.outputs = {name: Output(name, self) for name in output_names}
+
+    def eid(self):
+        return (self.func,) + tuple((inp.name, inp.vid()) for inp in self.inputs)
+
+
+    def run(self):
+        eid = self.eid()
+
         try:
-            return self._modules
-        except AttributeError:
-            with tempfile.NamedTemporaryFile('w', delete=False) as file:
-                path = file.name
-                file.write("import {}".format(self.func_name))
-            finder = ModuleFinder()
-            finder.run_script(path)
-            os.remove(path)
-            self._modules = {k: m.__file__ for k, m in finder.modules.items()
-                             if not k == '__main__'}
-            return self._modules
+            vids = previous_executions[eid]
+            values = {output_name: cache[vid] for output_name, vid in vids.items()}
+        except KeyError:
+            values = self.func(**{inp.name: inp.value() for inp in self.inputs})
+            vids = {output_name: hash(value) for output_name, value in values.items()}
+            previous_executions[eid] = vids
+            for output_name, vid in vids.items():
+                cache[vid] = values[output_name]
 
-class FileTarget(object):
-    """docstring for FileTarget"""
-    def __init__(self, path):
-        self.path = path
-        self._task = None
-
-    def __str__(self):
-        return '{} ({})'.format(repr(self), self.path)
-
-    @property
-    def task(self):
-        return self._task
-
-    @task.setter
-    def task(self, value):
-        if self._task is not None:
-            raise Exception('this target already belongs to a task')
-        self._task = value
-    
-
-# gpc make [target]:
-#     find out what is needed in directory, current state of system, etc
-#     from that, calculate hash/id of the requested target
-#     if not cached target exists:
-#         setup working directory
-#         start separate process to run the task that directory
-#         wait
-#         save record
-#         cache target
-#         clean/remove working directory
-#         
-#     when target exists:
-#         present it to user
+        return values
 
 def main():
-    if sys.argv[1] == 'make':
-        target_path = re.match('(?P<module>.+)\.(?P<target>[^\.]+)', sys.argv[2])
-        graph_mod = importlib.import_module(target_path.group('module'))
-        target = getattr(graph_mod, target_path.group('target'))
-        print('Target:\t{}\n\nTask:\t{}'.format(target, target.task))
-        
-        print('\nDepends on Target(s):')
-        for t in target.task.depends:
-            print('\t{}'.format(t))
-        print('\nDepends on module(s):')
-        for m, p in target.task.modules.items():
-            print('\t{}: {}'.format(m, p))
+    f1 = lambda: {'a': 42}
+    f2 = lambda **d: {'b': d['a'] + 1}
+    f3 = lambda **d: {'c': d['a'] + d['b']}
+
+    t1 = Task(f1, [], ['a'])
+    t2 = Task(f2, [t1.outputs['a']], ['b'])
+    t3 = Task(f3, [t1.outputs['a'], t2.outputs['b']], ['c'])
+
+    print(t3.outputs['c'].value())
 
 if __name__ == '__main__':
     main()
