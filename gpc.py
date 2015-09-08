@@ -1,64 +1,130 @@
 # -*- coding: utf-8 -*-
 
-cache = {} # maps data digests to data
-previous_executions = {} # maps task executions to (output name, data_digest) tuples
+import os
+import hashlib
+import shutil
+import subprocess
 
-class Output(object):
-    """docstring for Output"""
-    def __init__(self, name, task):
-        super(Output, self).__init__()
-        self.name = name
-        self.task = task
+output_digests = {}
 
-    def vid(self):
-        eid = self.task.eid()
-        if not eid in previous_executions:
-            self.task.run()
-        return previous_executions[eid][self.name]
+def copy_from_archive(digest, dst_path):
+    src_path = archive_path(digest)
+    shutil.copy2(src_path, dst_path)
 
-    def value(self):
-        vid = self.vid()
-        if not vid in cache:
-            self.task.run()
-        return cache[vid]
+def digest(obj):
+    return hashlib.sha1(str(obj).encode('utf-8')).hexdigest()
 
-class Task(object):
-    """docstring for Task"""
-    def __init__(self, func, inputs, output_names):
-        super(Task, self).__init__()
-        self.func = func
+def digest_file(path):
+    with open(path, 'rb') as f:
+        return hashlib.sha1(f.read()).hexdigest()
+
+def archive_path(file_digest):
+    return os.path.join('.gpc/archive/', file_digest)
+
+class Graph(object):
+    """docstring for Graph"""
+    def __init__(self):
+        super(Graph, self).__init__()
+        self.tasks = {}
+
+    def add_task(self, task):
+        if any(output in self.tasks for output in task.outputs):
+            raise ValueError('duplicate outputs not allowed')
+        for output in task.outputs:
+            self.tasks[output] = task
+
+    def find_task(self, output):
+        return self.tasks[output]
+
+    def calc_id(self, task):
+        things = tuple(task.task_id(),) + tuple((inp, self.output_digest(inp)) for inp in task.inputs)
+        return digest(things)
+
+    def output_digest(self, output):
+        task = self.find_task(output)
+        calc_id = self.calc_id(task)
+        return output_digests[calc_id][output]
+
+    # def file_id(self, output):
+    #     task = self.find_task(output)
+    #     things = (self.calc_id(task), output)
+    #     return digest(things)
+
+    def ensure_exists(self, output):
+        task = self.find_task(output)
+        for inp in task.inputs:
+            self.ensure_exists(inp)
+        
+        calc_id = self.calc_id(task)
+        
+        if calc_id in output_digests:
+            file_digest = output_digests[calc_id]
+            if os.path.exists(archive_path(file_digest)):
+                return
+    
+        workdir = os.path.join('/tmp/.gpc/', calc_id)
+        if os.path.exists(workdir):
+            print('deleting', workdir)
+            shutil.rmtree(workdir)
+        os.makedirs(workdir)
+        for inp in task.inputs:
+            copy_from_archive(self.output_digest(inp), os.path.join(workdir, inp))
+        
+        print('running in', workdir)
+        task.run(workdir)
+
+        
+        output_digests[calc_id] = {}
+        for output in task.outputs:
+            dst_path = os.path.join(workdir, output)
+            digest = digest_file(dst_path)
+            if not os.path.exists(archive_path('')):
+                os.makedirs(archive_path(''))
+            shutil.move(dst_path, archive_path(digest))
+            output_digests[calc_id][output] = digest
+
+        if os.path.exists(workdir):
+            print('deleting', workdir)
+            shutil.rmtree(workdir)
+
+
+    def make(self, output):
+        self.ensure_exists(output)
+        copy_from_archive(self.output_digest(output), output)
+
+
+class ShellTask(object):
+    """docstring for ShellTask"""
+    def __init__(self, command, inputs, outputs):
+        super(ShellTask, self).__init__()
+        self.command = command
         self.inputs = inputs
-        self.outputs = {name: Output(name, self) for name in output_names}
+        self.outputs = outputs
 
-    def eid(self):
-        return (self.func,) + tuple((inp.name, inp.vid()) for inp in self.inputs)
+    def task_id(self):
+        return self.command
 
-
-    def run(self):
-        eid = self.eid()
-
+    def run(self, workdir):
+        original_wd = os.getcwd()
+        os.chdir(workdir)
         try:
-            vids = previous_executions[eid]
-            values = {output_name: cache[vid] for output_name, vid in vids.items()}
-        except KeyError:
-            values = self.func(**{inp.name: inp.value() for inp in self.inputs})
-            vids = {output_name: hash(value) for output_name, value in values.items()}
-            previous_executions[eid] = vids
-            for output_name, vid in vids.items():
-                cache[vid] = values[output_name]
-
-        return values
+            subprocess.call(self.command, shell=True)
+        except Exception, e:
+            raise e
+        finally:
+            os.chdir(original_wd)
+        
 
 def main():
-    f1 = lambda: {'a': 42}
-    f2 = lambda **d: {'b': d['a'] + 1}
-    f3 = lambda **d: {'c': d['a'] + d['b']}
+    t1 = ShellTask('echo hello > a', [], ['a'])
+    t2 = ShellTask('echo world > b', [], ['b'])
+    t3 = ShellTask('cat a b > c', ['a', 'b'], ['c'])
+    g = Graph()
+    g.add_task(t1)
+    g.add_task(t2)
+    g.add_task(t3)
+    g.make('c')
 
-    t1 = Task(f1, [], ['a'])
-    t2 = Task(f2, [t1.outputs['a']], ['b'])
-    t3 = Task(f3, [t1.outputs['a'], t2.outputs['b']], ['c'])
-
-    print(t3.outputs['c'].value())
 
 if __name__ == '__main__':
     main()
