@@ -9,7 +9,15 @@ drop table if exists fso;
 create table run (
   id text primary key,
   usr text,
-  calc text
+  task text references task
+  -- info
+  -- timestamp
+);
+
+create table task (
+  id text primary key,
+  define text,
+  sysstate text
 );
 
 create table fso (
@@ -21,7 +29,7 @@ create table fso (
 create table runout (
   run text references run,
   fso text references fso,
-  correct boolean,
+  correct boolean, -- move to own action table
   primary key (run, fso)
 );
 
