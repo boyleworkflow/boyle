@@ -75,6 +75,14 @@ class Log(object):
             return results.keys()[0]
         else:
             raise ConflictException(calculation.id, path)
+
+    def find_supporters(self, calculation, path, digest):
+        """Find all runs that support a certain result."""
+        candidates = (r for r in self._shelf['runs'].values() if r.calculation == calculation)
+        def is_supporter(run):
+            return run.output_fsos[path] == digest
+
+        return list(run for run in candidates if run.output_fsos[path] == digest)
        
     def save_run(self, run):
         """Save a Run."""
@@ -95,8 +103,8 @@ class Log(object):
         """
         pass
 
-    def get_provenance(self):
-        pass
+    def get_provenance(self, digest):
+        return list(r for r in self._shelf['runs'].values() if digest in r.output_fsos.values())
 
 
 class Storage(object):
@@ -159,12 +167,13 @@ class Storage(object):
 
 class Run(object):
     """docstring for Run"""
-    def __init__(self, calculation, output_fsos, info):
+    def __init__(self, calculation, output_fsos, info, supporters):
         super(Run, self).__init__()
         self.id = uuid4()
         self.calculation = calculation
         self.output_fsos = output_fsos
         self.info = info
+        self.supporters = supporters
 
         # Should contain (or be able to report)
         # (1) Calculation the Run carried out
@@ -261,6 +270,12 @@ class Graph(object):
                 parent_calc = self._get_calc(parent_task)
                 self._run(parent_calc)
 
+        supporters = set()
+        for path, digest in calculation.input_fsos.items():
+            parent_task, = self._graph.predecessors(path)
+            parent_calc = self._get_calc(parent_task)
+            supporters.update(self.log.find_supporters(parent_calc, path, digest))
+
         logger.info('Running {}'.format(calculation))
 
         # create temp dir
@@ -292,7 +307,7 @@ class Graph(object):
 
         info = 'I computed this at t={}.'.format(time.time())
 
-        run = Run(calculation, output_fsos, info)
+        run = Run(calculation, output_fsos, info, supporters)
         self.log.save_run(run)
 
         if os.path.exists(workdir):
@@ -324,6 +339,21 @@ class ShellTask(object):
         finally:
             os.chdir(original_wd)
 
+def print_run(run, level=1):
+    spacing = '   ' * level
+    def pr(val):
+        print('%s%s' % (spacing, val))
+    pr(run)
+    pr(run.calculation)
+    pr(run.info)
+    for path, digest in run.calculation.input_fsos.items():
+        pr(' Input %s (%s)' % (path, digest))
+        for i, sr in enumerate(r for r in run.supporters if path in r.output_fsos):
+                pr('  Supporter #%i' % (i+1))
+                print_run(sr, level=level+1)
+    pr('')
+
+
 def main():
     t1 = ShellTask('echo hello > a', [], ['a'])
     t2 = ShellTask('echo world > b', [], ['b'])
@@ -336,6 +366,12 @@ def main():
     g.add_task(t2)
     g.add_task(t3)
     g.make('c')
+
+    
+    responsible_runs = log.get_provenance(digest_file('c'))
+    print('The file was produced by %i run(s):' % len(responsible_runs))
+    for r in responsible_runs:
+        print_run(r)
 
 
 if __name__ == '__main__':
