@@ -13,6 +13,8 @@ import logging
 from uuid import uuid4
 import time
 import shelve
+import itertools
+from itertools import chain
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -34,18 +36,91 @@ class ConflictException(Exception):
         super(ConflictException, self).__init__()
         self.calc_id = calc_id
         self.path = path
-       
 
 class Log(object):
     """docstring for Log"""
     def __init__(self, path):
         super(Log, self).__init__()
-        # self.path = os.path.abspath(path)
-        # if not os.path.isdir(self.path):
-        #     raise ValueError("could not find a log at '{}'".format(self.path))
-        self._shelf = shelve.open(path, writeback=True)
-        if not 'runs' in self._shelf:
-            self._shelf['runs'] = {}
+        self.path = os.path.abspath(path)
+        self.db = ...
+
+    @classmethod        
+    def create(cls, path):
+        """Try to create a log database.
+
+        Args:
+            path: Where to create the database.
+                Should be an empty or nonexistent directory.
+
+        Raises:
+            ValueError: If the directory is not empty.
+        """
+        if not os.path.exists(path):
+            os.makedirs(path)
+
+        if os.listdir(path):
+            raise ValueError('directory not empty')
+        
+        db_path = os.path.join(path, 'db')
+        os.makedirs(db_path)
+        db = fsdb.path(db_path)
+
+        db.create_table(
+            'task',
+            ['id', 'definition', 'sysstate'],
+            ['id'])
+
+        db.create_table(
+            'calculation',
+            ['id', 'task'],
+            ['id'])
+
+        db.create_table(
+            'usr',
+            ['id', 'name'],
+            ['id'])
+
+        db.create_table(
+            'run',
+            ['id', 'usr', 'calculation', 'info', 'time'],
+            ['id'])
+            #index='calculation'
+
+        db.create_table(
+            'fso',
+            ['id', 'digest', 'path'],
+            ['digest', 'path'])
+
+        db.create_table(
+            'created',
+            ['run', 'fso'],
+            ['run', 'fso'])
+
+        db.create_table(
+            'trust',
+            ['run', 'fso', 'usr', 'time', 'correct'],
+            ['run', 'fso'])
+            #index=['run', 'fso']
+
+        db.create_table(
+            'used',
+            ['task', 'fso'],
+            ['task', 'fso'])
+
+        db.create_table(
+            'depended',
+            ['run', 'inputrun'],
+            ['run'])
+
+
+        # then create a log object and return it
+        return cls(path)
+
+    def _is_trusted(self, run_id, fso_id):
+        rows = self.db.select('trust', run_id=run_id, fso_id=fso_id)
+        rows = sorted(rows, key=lambda row: row['time'], reverse=True)
+        return rows[0]
+
 
     def find_output(self, calculation, path):
         """Try to find the digest of a calculation output.
@@ -62,31 +137,33 @@ class Log(object):
             ConflictException: If there are more than one candidate values.
         """
         logger.debug('Searching for output {}: {}'.format(calculation, path))
-        runs = (r for r in self._shelf['runs'].values() if r.calculation == calculation)
-        results = defaultdict(list)
-        for r in runs:
-            digest = r.output_fsos[path]
-            results[digest].append(r)
-        if len(results) == 0:
-            logger.debug('No output for {}, {}'.format(calculation, path))
+        trusted_fsos = set()
+        runs = self.db.select('run', calc_id=calculation.id)
+        for run in runs:
+            created = self.db.select('created', run_id=run['id'])
+            fsos = chain(*(self.db.select('fso', id=row['fso_id']) for row in created))
+            trusted_fsos.update(fso for fso in fsos if self._is_trusted(run['id'], fso['id']))
+
+        if len(trusted_fsos) == 0:
+            logger.debug('No trusted output for {}, {}'.format(calculation, path))
             return None
-        elif len(results) == 1:
-            logger.debug('Output for {}, {}: {}'.format(calculation, path, results.keys()[0]))
-            return results.keys()[0]
+        elif len(trusted_fsos) == 1:
+            return trusted_fsos.pop()
         else:
             raise ConflictException(calculation.id, path)
 
     def find_supporters(self, calculation, path, digest):
         """Find all runs that support a certain result."""
-        candidates = (r for r in self._shelf['runs'].values() if r.calculation == calculation)
-        def is_supporter(run):
-            return run.output_fsos[path] == digest
+        fso_id = self.db.get_id('fso', path=path, digest=digest)
+        candidates = self.db.select('run', calc_id=calculation.id)
+        def is_supporter(run_id):
+            return len(self.db.select('created', run_id=run_id, fso_id=fso_id)) == 1
 
-        return list(run for run in candidates if run.output_fsos[path] == digest)
+        return set(filter(candidates, is_supporter))
        
     def save_run(self, run):
         """Save a Run."""
-        self._shelf['runs'][run.id] = run
+        self.db.insert('run', **run)
         
 
     def get_conflict(self, calc_id, path):
@@ -104,7 +181,10 @@ class Log(object):
         pass
 
     def get_provenance(self, digest):
-        return list(r for r in self._shelf['runs'].values() if digest in r.output_fsos.values())
+        fsos = self.db.select('fso', digest=digest)
+        get_runs = lambda fso: (row['run'] for row in self.db.select('created', fso=fso['id']))
+        runs = chain(*map(get_runs, fsos))
+        return set(runs)
 
 
 class Storage(object):
