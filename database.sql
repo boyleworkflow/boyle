@@ -6,6 +6,8 @@ drop table if exists used;
 drop table if exists trust;
 drop table if exists created;
 drop table if exists run;
+drop table if exists usr;
+drop table if exists calculation;
 drop table if exists fso;
 drop table if exists task;
 
@@ -16,11 +18,21 @@ create table task (
   sysstate text
 );
 
+create table calculation (
+  id text primary key,
+  task text references task
+);
+
+create table usr (
+  id text primary key,
+  name text
+);
+
 -- log of each run of a task
 create table run (
   id text primary key,
-  usr text,
-  task text references task,
+  usr text references usr,
+  calculation text references calculation,
   info text,
   time timestamp with time zone
 );
@@ -43,6 +55,7 @@ create table created (
 create table trust (
   run text,
   fso text,
+  usr text references usr,
   time timestamp with time zone,
   correct boolean,
   constraint fk foreign key (run, fso) references created
@@ -51,9 +64,9 @@ create table trust (
 -- fsos used as input by a run
 -- needed for caching
 create table used (
-  run text references run,
+  task text references task,
   fso text references fso,
-  primary key (run, fso)
+  primary key (task, fso)
 );
 
 -- other run used as to generate input to a run
