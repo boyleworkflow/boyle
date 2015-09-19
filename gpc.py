@@ -10,9 +10,12 @@ import networkx as nx
 from collections import namedtuple
 from collections import defaultdict
 import logging
+from uuid import uuid4
+import time
+import shelve
 
 logging.basicConfig(level=logging.INFO)
-log = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)
 
 def unique_json(obj):
     return json.dumps(obj, sort_keys=True)
@@ -25,64 +28,169 @@ def digest_file(path):
         return hashlib.sha1(f.read()).hexdigest()
 
 
-class Repository(object):
-    """docstring for Repository"""
+class ConflictException(Exception):
+    """docstring for ConflictException"""
+    def __init__(self, calc_id, path):
+        super(ConflictException, self).__init__()
+        self.calc_id = calc_id
+        self.path = path
+       
+
+class Log(object):
+    """docstring for Log"""
     def __init__(self, path):
-        super(Repository, self).__init__()
-        gpc_dir = os.path.abspath(os.path.join(path, '.gpc'))
-        if not os.path.isdir(gpc_dir):
-            raise ValueError("could not find a repo at '{}'".format(gpc_dir))
-        self._path = os.path.abspath(path)
-        self._runs_path = os.path.join(gpc_dir, 'runs')
-        self._archive_path = os.path.join(gpc_dir, 'archive')
+        super(Log, self).__init__()
+        # self.path = os.path.abspath(path)
+        # if not os.path.isdir(self.path):
+        #     raise ValueError("could not find a log at '{}'".format(self.path))
+        self._shelf = shelve.open(path, writeback=True)
+        if not 'runs' in self._shelf:
+            self._shelf['runs'] = {}
 
-    def find_results(self, calc):
-        with open(self._runs_path, 'a+') as f:
-            reader = csv.reader(f)
-            for row in reader:
-                if row[0] == calc.id:
-                    return json.loads(row[1])
-        return None
+    def find_output(self, calculation, path):
+        """Try to find the digest of a calculation output.
 
-    def save_results(self, calc, results):
-        try:
-            previous = self.find_results(calc)
-            if previous is not None and previous != results:
-                raise ValueError('{} already exists with other result'.format(calc))
-        except KeyError:
-            pass
+        Args:
+            calculation (Calculation): The calculation in question.
+            path (str): The relative path of the output.
 
-        with open(self._runs_path, 'a') as f:
-            writer = csv.writer(f)
-            writer.writerow([calc.id, unique_json(results)])
+        Returns:
+            None: If the output cannot be found.
+            str: A file digest, if exactly one is found.
 
-    def _data_path(self, digest):
-        return os.path.join(self._archive_path, digest)
+        Raises:
+            ConflictException: If there are more than one candidate values.
+        """
+        logger.debug('Searching for output {}: {}'.format(calculation, path))
+        runs = (r for r in self._shelf['runs'].values() if r.calculation == calculation)
+        results = defaultdict(list)
+        for r in runs:
+            digest = r.output_fsos[path]
+            results[digest].append(r)
+        if len(results) == 0:
+            logger.debug('No output for {}, {}'.format(calculation, path))
+            return None
+        elif len(results) == 1:
+            logger.debug('Output for {}, {}: {}'.format(calculation, path, results.keys()[0]))
+            return results.keys()[0]
+        else:
+            raise ConflictException(calculation.id, path)
+       
+    def save_run(self, run):
+        """Save a Run."""
+        self._shelf['runs'][run.id] = run
+        
 
-    def find_data(self, digest):
-        return os.path.exists(self._data_path(digest))
+    def get_conflict(self, calc_id, path):
+        """Get info about a conflict over an output of a calculation.
 
-    def copy_from_archive(self, digest, dst_path):
-        src_path = self._data_path(digest)
-        dst_path = os.path.join(self._path, dst_path)
-        shutil.copy2(src_path, dst_path)
+        Args:
+            calc_id (str): The id of the calculation.
+            path (str): The relative path of the output.
 
-    def move_to_archive(self, src_path):
-        if not os.path.exists(self._archive_path):
-            os.makedirs(self._archive_path)
-        digest = digest_file(src_path)
-        shutil.move(src_path, self._data_path(digest))
+        Returns:
+            A list of lists, containing all the Run objects that are
+            involved in the conflict. All the runs in each list are
+            in agreement with each other.
+        """
+        pass
+
+    def get_provenance(self):
+        pass
+
+
+class Storage(object):
+    """docstring for Storage"""
+    def __init__(self, path):
+        super(Storage, self).__init__()
+        self.path = os.path.abspath(path)
+
+    def has_file(self, digest):
+        """Check if a file exists in the storage.
+
+        Args:
+            digest (str): A file digest.
+
+        Returns:
+            bool: A value indicating whether the file is available.
+
+        """
+        return os.path.exists(os.path.join(self.path, digest))
+
+
+    def copy_to(self, digest, path):
+        """Copy a file from the storage.
+
+        Args:
+            digest (str): A file digest.
+            path (str): A path to put the file at.
+
+        Raises:
+            KeyError: If the file does not exist in the storage.
+        """
+        src_path = os.path.join(self.path, digest)
+        if not os.path.exists(src_path):
+            raise KeyError
+        shutil.copy2(src_path, path)
+
+
+
+    def save(self, path):
+        """Save a file in the storage.
+
+        Note:
+            The file is moved to the storage, not copied.
+
+        Args:
+            path (str): A path where the file is located.
+
+        Returns:
+            str: The digest of the file.
+        """
+        if not os.path.exists(self.path):
+            os.makedirs(self.path)
+        digest = digest_file(path)
+        dst_path = os.path.join(self.path, digest)
+        shutil.move(path, dst_path)
+
         return digest
+        
+
+
+class Run(object):
+    """docstring for Run"""
+    def __init__(self, calculation, output_fsos, info):
+        super(Run, self).__init__()
+        self.id = uuid4()
+        self.calculation = calculation
+        self.output_fsos = output_fsos
+        self.info = info
+
+        # Should contain (or be able to report)
+        # (1) Calculation the Run carried out
+        # (2) FSOs used as inputs
+        # (3) For each used input FSO, a list of Runs that have produced that input FSO
+        # (4) FSOs produced by this Run
+
+    def __hash__(self):
+        return hash(self.id)
+
+    def __eq__(self, other):
+        return type(self) == type(other) and self.id == other.id
+
+    def __repr__(self):
+        return '<Run {}>'.format(self.id)
+        
 
 
 class Calculation(object):
     """docstring for Calculation"""
-    def __init__(self, task, indata):
+    def __init__(self, task, input_fsos):
         super(Calculation, self).__init__()
         self.task = task
-        self.indata = indata
-        calc_desc = dict(task=task.task_id(), **{item.path: item.digest for item in indata})
-        self.id = hexdigest(unique_json(calc_desc))
+        self.input_fsos = input_fsos.copy()
+        id_dict = dict(task=task.id, inputs=input_fsos)
+        self.id = hexdigest(unique_json(id_dict))
 
     def __hash__(self):
         return hash(self.id)
@@ -94,19 +202,23 @@ class Calculation(object):
         return '<Calculation {}>'.format(self.id)
 
 
-DataItem = namedtuple('DataItem', ['path', 'digest'])
+FileSystemObject = namedtuple('FileSystemObject', ['path', 'digest'])
 
 class Graph(object):
     """docstring for Graph"""
-    def __init__(self, repo):
+    def __init__(self, log, storage):
         super(Graph, self).__init__()
-        self._repo = repo
+        self.log = log
+        self.storage = storage
         self._graph = nx.DiGraph()
         self._tasks = set()
         self._outputs = set()
-        self._cache = defaultdict(dict)
+        self._fsos = dict()
+        self._calculations = dict()
 
     def add_task(self, task):
+        # TODO: Check if task is already in graph. If so, silently skip?
+
         if any(output in self._graph for output in task.outputs):
             raise ValueError('duplicate outputs not allowed')
 
@@ -119,74 +231,78 @@ class Graph(object):
         self._outputs.update(task.outputs)
         self._tasks.add(task)
 
-    def ensure_exists(self, *requested_outputs):
-        cache = self._cache
-        
+    def _get_calc(self, task):
+        return Calculation(task, {path: self._fsos[path] for path in task.inputs})
+
+    def ensure_exists(self, *requested_outputs):       
         ancestors = set.union(*(nx.ancestors(self._graph, output) for output in requested_outputs))
         ancestor_graph = nx.subgraph(self._graph, ancestors)
         task_graph = nx.project(ancestor_graph, self._tasks)
 
         for task in nx.topological_sort(task_graph):
-            inputs = (DataItem(path=path, digest=cache[path]['digest']) for path in task.inputs)
-            calculation = Calculation(task, inputs)
-            for path in task.outputs:
-                cache[path]['calculation'] = calculation
-            if not self._repo.find_results(calculation):
+            calculation = self._get_calc(task)
+            if not all(self.log.find_output(calculation, p) for p in task.outputs):
                 self._run(calculation)
             else:
-                log.info('{} has been run previously'.format(calculation))
-            
-            results = self._repo.find_results(calculation)
-
+                logger.info('{} has been run previously'.format(calculation))
+           
             for path in task.outputs:
-                cache[path]['digest'] = results[path]
-                if path in requested_outputs and not self._repo.find_data(cache[path]['digest']):
+                fso = self.log.find_output(calculation, path)
+                self._fsos[path] = fso
+                if path in requested_outputs and not self.storage.has_file(fso):
                     self._run(calculation)
 
-    def _run(self, calculation):
-        cache = self._cache
-        for path in calculation.task.inputs:
-            if not self._repo.find_data(cache[path]['digest']):
-                self._run(cache[path]['calculation'])
 
-        log.info('Running {}'.format(calculation))
+    def _run(self, calculation):
+
+        for path, digest in calculation.input_fsos.items():
+            if not self.storage.has_file(digest):
+                parent_task, = self._graph.predecessors(path)
+                parent_calc = self._get_calc(parent_task)
+                self._run(parent_calc)
+
+        logger.info('Running {}'.format(calculation))
 
         # create temp dir
         # run task.prepare(...)
         # copy input files
         # invoke task
-        # if previous run of same calculation in repo, check_reproduced(result)
         # archive input files
+        # save run info in log
 
         workdir = os.path.join('/tmp/.gpc/', calculation.id)
         if os.path.exists(workdir):
-            log.debug('deleting {}'.format(workdir))
+            logger.debug('deleting {}'.format(workdir))
             shutil.rmtree(workdir)
-        log.debug('creating {}'.format(workdir))
+        logger.debug('creating {}'.format(workdir))
         os.makedirs(workdir)
 
         task = calculation.task
-        for path in task.inputs:
-            self._repo.copy_from_archive(cache[path]['digest'], os.path.join(workdir, path))
-        
-        log.debug('running in {}'.format(workdir))
+        for path, digest in calculation.input_fsos.items():
+            self.storage.copy_to(digest, os.path.join(workdir, path))
+       
+        logger.debug('running in {}'.format(workdir))
         task.run(workdir)
 
-        results = {}
-        for output in task.outputs:
-            dst_path = os.path.join(workdir, output)
-            digest = self._repo.move_to_archive(dst_path)
-            results[output] = digest
-        self._repo.save_results(calculation, results)
+        output_fsos = {}
+        for path in task.outputs:
+            dst_path = os.path.join(workdir, path)
+            digest = self.storage.save(dst_path)
+            output_fsos[path] = digest
+
+        info = 'I computed this at t={}.'.format(time.time())
+
+        run = Run(calculation, output_fsos, info)
+        self.log.save_run(run)
 
         if os.path.exists(workdir):
-            log.debug('deleting {}'.format(workdir))
+            logger.debug('deleting {}'.format(workdir))
             shutil.rmtree(workdir)
 
 
     def make(self, output):
         self.ensure_exists(output)
-        self._repo.copy_from_archive(self._cache[output]['digest'], output)
+        self.storage.copy_to(self._fsos[output], output)
 
 
 class ShellTask(object):
@@ -196,9 +312,7 @@ class ShellTask(object):
         self.command = command
         self.inputs = inputs
         self.outputs = outputs
-
-    def task_id(self):
-        return self.command
+        self.id = command
 
     def run(self, workdir):
         original_wd = os.getcwd()
@@ -210,26 +324,14 @@ class ShellTask(object):
         finally:
             os.chdir(original_wd)
 
-
-def run_python_task(gpc_dir, work_dir, func_name, args):
-    """
-    import gpc
-    chdir({work_dir})
-    import {module}
-    values = {name: gpc.load_value()
-    result = {module}.{func_name}()
-    gpc.save_value('{calculation_id}' '{name}', result)
-    ...
-    """
-
-
 def main():
     t1 = ShellTask('echo hello > a', [], ['a'])
     t2 = ShellTask('echo world > b', [], ['b'])
     t3 = ShellTask('cat a b > c', ['a', 'b'], ['c'])
 
-    r = Repository('')
-    g = Graph(r)
+    log = Log('log')
+    storage = Storage('storage')
+    g = Graph(log, storage)
     g.add_task(t1)
     g.add_task(t2)
     g.add_task(t3)
