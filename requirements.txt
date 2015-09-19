@@ -1,1 +1,1 @@
-PyYAML==3.11
+networkx==1.10
