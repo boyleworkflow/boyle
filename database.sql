@@ -3,8 +3,10 @@
 
 drop table if exists depended;
 drop table if exists used;
+drop index if exists trust_run_fso;
 drop table if exists trust;
 drop table if exists created;
+drop index if exists run_calculation;
 drop table if exists run;
 drop table if exists usr;
 drop table if exists calculation;
@@ -36,6 +38,7 @@ create table run (
   info text,
   time timestamp with time zone
 );
+create index run_calculation on run (calculation);
 
 -- file system object
 create table fso (
@@ -60,6 +63,7 @@ create table trust (
   correct boolean,
   constraint fk foreign key (run, fso) references created
 );
+create index trust_run_fso on trust (run, fso);
 
 -- fsos used as input by a run
 -- needed for caching
