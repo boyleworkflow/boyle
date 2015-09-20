@@ -65,12 +65,12 @@ create table trust (
 );
 create index trust_run_fso on trust (run, fso);
 
--- fsos used as input by a run
+-- fsos used as input by a calculation
 -- needed for caching
 create table used (
-  task text references task,
+  calculation text references calculation,
   fso text references fso,
-  primary key (task, fso)
+  primary key (calculation, fso)
 );
 
 -- other run used as to generate input to a run
