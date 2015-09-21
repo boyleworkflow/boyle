@@ -20,17 +20,17 @@ create table task (
 );
 
 create table calculation (
-  id text primary key,
+  id text primary key, -- id based on task and inputs
   task text references task
 );
 
 create table result (
+  id text primary key, -- mostly because we want a simple way to reference results
   calculation text references calculation,
   path text,
-  digest text,
-  primary key (calculation, path, digest)
+  digest text
 );
--- this table is in practice redundant since the key contains all columns
+-- also index the result table?
 
 create table composition (
   id text primary key,
@@ -44,16 +44,12 @@ create table input (
 );
 
 create table trust (
-  calculation text,
-  path text,
-  digest,
+  result text references result,
   usr text references usr,
   time timestamp with time zone,
   correct boolean,
-  constraint fk foreign key (calculation, path, digest) references result
+  primary key (result, usr, time)
 );
--- is this the right index to use?
-create index trust_run_path on trust (calculation, path, digest);
 
 create table usr (
   id text primary key,
@@ -69,3 +65,9 @@ create table run (
   calculation text references calculation
 );
 create index run_calculation on run (calculation);
+
+create table runresult (
+  run text references run,
+  result text references result,
+  primary key (run, result)
+);
