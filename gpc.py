@@ -1,20 +1,17 @@
 # -*- coding: utf-8 -*-
 
 import os
-import hashlib
 import shutil
 import subprocess
-import csv
 import json
 import networkx as nx
-from collections import namedtuple
-from collections import defaultdict
 import logging
 from uuid import uuid4
 import time
-import shelve
-import itertools
 from itertools import chain
+
+from common import hexdigest, digest_file, unique_json
+import fsdb
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -28,95 +25,72 @@ class ConflictException(Exception):
         self.path = path
 
 class Log(object):
-    """docstring for Log"""
     def __init__(self, path):
-        super(Log, self).__init__()
-        self.path = os.path.abspath(path)
-        self.db = ...
-
-    @classmethod        
-    def create(cls, path):
-        """Try to create a log database.
+        """Create or open a log.
 
         Args:
-            path: Where to create the database.
-                Should be an empty or nonexistent directory.
-
-        Raises:
-            ValueError: If the directory is not empty.
+            path: Where to create the log. To create a new log,
+             pick an empty or nonexistent directory.
         """
+        super(Log, self).__init__()
+        self.path = os.path.abspath(path)
         if not os.path.exists(path):
             os.makedirs(path)
+        self._db = fsdb.Database(os.path.join(self.path, 'db'))
+        if not self._db.tables():
+            self._create_tables()
 
-        if os.listdir(path):
-            raise ValueError('directory not empty')
-        
-        db_path = os.path.join(path, 'db')
-        os.makedirs(db_path)
-        db = fsdb.path(db_path)
 
-        db.create_table(
+    def _create_tables(self):
+        # TODO generate this info automatically from an SQL file or similar?
+        self._db.create_table(
             'task',
             ['id', 'definition', 'sysstate'],
             ['id'])
 
-        db.create_table(
+        self._db.create_table(
             'calculation',
             ['id', 'task'],
             ['id'])
 
-        db.create_table(
+        self._db.create_table(
             'usr',
             ['id', 'name'],
             ['id'])
 
-        db.create_table(
+        self._db.create_table(
             'run',
             ['id', 'usr', 'calculation', 'info', 'time'],
             ['id'])
-            #index='calculation'
+            #TODO index='calculation'
 
-        db.create_table(
-            'fso',
-            ['id', 'digest', 'path'],
-            ['digest', 'path'])
-
-        db.create_table(
+        self._db.create_table(
             'created',
-            ['run', 'fso'],
-            ['run', 'fso'])
+            ['run', 'path', 'digest'],
+            ['run', 'path'])
 
-        db.create_table(
+        self._db.create_table(
             'trust',
-            ['run', 'fso', 'usr', 'time', 'correct'],
-            ['run', 'fso'])
-            #index=['run', 'fso']
+            ['run', 'path', 'usr', 'time', 'correct'],
+            ['run', 'path', 'usr', 'time', 'correct'])
+            #TODO index=['run', 'path']
 
-        db.create_table(
+        self._db.create_table(
             'used',
-            ['task', 'fso'],
-            ['task', 'fso'])
+            ['calculation', 'path', 'digest'],
+            ['calculation', 'path'])
 
-        db.create_table(
+        self._db.create_table(
             'depended',
             ['run', 'inputrun'],
-            ['run'])
+            ['run', 'inputrun'])
 
 
-        # then create a log object and return it
-        return cls(path)
-
-    def _is_trusted(self, run_id, fso_id):
-        rows = self.db.select('trust', run_id=run_id, fso_id=fso_id)
-        rows = sorted(rows, key=lambda row: row['time'], reverse=True)
-        return rows[0]
-
-
-    def find_output(self, calculation, path):
+    def find_output(self, calc_id, path):
         """Try to find the digest of a calculation output.
 
         Args:
-            calculation (Calculation): The calculation in question.
+            calc_id (str): The id of the calculation in question.
             path (str): The relative path of the output.
 
         Returns:
@@ -126,35 +100,69 @@ class Log(object):
         Raises:
             ConflictException: If there are more than one candidate values.
         """
-        logger.debug('Searching for output {}: {}'.format(calculation, path))
-        trusted_fsos = set()
-        runs = self.db.select('run', calc_id=calculation.id)
-        for run in runs:
-            created = self.db.select('created', run_id=run['id'])
-            fsos = chain(*(self.db.select('fso', id=row['fso_id']) for row in created))
-            trusted_fsos.update(fso for fso in fsos if self._is_trusted(run['id'], fso['id']))
+        def is_trusted(run):
+            rows = self._db.select('trust', run=run['id'], path=path)
+            rows = sorted(rows, key=lambda row: row['time'], reverse=True)
+            return rows[0]['correct']
 
-        if len(trusted_fsos) == 0:
-            logger.debug('No trusted output for {}, {}'.format(calculation, path))
-            return None
-        elif len(trusted_fsos) == 1:
-            return trusted_fsos.pop()
-        else:
-            raise ConflictException(calculation.id, path)
-
-    def find_supporters(self, calculation, path, digest):
-        """Find all runs that support a certain result."""
-        fso_id = self.db.get_id('fso', path=path, digest=digest)
-        candidates = self.db.select('run', calc_id=calculation.id)
-        def is_supporter(run_id):
-            return len(self.db.select('created', run_id=run_id, fso_id=fso_id)) == 1
-
-        return set(filter(candidates, is_supporter))
-       
-    def save_run(self, run):
-        """Save a Run."""
-        self.db.insert('run', **run)
+        logger.debug('Searching for output {}: {}'.format(calc_id, path))
         
+        trusted_digests = set()
+        runs = self._db.select('run', calculation=calc_id)
+        logger.debug('Found %i matching run(s):' % len(runs))
+        for r in runs:
+            logger.debug(' %s' % r['id'])
+
+        for run in filter(is_trusted, runs):
+            created = self._db.select('created', run=run['id'], path=path)
+            # There should be exactly one file created with that run and path
+            assert len(created) == 1
+            trusted_digests.add(created[0]['digest'])
+
+        if len(trusted_digests) == 0:
+            logger.debug('No trusted output')
+            return None
+        elif len(trusted_digests) == 1:
+            logger.debug('One trusted output: {}'.format(trusted_digests))
+            return trusted_digests.pop()
+        else:
+            logger.debug('More than one trusted output: {}'.format(trusted_digests))
+            raise ConflictException(calc_id, path)
+
+
+    def find_supporters(self, calc_id, path, digest):
+        """Find all runs that support a certain result."""
+        candidates = self._db.select('run', calculation=calc_id)
+        def is_supporter(run):
+            created = self._db.select('created', run=run['id'], path=path)
+            assert len(created) == 1
+            return created[0]['digest'] == digest
+
+        return set(run['id'] for run in filter(is_supporter, candidates))
+
+
+    def save_run(self, run, supporter_ids, outputs):
+        """Save a Run.
+
+        Args:
+            run (dict): A row for the run table.
+            supporter_ids (list): List of run ids supporting the input data.
+            outputs (dict): Map of path: digest pairs produced by the run.
+        """
+        self._db.insert('run', **run)
+        for sid in supporter_ids:
+            self._db.insert('depended', run=run['id'], inputrun=sid)
+
+        for path, digest in outputs.items():
+            self._db.insert('created', run=run['id'], path=path, digest=digest)
+            trust_row = dict(
+                run=run['id'],
+                path=path,
+                usr=None,
+                time=time.time(),
+                correct=True)
+            self._db.insert('trust', **trust_row)
+
 
     def get_conflict(self, calc_id, path):
         """Get info about a conflict over an output of a calculation.
@@ -170,11 +178,11 @@ class Log(object):
         """
         pass
 
+
     def get_provenance(self, digest):
-        fsos = self.db.select('fso', digest=digest)
-        get_runs = lambda fso: (row['run'] for row in self.db.select('created', fso=fso['id']))
-        runs = chain(*map(get_runs, fsos))
-        return set(runs)
+        creations = self._db.select('created', digest=digest)
+        run_ids = (row['run'] for row in creations)
+        return set(run_ids)
 
 
 class Storage(object):
@@ -232,56 +240,9 @@ class Storage(object):
         shutil.move(path, dst_path)
 
         return digest
-        
 
 
-class Run(object):
-    """docstring for Run"""
-    def __init__(self, calculation, output_fsos, info, supporters):
-        super(Run, self).__init__()
-        self.id = uuid4()
-        self.calculation = calculation
-        self.output_fsos = output_fsos
-        self.info = info
-        self.supporters = supporters
 
-        # Should contain (or be able to report)
-        # (1) Calculation the Run carried out
-        # (2) FSOs used as inputs
-        # (3) For each used input FSO, a list of Runs that have produced that input FSO
-        # (4) FSOs produced by this Run
-
-    def __hash__(self):
-        return hash(self.id)
-
-    def __eq__(self, other):
-        return type(self) == type(other) and self.id == other.id
-
-    def __repr__(self):
-        return '<Run {}>'.format(self.id)
-        
-
-
-class Calculation(object):
-    """docstring for Calculation"""
-    def __init__(self, task, input_fsos):
-        super(Calculation, self).__init__()
-        self.task = task
-        self.input_fsos = input_fsos.copy()
-        id_dict = dict(task=task.id, inputs=input_fsos)
-        self.id = hexdigest(unique_json(id_dict))
-
-    def __hash__(self):
-        return hash(self.id)
-
-    def __eq__(self, other):
-        return type(self) == type(other) and self.id == other.id
-
-    def __repr__(self):
-        return '<Calculation {}>'.format(self.id)
-
-
-FileSystemObject = namedtuple('FileSystemObject', ['path', 'digest'])
 
 class Graph(object):
     """docstring for Graph"""
@@ -293,7 +254,6 @@ class Graph(object):
         self._tasks = set()
         self._outputs = set()
         self._fsos = dict()
-        self._calculations = dict()
 
     def add_task(self, task):
         # TODO: Check if task is already in graph. If so, silently skip?
@@ -310,8 +270,12 @@ class Graph(object):
         self._outputs.update(task.outputs)
         self._tasks.add(task)
 
-    def _get_calc(self, task):
-        return Calculation(task, {path: self._fsos[path] for path in task.inputs})
+
+    def _calc_id(self, task):
+        # Note: id_contents should be independent of the order of inputs
+        id_contents = [task.id, {path: self._fsos[path] for path in task.inputs}]
+        return hexdigest(unique_json(id_contents))
+
 
     def ensure_exists(self, *requested_outputs):       
         ancestors = set.union(*(nx.ancestors(self._graph, output) for output in requested_outputs))
@@ -319,34 +283,40 @@ class Graph(object):
         task_graph = nx.project(ancestor_graph, self._tasks)
 
         for task in nx.topological_sort(task_graph):
-            calculation = self._get_calc(task)
-            if not all(self.log.find_output(calculation, p) for p in task.outputs):
-                self._run(calculation)
+            calc_id = self._calc_id(task)
+            inputs = {path: self._fsos[path] for path in task.inputs}
+            if not all(self.log.find_output(calc_id, path) for path in task.outputs):
+                # TODO be more conservative: we only need to know the digests of the 
+                # outputs actually used further down in the graph.
+                self._run(task)
             else:
-                logger.info('{} has been run previously'.format(calculation))
+                logger.info('Calculation {} has been run previously'.format(calc_id))
            
             for path in task.outputs:
-                fso = self.log.find_output(calculation, path)
-                self._fsos[path] = fso
-                if path in requested_outputs and not self.storage.has_file(fso):
-                    self._run(calculation)
+                # TODO likewise, be more conservative here too of course
+                digest = self.log.find_output(calc_id, path)
+                self._fsos[path] = digest
+                if path in requested_outputs and not self.storage.has_file(digest):
+                    self._run(task)
 
 
-    def _run(self, calculation):
+    def _run(self, task):
+        inputs = {path: self._fsos[path] for path in task.inputs}
+        calc_id = self._calc_id(task)
 
-        for path, digest in calculation.input_fsos.items():
+        supporter_ids = set()
+        for path, digest in inputs.items():
+            # Find supporters (for provenance)
+            parent_task, = self._graph.predecessors(path)
+            parent_calc_id = self._calc_id(parent_task)
+            supporter_ids.update(self.log.find_supporters(parent_calc_id, path, digest))
+            
+            # Make sure input files are available
             if not self.storage.has_file(digest):
                 parent_task, = self._graph.predecessors(path)
-                parent_calc = self._get_calc(parent_task)
-                self._run(parent_calc)
+                self._run(parent_task)
 
-        supporters = set()
-        for path, digest in calculation.input_fsos.items():
-            parent_task, = self._graph.predecessors(path)
-            parent_calc = self._get_calc(parent_task)
-            supporters.update(self.log.find_supporters(parent_calc, path, digest))
-
-        logger.info('Running {}'.format(calculation))
+        logger.info('Running calculation {}'.format(calc_id))
 
         # create temp dir
         # run task.prepare(...)
@@ -355,31 +325,34 @@ class Graph(object):
         # archive input files
         # save run info in log
 
-        workdir = os.path.join('/tmp/.gpc/', calculation.id)
+        workdir = os.path.join('/tmp/.gpc/', calc_id)
         if os.path.exists(workdir):
             logger.debug('deleting {}'.format(workdir))
             shutil.rmtree(workdir)
         logger.debug('creating {}'.format(workdir))
         os.makedirs(workdir)
 
-        task = calculation.task
-        for path, digest in calculation.input_fsos.items():
+        for path, digest in inputs.items():
             self.storage.copy_to(digest, os.path.join(workdir, path))
        
         logger.debug('running in {}'.format(workdir))
         task.run(workdir)
 
-        output_fsos = {}
+        outputs = {}
         for path in task.outputs:
             dst_path = os.path.join(workdir, path)
             digest = self.storage.save(dst_path)
-            output_fsos[path] = digest
+            outputs[path] = digest
 
-        info = 'I computed this at t={}.'.format(time.time())
+        run = dict(
+            id=str(uuid4()),
+            usr=None,
+            calculation=calc_id,
+            info=None,
+            time=time.time())
 
-        run = Run(calculation, output_fsos, info, supporters)
-        self.log.save_run(run)
-
+        self.log.save_run(run, supporter_ids, outputs)
+        
         if os.path.exists(workdir):
             logger.debug('deleting {}'.format(workdir))
             shutil.rmtree(workdir)
@@ -404,24 +377,24 @@ class ShellTask(object):
         os.chdir(workdir)
         try:
             subprocess.call(self.command, shell=True)
-        except Exception, e:
+        except Exception as e:
             raise e
         finally:
             os.chdir(original_wd)
 
-def print_run(run, level=1):
-    spacing = '   ' * level
-    def pr(val):
-        print('%s%s' % (spacing, val))
-    pr(run)
-    pr(run.calculation)
-    pr(run.info)
-    for path, digest in run.calculation.input_fsos.items():
-        pr(' Input %s (%s)' % (path, digest))
-        for i, sr in enumerate(r for r in run.supporters if path in r.output_fsos):
-                pr('  Supporter #%i' % (i+1))
-                print_run(sr, level=level+1)
-    pr('')
+# def print_run(run, level=1):
+#     spacing = '   ' * level
+#     def pr(val):
+#         print('%s%s' % (spacing, val))
+#     pr(run)
+#     pr(run.calculation)
+#     pr(run.info)
+#     for path, digest in run.calculation.input_fsos.items():
+#         pr(' Input %s (%s)' % (path, digest))
+#         for i, sr in enumerate(r for r in run.supporters if path in r.output_fsos):
+#                 pr('  Supporter #%i' % (i+1))
+#                 print_run(sr, level=level+1)
+#     pr('')
 
 
 def main():
@@ -441,7 +414,8 @@ def main():
     responsible_runs = log.get_provenance(digest_file('c'))
     print('The file was produced by %i run(s):' % len(responsible_runs))
     for r in responsible_runs:
-        print_run(r)
+        #print_run(r)
+        print(r)
 
 
 if __name__ == '__main__':
