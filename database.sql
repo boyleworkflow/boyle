@@ -71,3 +71,9 @@ create table runresult (
   result text references result,
   primary key (run, result)
 );
+
+create table request (
+  composition text references composition,
+  result text references result,
+  primary key (composition, result)
+);
