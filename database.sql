@@ -66,20 +66,20 @@ create table run (
 );
 create index run_calculation on run (calculation);
 
-create table runresult (
+create table created (
   run text references run,
   fso text references fso,
   primary key (run, fso)
 );
 
-create table compositionresult (
+create table output (
   composition text references composition,
   fso text references fso,
   primary key (composition, fso)
 );
 
-create table used {
+create table used (
   calculation text references calculation,
   fso text references fso,
   primary key (calculation, fso)
-};
+);
