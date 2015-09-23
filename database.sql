@@ -24,7 +24,7 @@ create table calculation (
   task text references task
 );
 
-create table result (
+create table fso (
   id text primary key, -- mostly because we want a simple way to reference results
   calculation text references calculation,
   path text,
@@ -44,11 +44,11 @@ create table input (
 );
 
 create table trust (
-  result text references result,
+  fso text references fso,
   usr text references usr,
   time timestamp with time zone,
   correct boolean,
-  primary key (result, usr, time)
+  primary key (fso, usr, time)
 );
 
 create table usr (
@@ -68,12 +68,18 @@ create index run_calculation on run (calculation);
 
 create table runresult (
   run text references run,
-  result text references result,
-  primary key (run, result)
+  fso text references fso,
+  primary key (run, fso)
 );
 
-create table request (
+create table compositionresult (
   composition text references composition,
-  result text references result,
-  primary key (composition, result)
+  fso text references fso,
+  primary key (composition, fso)
 );
+
+create table used {
+  calculation text references calculation,
+  fso text references fso,
+  primary key (calculation, fso)
+};
