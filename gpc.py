@@ -9,6 +9,7 @@ import logging
 from uuid import uuid4
 import time
 from itertools import chain
+import yaml
 
 from common import hexdigest, digest_file, unique_json
 import fsdb
@@ -398,16 +399,17 @@ class ShellTask(object):
 
 
 def main():
-    t1 = ShellTask('echo hello > a', [], ['a'])
-    t2 = ShellTask('echo world > b', [], ['b'])
-    t3 = ShellTask('cat a b > c', ['a', 'b'], ['c'])
-
     log = Log('log')
     storage = Storage('storage')
     g = Graph(log, storage)
-    g.add_task(t1)
-    g.add_task(t2)
-    g.add_task(t3)
+
+    graph_spec = yaml.load(open('simple.yaml', 'r'))
+    for task in graph_spec['tasks']:
+        if 'shell' in task:
+            t = ShellTask(task['shell'], task.get('inputs', []),
+                          task.get('outputs', []))
+            g.add_task(t)
+            
     g.make('c')
 
     
