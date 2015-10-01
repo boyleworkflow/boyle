@@ -243,18 +243,12 @@ class Storage(object):
         return digest
 
 
-
-
 class Graph(object):
-    """docstring for Graph"""
-    def __init__(self, log, storage):
+    def __init__(self):
         super(Graph, self).__init__()
-        self.log = log
-        self.storage = storage
         self._graph = nx.DiGraph()
         self._tasks = set()
-        self._outputs = set()
-        self._fsos = dict()
+        self.outputs = set()
 
     def add_task(self, task):
         # TODO: Check if task is already in graph. If so, silently skip?
@@ -268,9 +262,25 @@ class Graph(object):
         for output in task.outputs:
             self._graph.add_edge(task, output)
 
-        self._outputs.update(task.outputs)
+        self.outputs.update(task.outputs)
         self._tasks.add(task)
 
+    def get_tasks(self, *requested_outputs):
+        ancestors = set.union(*(nx.ancestors(self._graph, output) for output in requested_outputs))
+        ancestor_graph = nx.subgraph(self._graph, ancestors)
+        task_graph = nx.project(ancestor_graph, self._tasks)
+        return(nx.topological_sort(task_graph))
+
+    def predecessors(self, path):
+        return(self._graph.predecessors(path))
+
+class Runner(object):
+    def __init__(self, log, storage, graph):
+        super(Runner, self).__init__()
+        self.log = log
+        self.storage = storage
+        self._graph = graph
+        self._fsos = dict()
 
     def _calc_id(self, task):
         # Note: id_contents should be independent of the order of inputs
@@ -278,12 +288,8 @@ class Graph(object):
         return hexdigest(unique_json(id_contents))
 
 
-    def ensure_exists(self, *requested_outputs):       
-        ancestors = set.union(*(nx.ancestors(self._graph, output) for output in requested_outputs))
-        ancestor_graph = nx.subgraph(self._graph, ancestors)
-        task_graph = nx.project(ancestor_graph, self._tasks)
-
-        for task in nx.topological_sort(task_graph):
+    def ensure_exists(self, *requested_outputs):
+        for task in self._graph.get_tasks(*requested_outputs):
             calc_id = self._calc_id(task)
             inputs = {path: self._fsos[path] for path in task.inputs}
             if not all(self.log.find_output(calc_id, path) for path in task.outputs):
@@ -401,24 +407,24 @@ class ShellTask(object):
 def main():
     log = Log('log')
     storage = Storage('storage')
-    g = Graph(log, storage)
+    g = Graph()
 
     graph_spec = yaml.load(open('simple.yaml', 'r'))
     for task in graph_spec['tasks']:
         if 'shell' in task:
-            t = ShellTask(task['shell'], task.get('inputs', []),
+            t = ShellTask(task['shell'],
+                          task.get('inputs', []),
                           task.get('outputs', []))
             g.add_task(t)
-            
-    g.make('c')
 
+    runner = Runner(log, storage, g)
+    runner.make('c')
     
     responsible_runs = log.get_provenance(digest_file('c'))
     print('The file was produced by %i run(s):' % len(responsible_runs))
     for r in responsible_runs:
         #print_run(r)
         print(r)
-
 
 if __name__ == '__main__':
     main()
