@@ -2,7 +2,7 @@
 -- create database gpc;
 
 drop table if exists depended;
-drop table if exists used;
+drop table if exists uses;
 drop index if exists trust_run_path;
 drop table if exists trust;
 drop table if exists created;
@@ -25,12 +25,17 @@ create table calculation (
 );
 
 create table fso (
-  id text primary key, -- mostly because we want a simple way to reference results
-  calculation text references calculation,
   path text,
-  digest text
+  digest text,
+  primary key (path, digest)
 );
 -- also index the result table?
+
+create table output (
+  calculation text references calculation,
+  fso text references fso,
+  primary key (calculation, fso)
+);
 
 create table composition (
   id text primary key,
@@ -44,7 +49,7 @@ create table input (
 );
 
 create table trust (
-  fso text references fso,
+  output text references output,
   usr text references usr,
   time timestamp with time zone,
   correct boolean,
@@ -62,23 +67,17 @@ create table run (
   usr text references usr,
   info text,
   time timestamp with time zone,
-  calculation text references calculation
+  composition text references composition
 );
 create index run_calculation on run (calculation);
 
 create table created (
   run text references run,
-  fso text references fso,
-  primary key (run, fso)
+  output text references output,
+  primary key (run, output)
 );
 
-create table output (
-  composition text references composition,
-  fso text references fso,
-  primary key (composition, fso)
-);
-
-create table used (
+create table uses (
   calculation text references calculation,
   fso text references fso,
   primary key (calculation, fso)
