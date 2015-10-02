@@ -53,7 +53,7 @@ create table trust (
   usr text references usr,
   time timestamp with time zone,
   correct boolean,
-  primary key (fso, usr, time)
+  primary key (output, usr, time)
 );
 
 create table usr (
