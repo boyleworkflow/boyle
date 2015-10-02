@@ -14,9 +14,9 @@ drop table if exists task;
 
 -- state of task when run
 create table task (
-  id text primary key,
   definition text,
-  sysstate text
+  sysstate text,
+  primary key (definition, sysstate)
 );
 
 create table calculation (
@@ -63,7 +63,7 @@ create table usr (
 
 -- log of each run of a task
 create table run (
-  id text primary key,
+  id text primary key, -- remove this?
   usr text references usr,
   info text,
   time timestamp with time zone,
