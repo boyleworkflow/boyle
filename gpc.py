@@ -46,45 +46,58 @@ class Log(object):
         # TODO generate this info automatically from an SQL file or similar?
         self._db.create_table(
             'task',
-            ['id', 'definition', 'sysstate'],
-            ['id'])
+            ['definition', 'sysstate']
+            ['definition', 'sysstate'])
+
+        self._db.create_table(
+            'fso',
+            ['path', 'digest']
+            ['path', 'digest'])
 
         self._db.create_table(
             'calculation',
-            ['id', 'task'],
+            ['id', 'task']
             ['id'])
 
         self._db.create_table(
+            'uses',
+            ['calculation', 'fso']
+            ['calculation', 'fso'])
+
+        self._db.create_table(
+            'output',
+            ['calculation', 'fso']
+            ['calculation', 'fso'])
+
+        self._db.create_table(
+            'composition',
+            ['id', 'calculation']
+            ['id'])
+
+        self._db.create_table(
+            'input',
+            ['composition', 'inputcomposition']
+            ['composition', 'inputcomposition'])
+
+        self._db.create_table(
             'usr',
-            ['id', 'name'],
+            ['id', 'name']
             ['id'])
 
         self._db.create_table(
             'run',
-            ['id', 'usr', 'calculation', 'info', 'time'],
+            ['id', 'usr', 'info', 'time', 'composition']
             ['id'])
-            #TODO index='calculation'
 
         self._db.create_table(
             'created',
-            ['run', 'path', 'digest'],
-            ['run', 'path'])
+            ['run', 'output']
+            ['run', 'output'])
 
         self._db.create_table(
             'trust',
-            ['run', 'path', 'usr', 'time', 'correct'],
-            ['run', 'path', 'usr', 'time', 'correct'])
-            #TODO index=['run', 'path']
-
-        self._db.create_table(
-            'used',
-            ['calculation', 'path', 'digest'],
-            ['calculation', 'path'])
-
-        self._db.create_table(
-            'depended',
-            ['run', 'inputrun'],
-            ['run', 'inputrun'])
+            ['output', 'usr', 'time', 'correct']
+            ['output', 'usr', 'time'])
 
 
     def find_output(self, calc_id, path):
