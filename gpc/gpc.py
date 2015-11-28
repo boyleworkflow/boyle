@@ -264,8 +264,6 @@ class Graph(object):
         self.outputs = set()
 
     def add_task(self, task):
-        # TODO: Check if task is already in graph. If so, silently skip?
-
         if any(output in self._graph for output in task.outputs):
             raise ValueError('duplicate outputs not allowed')
 
@@ -282,7 +280,8 @@ class Graph(object):
         ancestors = set.union(*(nx.ancestors(self._graph, output) for output
                                 in requested_outputs))
         ancestor_graph = nx.subgraph(self._graph, ancestors)
-        task_graph = nx.project(ancestor_graph, self._tasks)
+        tasks_in_subgraph = self._tasks.intersection(ancestors)
+        task_graph = nx.projected_graph(ancestor_graph, tasks_in_subgraph)
         return(nx.topological_sort(task_graph))
 
     def predecessors(self, path):
@@ -411,6 +410,9 @@ class Task(object):
             raise e
         finally:
             os.chdir(original_wd)
+
+    def __repr__(self):
+        return '{} with command "{}"'.format(type(self), self.command)
 
 class ShellTask(Task):
     """docstring for ShellTask"""
