@@ -274,6 +274,11 @@ class Graph(object):
     def predecessors(self, path):
         return(self._graph.predecessors(path))
 
+    def ensure_complete(self):
+        ## find input at start of graph
+        ## add CopyTask for each such input
+        pass
+
 class Runner(object):
     def __init__(self, log, storage, graph):
         super(Runner, self).__init__()
