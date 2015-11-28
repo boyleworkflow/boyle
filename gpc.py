@@ -290,7 +290,14 @@ class Graph(object):
     def ensure_complete(self):
         ## find input at start of graph
         ## add CopyTask for each such input
-        pass
+        for node in nx.nodes(self._graph):
+            if len(nx.ancestors(self._graph, node)) == 0:
+                if not isinstance(node, Task):
+                    t = CopyTask(node)
+                    self._graph.add_edge(t, node)
+                    self.outputs.update(node)
+                    self._tasks.add(t)
+
 
 class Runner(object):
     def __init__(self, log, storage, graph):
@@ -298,6 +305,7 @@ class Runner(object):
         self.log = log
         self.storage = storage
         self._graph = graph
+        self._graph.ensure_complete()
         self._fsos = dict()
 
     def _calc_id(self, task):
@@ -382,21 +390,15 @@ class Runner(object):
             logger.debug('deleting {}'.format(workdir))
             shutil.rmtree(workdir)
 
-
     def make(self, output):
         self.ensure_exists(output)
         self.storage.copy_to(self._fsos[output], output)
 
-
-class ShellTask(object):
-    """docstring for ShellTask"""
-    def __init__(self, command, inputs, outputs):
-        super(ShellTask, self).__init__()
+class Task(object):
+    def __init__(self, command):
+        super(Task, self).__init__()
         self.command = command
-        self.inputs = inputs
-        self.outputs = outputs
-        self.id = command
-
+        
     def run(self, workdir):
         original_wd = os.getcwd()
         os.chdir(workdir)
@@ -406,7 +408,26 @@ class ShellTask(object):
             raise e
         finally:
             os.chdir(original_wd)
+    pass
 
+class ShellTask(Task):
+    """docstring for ShellTask"""
+    def __init__(self, command, inputs, outputs):
+        super(ShellTask, self).__init__(command)
+        self.inputs = inputs
+        self.outputs = outputs
+        self.id = command
+
+class CopyTask(Task):
+    def __init__(self, outputs):
+        original_wd = os.getcwd()
+        files = [original_wd + '/' + o for o in outputs]
+        command = "cp " + ' '.join(files) + ' ./'
+        super(CopyTask, self).__init__(command)
+        self.inputs = []
+        self.outputs = outputs
+        self.id = self.command
+        
 # def print_run(run, level=1):
 #     spacing = '   ' * level
 #     def pr(val):
