@@ -24,13 +24,6 @@ create table calculation (
   task text references task
 );
 
-create table fso (
-  path text,
-  digest text,
-  primary key (path, digest)
-);
--- also index the result table?
-
 create table composition (
   id text primary key,
   calculation text references calculation
@@ -43,12 +36,13 @@ create table input (
 );
 
 create table trust (
-  fso text references fso,
+  path text,
+  digest text,
   calculation text references calculation,
   usr text references usr,
   time timestamp with time zone,
   correct boolean,
-  primary key (fso, calculation, usr, time)
+  primary key (path, digest, calculation, usr, time)
 );
 
 create table usr (
@@ -68,20 +62,23 @@ create index run_calculation on run (calculation);
 
 create table created (
   run text references run,
-  fso text references fso,
-  primary key (run, fso)
+  path text,
+  digest text,
+  primary key (run, path, digest)
 );
 
 create table uses (
   calculation text references calculation,
-  fso text references fso,
-  primary key (calculation, fso)
+  path text,
+  digest text,
+  primary key (calculation, path, digest)
 );
 
 create table requested (
-  fso text references fso,
+  path text,
+  digest text,
   usr text references usr,
   firsttime timestamp with time zone,
   composition text references composition,
-  primary key (fso, usr, composition)
+  primary key (path, digest, usr, composition)
 );
