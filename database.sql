@@ -31,12 +31,6 @@ create table fso (
 );
 -- also index the result table?
 
-create table output (
-  calculation text references calculation,
-  fso text references fso,
-  primary key (calculation, fso)
-);
-
 create table composition (
   id text primary key,
   calculation text references calculation
@@ -49,11 +43,12 @@ create table input (
 );
 
 create table trust (
-  output text references output,
+  fso text references fso,
+  calculation text references calculation,
   usr text references usr,
   time timestamp with time zone,
   correct boolean,
-  primary key (output, usr, time)
+  primary key (fso, calculation, usr, time)
 );
 
 create table usr (
@@ -67,18 +62,26 @@ create table run (
   usr text references usr,
   info text,
   time timestamp with time zone,
-  composition text references composition
+  calculation text references calculation
 );
 create index run_calculation on run (calculation);
 
 create table created (
   run text references run,
-  output text references output,
-  primary key (run, output)
+  fso text references fso,
+  primary key (run, fso)
 );
 
 create table uses (
   calculation text references calculation,
   fso text references fso,
   primary key (calculation, fso)
+);
+
+create table requested (
+  fso text references fso,
+  usr text references usr,
+  firsttime timestamp with time zone,
+  composition text references composition,
+  primary key (fso, usr, composition)
 );
