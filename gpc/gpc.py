@@ -306,7 +306,6 @@ class Runner(object):
         self.log = log
         self.storage = storage
         self._graph = graph
-        self._graph.ensure_complete()
         self._fsos = dict()
 
     def _calc_id(self, task):
@@ -392,6 +391,7 @@ class Runner(object):
             shutil.rmtree(workdir)
 
     def make(self, output):
+        self._graph.ensure_complete()
         self.ensure_exists(output)
         self.storage.copy_to(self._fsos[output], output)
 
@@ -443,32 +443,3 @@ class CopyTask(Task):
 #                 pr('  Supporter #%i' % (i+1))
 #                 print_run(sr, level=level+1)
 #     pr('')
-
-
-def main():
-    log = Log('log')
-    storage = Storage('storage')
-    g = Graph()
-
-    graph_spec = yaml.load(open('simple.yaml', 'r'))
-    for task in graph_spec['tasks']:
-        if 'shell' in task:
-            t = ShellTask(task['shell'],
-                          task.get('inputs', []),
-                          task.get('outputs', []))
-            g.add_task(t)
-
-    runner = Runner(log, storage, g)
-    runner.make('c')
-    
-    responsible_runs = log.get_provenance(digest_file('c'))
-    print('The file was produced by %i run(s):' % len(responsible_runs))
-    for r in responsible_runs:
-        #print_run(r)
-        print(r)
-
-def hello():
-    print('hello')
-    
-if __name__ == '__main__':
-    main()

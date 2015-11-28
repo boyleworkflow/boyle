@@ -21,6 +21,19 @@ class TestGraph(unittest.TestCase):
         self.assertTrue(len(g.get_tasks(outputs[1])) == 1)
         with self.assertRaises(networkx.exception.NetworkXError):
             g.get_tasks(outputs[2])
+
+    def test_ensure_complete(self):
+        g = Graph()
+        g.add_task(ShellTask('command', ['a'], ['b']))
+        self.assertTrue(len(g.get_tasks('b')) == 1)
+        g.ensure_complete()
+        self.assertTrue(len(g.get_tasks('b')) == 2)
+
+        g = Graph()
+        g.add_task(ShellTask('command', [], ['a']))
+        self.assertTrue(len(g.get_tasks('a')) == 1)
+        g.ensure_complete()
+        self.assertTrue(len(g.get_tasks('a')) == 1)
             
 if __name__ == '__main__':
     unittest.main()
