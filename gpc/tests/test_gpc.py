@@ -51,9 +51,9 @@ class TestGraph(unittest.TestCase):
         t3 = ShellTask('c3', ['c', 'e'], ['f'])
         g.add_task(t3)
         lf = g.get_tasks('f')
-        self.assertTrue(t1 in lf)
-        self.assertTrue(t2 in lf)
-        self.assertTrue(t3 in lf)
+        self.assertTrue(t1 in lf[0:2])
+        self.assertTrue(t2 in lf[0:2])
+        self.assertTrue(t3 == lf[2])
         self.assertTrue(len(lf) == 3)
 
 if __name__ == '__main__':
