@@ -11,8 +11,8 @@ import time
 from itertools import chain
 import yaml
 
-from common import hexdigest, digest_file, unique_json
-import fsdb
+from gpc.common import hexdigest, digest_file, unique_json
+from gpc import fsdb
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -279,7 +279,8 @@ class Graph(object):
         self._tasks.add(task)
 
     def get_tasks(self, *requested_outputs):
-        ancestors = set.union(*(nx.ancestors(self._graph, output) for output in requested_outputs))
+        ancestors = set.union(*(nx.ancestors(self._graph, output) for output
+                                in requested_outputs))
         ancestor_graph = nx.subgraph(self._graph, ancestors)
         task_graph = nx.project(ancestor_graph, self._tasks)
         return(nx.topological_sort(task_graph))
@@ -398,6 +399,8 @@ class Task(object):
     def __init__(self, command):
         super(Task, self).__init__()
         self.command = command
+        self.inputs = []
+        self.outputs = []
         
     def run(self, workdir):
         original_wd = os.getcwd()
@@ -408,7 +411,6 @@ class Task(object):
             raise e
         finally:
             os.chdir(original_wd)
-    pass
 
 class ShellTask(Task):
     """docstring for ShellTask"""
@@ -465,5 +467,8 @@ def main():
         #print_run(r)
         print(r)
 
+def hello():
+    print('hello')
+    
 if __name__ == '__main__':
     main()

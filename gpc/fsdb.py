@@ -1,8 +1,8 @@
 import os
 import json
-import common
+from gpc import common
 
-from common import unique_json, hexdigest
+from gpc.common import unique_json, hexdigest
 
 class DatabaseError(Exception): pass
 
