@@ -9,7 +9,6 @@ import logging
 from uuid import uuid4
 import time
 from itertools import chain
-import yaml
 
 from gpc.common import hexdigest, digest_file, unique_json
 from gpc import fsdb

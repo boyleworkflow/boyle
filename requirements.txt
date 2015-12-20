@@ -1,2 +1,3 @@
 networkx==1.10
 PyYAML==3.11
+scripttest==1.3
