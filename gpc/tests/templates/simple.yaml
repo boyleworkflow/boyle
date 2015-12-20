@@ -1,8 +1,6 @@
 tasks:
   - name: t1
     shell: echo hello > a
-    inputs:
-      - d
     outputs:
       - a
 
