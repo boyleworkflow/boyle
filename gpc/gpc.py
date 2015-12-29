@@ -17,6 +17,9 @@ from gpc import fsdb
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+USER_ID = 1234
+USER_NAME = 'aoeu'
+
 
 class ConflictException(Exception):
     """docstring for ConflictException"""
@@ -24,6 +27,7 @@ class ConflictException(Exception):
         super(ConflictException, self).__init__()
         self.calc_id = calc_id
         self.path = path
+
 
 class Log(object):
     def __init__(self, path):
@@ -36,69 +40,21 @@ class Log(object):
         super(Log, self).__init__()
         self.path = os.path.abspath(path)
         if not os.path.exists(path):
-            os.makedirs(path)
-        self._db = fsdb.Database(os.path.join(self.path, 'db'))
-        if not self._db.tables():
-            self._create_tables()
+            schema_path = os.path.join(
+                os.path.dirname(__file__),
+                '../database.sql')
+            schema = open(schema_path, 'r').read()
+            fsdb.Database.create(path, schema)
+        self._db = fsdb.Database.load(self.path)
 
+        count = self._db.execute(
+            'select count(id) from usr where id = ?',
+            (USER_ID,)).fetchone()[0]
 
-    def _create_tables(self):
-        # TODO generate this info automatically from an SQL file or similar?
-        self._db.create_table(
-            'task',
-            ['definition', 'sysstate']
-            ['definition', 'sysstate'])
-
-        self._db.create_table(
-            'fso',
-            ['path', 'digest']
-            ['path', 'digest'])
-
-        self._db.create_table(
-            'calculation',
-            ['id', 'task']
-            ['id'])
-
-        self._db.create_table(
-            'uses',
-            ['calculation', 'fso']
-            ['calculation', 'fso'])
-
-        self._db.create_table(
-            'output',
-            ['calculation', 'fso']
-            ['calculation', 'fso'])
-
-        self._db.create_table(
-            'composition',
-            ['id', 'calculation']
-            ['id'])
-
-        self._db.create_table(
-            'input',
-            ['composition', 'inputcomposition']
-            ['composition', 'inputcomposition'])
-
-        self._db.create_table(
-            'usr',
-            ['id', 'name']
-            ['id'])
-
-        self._db.create_table(
-            'run',
-            ['id', 'usr', 'info', 'time', 'composition']
-            ['id'])
-
-        self._db.create_table(
-            'created',
-            ['run', 'output']
-            ['run', 'output'])
-
-        self._db.create_table(
-            'trust',
-            ['output', 'usr', 'time', 'correct']
-            ['output', 'usr', 'time'])
-
+        if not count:
+            self._db.execute(
+                'insert into usr(id, name) values(?, ?)',
+                (USER_ID, USER_NAME))
 
     def find_output(self, calc_id, path):
         """Try to find the digest of a calculation output.
