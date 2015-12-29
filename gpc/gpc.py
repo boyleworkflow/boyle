@@ -9,7 +9,6 @@ import logging
 from uuid import uuid4
 import time
 from itertools import chain
-import yaml
 
 from gpc.common import hexdigest, digest_file, unique_json
 from gpc import fsdb
@@ -220,8 +219,6 @@ class Graph(object):
         self.outputs = set()
 
     def add_task(self, task):
-        # TODO: Check if task is already in graph. If so, silently skip?
-
         if any(output in self._graph for output in task.outputs):
             raise ValueError('duplicate outputs not allowed')
 
@@ -238,7 +235,8 @@ class Graph(object):
         ancestors = set.union(*(nx.ancestors(self._graph, output) for output
                                 in requested_outputs))
         ancestor_graph = nx.subgraph(self._graph, ancestors)
-        task_graph = nx.project(ancestor_graph, self._tasks)
+        tasks_in_subgraph = self._tasks.intersection(ancestors)
+        task_graph = nx.projected_graph(ancestor_graph, tasks_in_subgraph)
         return(nx.topological_sort(task_graph))
 
     def predecessors(self, path):
@@ -262,7 +260,6 @@ class Runner(object):
         self.log = log
         self.storage = storage
         self._graph = graph
-        self._graph.ensure_complete()
         self._fsos = dict()
 
     def _calc_id(self, task):
@@ -348,6 +345,7 @@ class Runner(object):
             shutil.rmtree(workdir)
 
     def make(self, output):
+        self._graph.ensure_complete()
         self.ensure_exists(output)
         self.storage.copy_to(self._fsos[output], output)
 
@@ -367,6 +365,9 @@ class Task(object):
             raise e
         finally:
             os.chdir(original_wd)
+
+    def __repr__(self):
+        return '{} with command "{}"'.format(type(self), self.command)
 
 class ShellTask(Task):
     """docstring for ShellTask"""
@@ -399,32 +400,3 @@ class CopyTask(Task):
 #                 pr('  Supporter #%i' % (i+1))
 #                 print_run(sr, level=level+1)
 #     pr('')
-
-
-def main():
-    log = Log('log')
-    storage = Storage('storage')
-    g = Graph()
-
-    graph_spec = yaml.load(open('simple.yaml', 'r'))
-    for task in graph_spec['tasks']:
-        if 'shell' in task:
-            t = ShellTask(task['shell'],
-                          task.get('inputs', []),
-                          task.get('outputs', []))
-            g.add_task(t)
-
-    runner = Runner(log, storage, g)
-    runner.make('c')
-    
-    responsible_runs = log.get_provenance(digest_file('c'))
-    print('The file was produced by %i run(s):' % len(responsible_runs))
-    for r in responsible_runs:
-        #print_run(r)
-        print(r)
-
-def hello():
-    print('hello')
-    
-if __name__ == '__main__':
-    main()
