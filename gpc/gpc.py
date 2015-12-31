@@ -17,7 +17,7 @@ from collections import defaultdict
 from gpc.common import hexdigest, digest_file, unique_json
 from gpc import fsdb
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 USER_ID = 1234
@@ -74,6 +74,27 @@ class Log(object):
                 [(calc_id, p, d) for p, d in inputs.items()])
 
 
+    def save_composition(self, comp_id=None, calc_id=None, inputs=None):
+        with suppress(sqlite3.IntegrityError), self._db as db:
+            db.execute(
+                'INSERT OR ABORT INTO composition(id, calculation) '
+                'values(?, ?)', (comp_id, calc_id))
+
+            db.executemany(
+                'INSERT INTO input (composition, inputcomposition) '
+                'values (?, ?)',
+                [(comp_id, inputcomp_id) for inputcomp_id in inputs])
+
+    def save_request(self, path=None, comp_id=None, time=None, usr=None, digest=None):
+        """Note: only saves the first time a user requests"""
+        with suppress(sqlite3.IntegrityError), self._db as db:
+            db.execute(
+                'INSERT OR ABORT INTO '
+                'requested(path, digest, usr, firsttime, composition) '
+                'values(?, ?, ?, ?, ?)',
+                (path, digest, usr, time, comp_id))
+
+
     def save_run(self, run_id=None, info=None, time=None,
                  calculation=None, digests=None):
 
@@ -119,7 +140,10 @@ class Log(object):
         # explicitly think anything about, and for which other users
         # have mixed opinions, there is a conflict:
 
-        logger.debug('get_digest: path {} in calc {}'.format(path, calc_id))
+        logger.debug((
+            'get_digest:\n'
+            '\tcalc_id: %s\n'
+            '\tpath: %s') % (calc_id, path))
         logger.debug('opinions: {}'.format(dict(opinions)))
 
         for digest, users in opinions.items():
@@ -168,6 +192,7 @@ class Log(object):
 
 
     def get_provenance(self, digest):
+        return 'Placeholder provenance'
         raise NotImplementedError()
 
 
@@ -204,7 +229,6 @@ class Storage(object):
         if not os.path.exists(src_path):
             raise KeyError
         shutil.copy2(src_path, path)
-
 
 
     def save(self, path):
@@ -253,12 +277,14 @@ class Graph(object):
         return task
 
     def get_upstream_paths(self, *requested_paths):
-        ancestors = set.union(*(nx.ancestors(self._graph, path) for path
-                                in requested_paths))
-        ancestor_graph = nx.subgraph(self._graph, ancestors)
-        paths_in_subgraph = self._paths.intersection(ancestors)
-        path_graph = nx.projected_graph(ancestor_graph, paths_in_subgraph)
-        return(nx.topological_sort(path_graph))
+        subgraph_members = set(requested_paths)
+        for path in requested_paths:
+            subgraph_members.update(nx.ancestors(self._graph, path))
+
+        subgraph_paths = self._paths.intersection(subgraph_members)
+        full_subgraph = nx.subgraph(self._graph, subgraph_members)
+        path_subgraph = nx.projected_graph(full_subgraph, subgraph_paths)
+        return(nx.topological_sort(path_subgraph))
 
     def ensure_complete(self):
         ## find input at start of graph
@@ -271,7 +297,7 @@ class Graph(object):
                     self._paths.update(node)
                     self._tasks.add(t)
 
-def calc_id(task, input_digests):
+def get_calc_id(task, input_digests):
     """
     Compute the calculation id of a task with certain input digests.
 
@@ -289,7 +315,7 @@ def calc_id(task, input_digests):
     id_contents = [task.id, {p: input_digests[p] for p in task.inputs}]
     return hexdigest(unique_json(id_contents))
 
-def comp_id(calc_id, input_comp_ids):
+def get_comp_id(calc_id, input_comp_ids):
     """
     Compute the composition id of a calculation and its input compositions.
 
@@ -321,40 +347,51 @@ class Runner(object):
         self.graph = graph
 
 
-    def calc_id(self, task):
-        input_tasks = {path: self.graph.get_task(path) for path in task.inputs}
-        input_calc_ids = {p: self.calc_id(t) for p, t in input_tasks.items()}
-        input_digests = {p: self.log.get_digest(calc_id, p)
-                        for p, calc_id in input_calc_ids.items()}
+    def get_calc_id(self, task):
+        logger.debug('Getting calc_id\n\ttask: {}'.format(task))
+        inp_tasks = {path: self.graph.get_task(path) for path in task.inputs}
+        inp_calc_ids = {p: self.get_calc_id(t) for p, t in inp_tasks.items()}
+        inp_digests = {p: self.log.get_digest(calc_id, p)
+                        for p, calc_id in inp_calc_ids.items()}
 
-        calc_id = calc_id(task, input_digests)
+        calc_id = get_calc_id(task, inp_digests)
 
         self.log.save_calculation(
-            id=calc_id,
+            calc_id=calc_id,
             task=task.id,
-            inputs=input_digests)
+            inputs=inp_digests)
+
+        logger.debug('calc_id decided:\n\ttask: {}\n\tcalc_id: {}'.format(task, calc_id))
 
         return calc_id
 
 
-    def comp_id(self, task):
+    def get_comp_id(self, task):
         input_tasks = [self.graph.get_task(path) for path in task.inputs]
-        input_comp_ids = [self.comp_id(task) for task in input_tasks]
+        input_comp_ids = [self.get_comp_id(task) for task in input_tasks]
 
-        comp_id = comp_id(self.calc_id(task), input_comp_ids)
+        calc_id = self.get_calc_id(task)
+        comp_id = get_comp_id(calc_id, input_comp_ids)
 
         self.log.save_composition(
-            composition=comp_id,
-            calculation=calc_id,
+            comp_id=comp_id,
+            calc_id=calc_id,
             inputs=input_comp_ids)
 
         return comp_id
 
 
+    def get_digest(self, path):
+        task = self.graph.get_task(path)
+        calc_id = self.get_calc_id(task)
+        digest = self.log.get_digest(calc_id, path)
+        return digest
+
+
     def get_status(self, path):
         task = self.graph.get_task(path)
         try:
-            calc_id = self.calc_id(task)
+            calc_id = self.get_calc_id(task)
         except NotFoundException:
             return Status.unknown
 
@@ -369,34 +406,44 @@ class Runner(object):
             return Status.digest_known
 
 
-    def _save_request(self, path):
-        task = self.graph.get_task(p)
-        digest = self.log.get_digest(self.calc_id(task), path)
-        comp_id = comp_id(task)
+    def _save_request(self, path, digest):
+        task = self.graph.get_task(path)
+        comp_id = self.get_comp_id(task)
         self.log.save_request(
-            composition=self.comp_id(task),
+            comp_id=comp_id,
             time=time.time(),
             usr=USER_ID,
-            digest=digest)
+            digest=digest,
+            path=path)
 
 
     def ensure_exists(self, *requested_paths):
         self.graph.ensure_complete()
 
         upstream_paths = self.graph.get_upstream_paths(*requested_paths)
+        logger.debug('Requested: {}'.format(requested_paths))
+        logger.debug('Upstream paths: {}'.format(upstream_paths))
 
         status_goals = {p: Status.digest_known for p in upstream_paths}
         status_goals.update({p: Status.file_exists for p in requested_paths})
 
         def get_paths_to_work_on():
-            done = False
-            while not done:
+            counter = 0
+            while True:
+                counter += 1
+                logger.info('working round {}'.format(counter))
+                done = True
                 for path in upstream_paths:
                     status = self.get_status(path)
-                    if status < status_goals[p]:
+                    logger.info('working {} {}'.format(path, status))
+                    if status.value < status_goals[path].value:
+                        logger.info('working on {} {}'.format(path, status))
                         yield path, status
+                        done = False
                         break
-                done = True
+                logger.info('end of working round {}, done: {}'.format(counter, done))
+                if done:
+                    break
 
         for path, status in get_paths_to_work_on():
             task = self.graph.get_task(path)
@@ -413,15 +460,13 @@ class Runner(object):
                 raise RuntimeError(
                     'Unexpected status {} for {}'.format(status, path))
 
-        for p in upstream_paths:
-            self._save_composition(p)
-
-        for p in requested_paths:
-            self._save_request(p)
+        for path in requested_paths:
+            digest = self.get_digest(path)
+            self._save_request(path, digest)
 
     def _run(self, task):
-        calc_id = self.calc_id(task)
-        logger.info('Running calculation {}'.format(calc_id))
+        calc_id = self.get_calc_id(task)
+        logger.info('Running calculation\n\tcalc_id: {}\n\ttask: {}'.format(calc_id, task))
 
         # create temp dir
         # run task.prepare(...)
@@ -437,7 +482,7 @@ class Runner(object):
         logger.debug('creating {}'.format(workdir))
         os.makedirs(workdir)
 
-        inputs = {p: self.log.get_digest(calc_id, p) for p in task.inputs}
+        inputs = {path: self.get_digest(path) for path in task.inputs}
         for path, digest in inputs.items():
             self.storage.copy_to(digest, os.path.join(workdir, path))
        
@@ -451,8 +496,8 @@ class Runner(object):
             digests[path] = digest
 
         self.log.save_run(
-            id=str(uuid4()),
-            info=info,
+            run_id=str(uuid4()),
+            info='changeme',
             time=time.time(),
             calculation=calc_id,
             digests=digests
@@ -464,7 +509,8 @@ class Runner(object):
 
     def make(self, output):
         self.ensure_exists(output)
-        self.storage.copy_to(self._fsos[output], output)
+        digest = self.get_digest(output)
+        self.storage.copy_to(digest, output)
 
 class Task(object):
     def __init__(self, command):
