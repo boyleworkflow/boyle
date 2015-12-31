@@ -9,6 +9,10 @@ import logging
 from uuid import uuid4
 import time
 from itertools import chain
+from enum import Enum
+from contextlib import suppress
+import sqlite3
+from collections import defaultdict
 
 from gpc.common import hexdigest, digest_file, unique_json
 from gpc import fsdb
@@ -18,6 +22,8 @@ logger = logging.getLogger(__name__)
 
 USER_ID = 1234
 USER_NAME = 'aoeu'
+
+class NotFoundException(Exception): pass
 
 
 class ConflictException(Exception):
@@ -51,11 +57,38 @@ class Log(object):
             (USER_ID,)).fetchone()[0]
 
         if not count:
-            self._db.execute(
-                'insert into usr(id, name) values(?, ?)',
-                (USER_ID, USER_NAME))
+            with self._db:
+                self._db.execute(
+                    'insert into usr(id, name) values(?, ?)',
+                    (USER_ID, USER_NAME))
 
-    def find_output(self, calc_id, path):
+    def save_calculation(self, calc_id=None, task=None, inputs=None):
+        with suppress(sqlite3.IntegrityError), self._db as db:
+            db.execute(
+                'INSERT OR ABORT INTO calculation(id, task) values(?, ?)',
+                (calc_id, task))
+
+            db.executemany(
+                'INSERT INTO uses (calculation, path, digest) '
+                'values (?, ?, ?)',
+                [(calc_id, p, d) for p, d in inputs.items()])
+
+
+    def save_run(self, run_id=None, info=None, time=None,
+                 calculation=None, digests=None):
+
+        with self._db as db:
+            db.execute(
+                'INSERT INTO run(id, usr, info, time, calculation) '
+                'values(?, ?, ?, ?, ?)',
+                (run_id, USER_ID, info, time, calculation))
+
+            db.executemany(
+                'INSERT INTO created(run, path, digest) values(?, ?, ?)',
+                [(run_id, p, d) for p, d in digests.items()])
+
+
+    def get_digest(self, calc_id, path):
         """Try to find the digest of a calculation output.
 
         Args:
@@ -67,71 +100,57 @@ class Log(object):
             str: A file digest, if exactly one is found.
 
         Raises:
+            NotFoundException: If there is no candidate value.
             ConflictException: If there are more than one candidate values.
         """
-        def is_trusted(run):
-            rows = self._db.select('trust', run=run['id'], path=path)
-            rows = sorted(rows, key=lambda row: row['time'], reverse=True)
-            return rows[0]['correct']
 
-        logger.debug('Searching for output {}: {}'.format(calc_id, path))
-        
-        trusted_digests = set()
-        runs = self._db.select('run', calculation=calc_id)
-        logger.debug('Found %i matching run(s):' % len(runs))
-        for r in runs:
-            logger.debug(' %s' % r['id'])
+        candidates = self._db.execute(
+            'SELECT DISTINCT digest, trust.usr, correct FROM created '
+            'INNER JOIN run ON created.run = run.id '
+            'LEFT OUTER JOIN trust USING (calculation, digest, path) '
+            'WHERE (path = ? AND calculation = ?)',
+            (path, calc_id))
 
-        for run in filter(is_trusted, runs):
-            created = self._db.select('created', run=run['id'], path=path)
-            # There should be exactly one file created with that run and path
-            assert len(created) == 1
-            trusted_digests.add(created[0]['digest'])
+        opinions = defaultdict(lambda: defaultdict(list))
+        for digest, usr, correct in candidates:
+            opinions[digest][correct].append(usr)
 
-        if len(trusted_digests) == 0:
-            logger.debug('No trusted output')
-            return None
-        elif len(trusted_digests) == 1:
-            logger.debug('One trusted output: {}'.format(trusted_digests))
-            return trusted_digests.pop()
+        # If there are any digests which the current user does not
+        # explicitly think anything about, and for which other users
+        # have mixed opinions, there is a conflict:
+
+        logger.debug('get_digest: path {} in calc {}'.format(path, calc_id))
+        logger.debug('opinions: {}'.format(dict(opinions)))
+
+        for digest, users in opinions.items():
+            if (
+                USER_ID not in users[True] + users[False] and
+                len(users[True]) > 0 and
+                len(users[False]) > 0):
+                raise ConflictException(calc_id, path)
+
+
+        # Remove all digests which noone trusts and at least one distrusts
+        opinions = {
+            digest: users for digest, users in opinions.items()
+            if not (len(users[True]) == 0 and len(users[False]) > 0)}
+
+        # Remove all digests the current user distrusts
+        opinions = {
+            digest: users for digest, users in opinions.items()
+            if not USER_ID in users[False]}
+
+        # If there is no digest left, nothing is found.
+        # If there is exactly one left, it can be used.
+        # If there is more than one left, there is a conflict.
+
+        if len(opinions) == 0:
+            raise NotFoundException()
+        elif len(opinions) == 1:
+            digest, = opinions.keys()
+            return digest
         else:
-            logger.debug('More than one trusted output: {}'.format(trusted_digests))
             raise ConflictException(calc_id, path)
-
-
-    def find_supporters(self, calc_id, path, digest):
-        """Find all runs that support a certain result."""
-        candidates = self._db.select('run', calculation=calc_id)
-        def is_supporter(run):
-            created = self._db.select('created', run=run['id'], path=path)
-            assert len(created) == 1
-            return created[0]['digest'] == digest
-
-        return set(run['id'] for run in filter(is_supporter, candidates))
-
-
-    def save_run(self, run, supporter_ids, outputs):
-        """Save a Run.
-
-        Args:
-            run (dict): A row for the run table.
-            supporter_ids (list): List of run ids supporting the input data.
-            outputs (dict): Map of path: digest pairs produced by the run.
-        """
-        self._db.insert('run', **run)
-        for sid in supporter_ids:
-            self._db.insert('depended', run=run['id'], inputrun=sid)
-
-        for path, digest in outputs.items():
-            self._db.insert('created', run=run['id'], path=path, digest=digest)
-            trust_row = dict(
-                run=run['id'],
-                path=path,
-                usr=None,
-                time=time.time(),
-                correct=True)
-            self._db.insert('trust', **trust_row)
-
 
     def get_conflict(self, calc_id, path):
         """Get info about a conflict over an output of a calculation.
@@ -145,13 +164,11 @@ class Log(object):
             involved in the conflict. All the runs in each list are
             in agreement with each other.
         """
-        pass
+        raise NotImplementedError()
 
 
     def get_provenance(self, digest):
-        creations = self._db.select('created', digest=digest)
-        run_ids = (row['run'] for row in creations)
-        return set(run_ids)
+        raise NotImplementedError()
 
 
 class Storage(object):
@@ -216,31 +233,32 @@ class Graph(object):
         super(Graph, self).__init__()
         self._graph = nx.DiGraph()
         self._tasks = set()
-        self.outputs = set()
+        self._paths = set()
 
     def add_task(self, task):
-        if any(output in self._graph for output in task.outputs):
+        if any(path in self._graph for path in task.outputs):
             raise ValueError('duplicate outputs not allowed')
 
-        for inp in task.inputs:
-            self._graph.add_edge(inp, task)
+        for path in task.inputs:
+            self._graph.add_edge(path, task)
 
-        for output in task.outputs:
-            self._graph.add_edge(task, output)
+        for path in task.outputs:
+            self._graph.add_edge(task, path)
 
-        self.outputs.update(task.outputs)
+        self._paths.update(task.outputs)
         self._tasks.add(task)
 
-    def get_tasks(self, *requested_outputs):
-        ancestors = set.union(*(nx.ancestors(self._graph, output) for output
-                                in requested_outputs))
-        ancestor_graph = nx.subgraph(self._graph, ancestors)
-        tasks_in_subgraph = self._tasks.intersection(ancestors)
-        task_graph = nx.projected_graph(ancestor_graph, tasks_in_subgraph)
-        return(nx.topological_sort(task_graph))
+    def get_task(self, output_path):
+        task, = self._graph.predecessors(output_path)
+        return task
 
-    def predecessors(self, path):
-        return(self._graph.predecessors(path))
+    def get_upstream_paths(self, *requested_paths):
+        ancestors = set.union(*(nx.ancestors(self._graph, path) for path
+                                in requested_paths))
+        ancestor_graph = nx.subgraph(self._graph, ancestors)
+        paths_in_subgraph = self._paths.intersection(ancestors)
+        path_graph = nx.projected_graph(ancestor_graph, paths_in_subgraph)
+        return(nx.topological_sort(path_graph))
 
     def ensure_complete(self):
         ## find input at start of graph
@@ -250,59 +268,159 @@ class Graph(object):
                 if not isinstance(node, Task):
                     t = CopyTask(node)
                     self._graph.add_edge(t, node)
-                    self.outputs.update(node)
+                    self._paths.update(node)
                     self._tasks.add(t)
 
+def calc_id(task, input_digests):
+    """
+    Compute the calculation id of a task with certain input digests.
+
+    Args:
+        task: The Task object in question.
+        input_digests (dict-like): A mapping such that
+            input_digests[path] == digest for all inputs used by the task.
+
+    Returns:
+        A string with the calculation id.
+
+    """
+    # Note: calc_id could be constructed in different ways, but
+    # must be independent of the order of inputs.
+    id_contents = [task.id, {p: input_digests[p] for p in task.inputs}]
+    return hexdigest(unique_json(id_contents))
+
+def comp_id(calc_id, input_comp_ids):
+    """
+    Compute the composition id of a calculation and its input compositions.
+
+    Args:
+        calc_id: The calculation id of the calculation.
+        input_comp_ids (iterable): An iterable with the comp_id values
+            of the inputs to the composition.
+
+    Returns:
+        A string with the composition id.
+
+    """
+    # Note: comp_id could be constructed in different ways, but
+    # must be independent of the order of inputs.
+    id_contents = [calc_id, list(sorted(input_comp_ids))]
+    return hexdigest(unique_json(id_contents))
+
+class Status(Enum):
+    unknown = 0
+    no_digest = 1
+    digest_known = 2
+    file_exists = 3
 
 class Runner(object):
     def __init__(self, log, storage, graph):
         super(Runner, self).__init__()
         self.log = log
         self.storage = storage
-        self._graph = graph
-        self._fsos = dict()
-
-    def _calc_id(self, task):
-        # Note: id_contents should be independent of the order of inputs
-        id_contents = [task.id, {path: self._fsos[path] for path in task.inputs}]
-        return hexdigest(unique_json(id_contents))
+        self.graph = graph
 
 
-    def ensure_exists(self, *requested_outputs):
-        for task in self._graph.get_tasks(*requested_outputs):
-            calc_id = self._calc_id(task)
-            inputs = {path: self._fsos[path] for path in task.inputs}
-            if not all(self.log.find_output(calc_id, path) for path in task.outputs):
-                # TODO be more conservative: we only need to know the digests of the 
-                # outputs actually used further down in the graph.
-                self._run(task)
-            else:
-                logger.info('Calculation {} has been run previously'.format(calc_id))
-           
-            for path in task.outputs:
-                # TODO likewise, be more conservative here too of course
-                digest = self.log.find_output(calc_id, path)
-                self._fsos[path] = digest
-                if path in requested_outputs and not self.storage.has_file(digest):
+    def calc_id(self, task):
+        input_tasks = {path: self.graph.get_task(path) for path in task.inputs}
+        input_calc_ids = {p: self.calc_id(t) for p, t in input_tasks.items()}
+        input_digests = {p: self.log.get_digest(calc_id, p)
+                        for p, calc_id in input_calc_ids.items()}
+
+        calc_id = calc_id(task, input_digests)
+
+        self.log.save_calculation(
+            id=calc_id,
+            task=task.id,
+            inputs=input_digests)
+
+        return calc_id
+
+
+    def comp_id(self, task):
+        input_tasks = [self.graph.get_task(path) for path in task.inputs]
+        input_comp_ids = [self.comp_id(task) for task in input_tasks]
+
+        comp_id = comp_id(self.calc_id(task), input_comp_ids)
+
+        self.log.save_composition(
+            composition=comp_id,
+            calculation=calc_id,
+            inputs=input_comp_ids)
+
+        return comp_id
+
+
+    def get_status(self, path):
+        task = self.graph.get_task(path)
+        try:
+            calc_id = self.calc_id(task)
+        except NotFoundException:
+            return Status.unknown
+
+        try:
+            digest = self.log.get_digest(calc_id, path)
+        except NotFoundException:
+            return Status.no_digest
+
+        if self.storage.has_file(digest):
+            return Status.file_exists
+        else:
+            return Status.digest_known
+
+
+    def _save_request(self, path):
+        task = self.graph.get_task(p)
+        digest = self.log.get_digest(self.calc_id(task), path)
+        comp_id = comp_id(task)
+        self.log.save_request(
+            composition=self.comp_id(task),
+            time=time.time(),
+            usr=USER_ID,
+            digest=digest)
+
+
+    def ensure_exists(self, *requested_paths):
+        self.graph.ensure_complete()
+
+        upstream_paths = self.graph.get_upstream_paths(*requested_paths)
+
+        status_goals = {p: Status.digest_known for p in upstream_paths}
+        status_goals.update({p: Status.file_exists for p in requested_paths})
+
+        def get_paths_to_work_on():
+            done = False
+            while not done:
+                for path in upstream_paths:
+                    status = self.get_status(path)
+                    if status < status_goals[p]:
+                        yield path, status
+                        break
+                done = True
+
+        for path, status in get_paths_to_work_on():
+            task = self.graph.get_task(path)
+            if status in (Status.no_digest, Status.digest_known):
+                all_inputs_exist = True
+                for p in task.inputs:
+                    if self.get_status(p) != Status.file_exists:
+                        all_inputs_exist = False
+                        status_goals[p] = Status.file_exists
+
+                if all_inputs_exist:
                     self._run(task)
+            else:
+                raise RuntimeError(
+                    'Unexpected status {} for {}'.format(status, path))
 
+        for p in upstream_paths:
+            self._save_composition(p)
+
+        for p in requested_paths:
+            self._save_request(p)
 
     def _run(self, task):
-        inputs = {path: self._fsos[path] for path in task.inputs}
-        calc_id = self._calc_id(task)
-
-        supporter_ids = set()
-        for path, digest in inputs.items():
-            # Find supporters (for provenance)
-            parent_task, = self._graph.predecessors(path)
-            parent_calc_id = self._calc_id(parent_task)
-            supporter_ids.update(self.log.find_supporters(parent_calc_id, path, digest))
-            
-            # Make sure input files are available
-            if not self.storage.has_file(digest):
-                parent_task, = self._graph.predecessors(path)
-                self._run(parent_task)
-
+        calc_id = self.calc_id(task)
         logger.info('Running calculation {}'.format(calc_id))
 
         # create temp dir
@@ -319,33 +437,32 @@ class Runner(object):
         logger.debug('creating {}'.format(workdir))
         os.makedirs(workdir)
 
+        inputs = {p: self.log.get_digest(calc_id, p) for p in task.inputs}
         for path, digest in inputs.items():
             self.storage.copy_to(digest, os.path.join(workdir, path))
        
         logger.debug('running in {}'.format(workdir))
         task.run(workdir)
 
-        outputs = {}
+        digests = {}
         for path in task.outputs:
             dst_path = os.path.join(workdir, path)
             digest = self.storage.save(dst_path)
-            outputs[path] = digest
+            digests[path] = digest
 
-        run = dict(
+        self.log.save_run(
             id=str(uuid4()),
-            usr=None,
+            info=info,
+            time=time.time(),
             calculation=calc_id,
-            info=None,
-            time=time.time())
+            digests=digests
+            )
 
-        self.log.save_run(run, supporter_ids, outputs)
-        
         if os.path.exists(workdir):
             logger.debug('deleting {}'.format(workdir))
             shutil.rmtree(workdir)
 
     def make(self, output):
-        self._graph.ensure_complete()
         self.ensure_exists(output)
         self.storage.copy_to(self._fsos[output], output)
 
