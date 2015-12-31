@@ -1,0 +1,51 @@
+1. Discard all digests which noone trusts and at least one distrusts.
+
+2. Now one of three things happen:
+
+	Zero:
+		Do nothing.
+	One:
+		If we trust it, use it.
+		Else, if we distrust it, discard.
+		Else, 
+			a) Noone distrusts it. Use it!
+			b) Someone distrusts it and someone else trusts it. Conflict!
+		Use it if noone distrusts it. Otherwise conflict.
+	More than one:
+		Use it if we trust one and distrust all others. Otherwise conflict.
+
+- - -
+
+I think the following is equivalent:
+
+Initial possibilities:
+
+		Others
+		+	0	-	+/-
+Me 	+	Y 	Y 	Y	Y
+	0	Y 	Y 	N 	C
+	-	N 	N 	N 	N
+
+
+If there are any digests with mixed opinions which the current user does not explicitly think anything about, there is a conflict:
+
+		Others
+		+	0	-	+/-
+Me 	+	Y 	Y 	Y	Y
+	0	Y 	Y 	N 	
+	-	N 	N 	N 	N
+
+
+Remove all digests the current user distrusts:
+
+		Others
+		+	0	-	+/-
+Me 	+	Y 	Y 	Y	Y
+	0	Y 	Y 	N 	
+
+Remove all digests which noone trusts and at least one distrusts
+
+		Others
+		+	0	-	+/-
+Me 	+	Y 	Y 	Y	Y
+	0	Y 	Y 	  	
