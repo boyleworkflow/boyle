@@ -73,3 +73,6 @@ class Database(object):
         
     def execute(self, sql, parameters=()):
         return self._conn.execute(sql, parameters)
+
+    def executemany(self, sql, parameters=()):
+        return self._conn.executemany(sql, parameters)
