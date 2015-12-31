@@ -1,0 +1,1 @@
+INSERT OR ABORT INTO composition(id, calculation) values('e06ce475c0b6da1d929e4cb04d3bb14c24974270', '6fe789716fa3addeb196b97bbbe3dae4a39e306a')

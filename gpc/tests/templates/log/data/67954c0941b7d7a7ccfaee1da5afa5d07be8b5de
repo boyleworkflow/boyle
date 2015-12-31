@@ -1,0 +1,1 @@
+INSERT INTO run(id, usr, info, time, calculation) values('419f7139-f18f-4438-a66e-bc019f41c2bb', 1234, 'changeme', 1451563808.3997, 'ace5ab6167e7f742486bc144e72508adf385f087')

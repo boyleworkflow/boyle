@@ -1,0 +1,1 @@
+INSERT INTO created(run, path, digest) values('419f7139-f18f-4438-a66e-bc019f41c2bb', 'c', '58853e8a5e8272b1012f9a52a80758b27bd0d3cb')
