@@ -39,21 +39,15 @@ class GraphError(Exception): pass
 
 class Log(object):
     def __init__(self, path):
-        """Create or open a log.
+        """
+        Open a log.
 
         Args:
-            path: Where to create the log. To create a new log,
-             pick an empty or nonexistent directory.
+            path: The path of the log.
         """
         super(Log, self).__init__()
-        self.path = os.path.abspath(path)
-        if not os.path.exists(path):
-            schema_path = os.path.join(
-                os.path.dirname(__file__),
-                '../database.sql')
-            schema = open(schema_path, 'r').read()
-            fsdb.Database.create(path, schema)
-        self._db = fsdb.Database(self.path)
+        path = os.path.abspath(path)
+        self._db = fsdb.Database(path)
 
         count = self._db.execute(
             'SELECT COUNT(user_id) FROM user WHERE user_id = ?',
@@ -64,6 +58,16 @@ class Log(object):
                 self._db.execute(
                     'INSERT INTO user(user_id, name) VALUES (?, ?)',
                     (USER_ID, USER_NAME))
+
+    @staticmethod
+    def create(path):
+        """Create a log"""
+        schema_path = os.path.join(
+            os.path.dirname(__file__),
+            '../database.sql')
+        schema = open(schema_path, 'r').read()
+        fsdb.Database.create(path, schema)
+
 
     def save_calculation(self, calc_id=None, task_id=None, inputs=None):
         with suppress(sqlite3.IntegrityError), self._db as db:
