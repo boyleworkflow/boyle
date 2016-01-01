@@ -53,7 +53,7 @@ class Log(object):
                 '../database.sql')
             schema = open(schema_path, 'r').read()
             fsdb.Database.create(path, schema)
-        self._db = fsdb.Database.load(self.path)
+        self._db = fsdb.Database(self.path)
 
         count = self._db.execute(
             'SELECT COUNT(user_id) FROM user WHERE user_id = ?',

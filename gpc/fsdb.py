@@ -2,21 +2,45 @@ import os
 import json
 import sqlite3
 import functools
+from os.path import abspath
 
 from gpc import common
 
 from gpc.common import unique_json, hexdigest
 
+class DatabaseError(Exception): pass
 
 
 class Database(object):
     """Class to interact with the file-backed SQLlite database."""
     def __init__(self, path):
+        """Open a database"""
         super(Database, self).__init__()
-        self._path = os.path.abspath(path)
-        self._data_path = os.path.join(self._path, 'data')
-        self._schema_path = os.path.join(self._path, 'schema.sql')
+        self._data_path = Database._data_path(path)
         self._transaction = []
+
+        self._conn = sqlite3.connect(':memory:')
+
+        schema = open(Database._schema_path(path), 'r').read()
+
+        with self._conn as conn:
+            conn.executescript(schema)
+
+            for filename in os.listdir(self._data_path):
+                path = os.path.join(self._data_path, filename)
+                sql = open(path, 'r').read()
+                conn.execute(sql)
+
+        self._conn.set_trace_callback(self._handle_stmt)
+
+    @staticmethod
+    def _data_path(path):
+        return abspath(os.path.join(path, 'data'))
+
+    @staticmethod
+    def _schema_path(path):
+        return abspath(os.path.join(path, 'schema.sql'))
+
 
     def _handle_stmt(self, stmt):
         if stmt.strip() in ('BEGIN', 'ROLLBACK'):
@@ -36,32 +60,21 @@ class Database(object):
                     file.write(stmt)
                     file.write('\n')
 
-
-    @classmethod
-    def load(cls, path):
-        db = cls(path)
-
-        db._conn = sqlite3.connect(':memory:')
-        schema = open(db._schema_path, 'r').read()
-
-        db._conn.executescript(schema)
-
-        with db._conn as conn:
-            for filename in os.listdir(db._data_path):
-                path = os.path.join(db._data_path, filename)
-                sql = open(path, 'r').read()
-                conn.execute(sql)
-
-        db._conn.set_trace_callback(db._handle_stmt)
-        return db
-
-
     @classmethod
     def create(cls, path, schema):
-        db = cls(path)
-        os.makedirs(db._path)
-        os.makedirs(db._data_path)
-        open(db._schema_path, 'w').write(schema)
+        """
+        Create a new database
+
+        Raises:
+            DatabaseError: If path exists.
+        """
+
+        path = abspath(path)
+        if os.path.exists(path):
+            raise DatabaseError('Path must not exist when creating database!')
+        os.makedirs(path)
+        os.makedirs(Database._data_path(path))
+        open(Database._schema_path(path), 'w').write(schema)
 
 
     def __enter__(self, *args, **kwargs):
