@@ -34,6 +34,9 @@ class ConflictException(Exception):
         self.path = path
 
 
+class GraphError(Exception): pass
+
+
 class Log(object):
     def __init__(self, path):
         """Create or open a log.
@@ -261,7 +264,7 @@ class Graph(object):
 
     def add_task(self, task):
         if any(path in self._graph for path in task.outputs):
-            raise ValueError('duplicate outputs not allowed')
+            raise GraphError('duplicate outputs not allowed')
 
         for path in task.inputs:
             self._graph.add_edge(path, task)
@@ -273,8 +276,15 @@ class Graph(object):
         self._tasks.add(task)
 
     def get_task(self, output_path):
-        task, = self._graph.predecessors(output_path)
-        return task
+        if not output_path in self._graph:
+            raise GraphError("output '{}' not in graph".format(output_path))
+        pred = self._graph.predecessors(output_path)
+        if len(pred) == 0:
+            raise GraphError("no task has '{}' as output".format(output_path))
+        elif len(pred) == 1:
+            return pred[0]
+        else:
+            raise RuntimeError('this should not happen')
 
     def get_upstream_paths(self, *requested_paths):
         subgraph_members = set(requested_paths)
