@@ -1,1 +1,0 @@
-INSERT INTO run(run_id, user_id, info, time, calc_id) VALUES ('77f61a42-606d-4297-adbb-98b7ee74c367', 1234, 'changeme', 1451670924.84419, '6fe789716fa3addeb196b97bbbe3dae4a39e306a')

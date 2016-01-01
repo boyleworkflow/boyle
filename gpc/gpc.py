@@ -20,8 +20,6 @@ from gpc import fsdb
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-USER_ID = 1234
-USER_NAME = 'aoeu'
 
 class NotFoundException(Exception): pass
 
@@ -38,7 +36,7 @@ class GraphError(Exception): pass
 
 
 class Log(object):
-    def __init__(self, path):
+    def __init__(self, path, user):
         """
         Open a log.
 
@@ -49,15 +47,12 @@ class Log(object):
         path = os.path.abspath(path)
         self._db = fsdb.Database(path)
 
-        count = self._db.execute(
-            'SELECT COUNT(user_id) FROM user WHERE user_id = ?',
-            (USER_ID,)).fetchone()[0]
+        self.user = user
 
-        if not count:
-            with self._db:
-                self._db.execute(
-                    'INSERT INTO user(user_id, name) VALUES (?, ?)',
-                    (USER_ID, USER_NAME))
+        with self._db:
+            self._db.execute(
+                'INSERT OR REPLACE INTO user(user_id, name) VALUES (?, ?)',
+                (user['id'], user['name']))
 
     @staticmethod
     def create(path):
@@ -69,7 +64,7 @@ class Log(object):
         fsdb.Database.create(path, schema)
 
 
-    def save_calculation(self, calc_id=None, task_id=None, inputs=None):
+    def save_calculation(self, calc_id, task_id, inputs):
         with suppress(sqlite3.IntegrityError), self._db as db:
             db.execute(
                 'INSERT OR ABORT INTO calculation(calc_id, task_id) '
@@ -82,7 +77,7 @@ class Log(object):
                 [(calc_id, p, d) for p, d in inputs.items()])
 
 
-    def save_composition(self, comp_id=None, calc_id=None, subcomp_ids=None):
+    def save_composition(self, comp_id, calc_id, subcomp_ids):
         with suppress(sqlite3.IntegrityError), self._db as db:
             db.execute(
                 'INSERT OR ABORT INTO composition(comp_id, calc_id) '
@@ -93,24 +88,23 @@ class Log(object):
                 'VALUES (?, ?)',
                 [(comp_id, subcomp_id) for subcomp_id in subcomp_ids])
 
-    def save_request(self, path=None, comp_id=None, time=None, user_id=None, digest=None):
+    def save_request(self, path, comp_id, time, digest):
         """Note: only saves the first time a user requests"""
         with suppress(sqlite3.IntegrityError), self._db as db:
             db.execute(
                 'INSERT OR ABORT INTO '
                 'requested(path, digest, user_id, firsttime, comp_id) '
                 'VALUES (?, ?, ?, ?, ?)',
-                (path, digest, user_id, time, comp_id))
+                (path, digest, self.user['id'], time, comp_id))
 
 
-    def save_run(self, run_id=None, info=None, time=None,
-                 calc_id=None, digests=None):
+    def save_run(self, run_id, info, time, calc_id, digests):
 
         with self._db as db:
             db.execute(
                 'INSERT INTO run(run_id, user_id, info, time, calc_id) '
                 'VALUES (?, ?, ?, ?, ?)',
-                (run_id, USER_ID, info, time, calc_id))
+                (run_id, self.user['id'], info, time, calc_id))
 
             db.executemany(
                 'INSERT INTO created(run_id, path, digest) VALUES (?, ?, ?)',
@@ -156,7 +150,7 @@ class Log(object):
 
         for digest, users in opinions.items():
             if (
-                USER_ID not in users[True] + users[False] and
+                self.user['id'] not in users[True] + users[False] and
                 len(users[True]) > 0 and
                 len(users[False]) > 0):
                 raise ConflictException(calc_id, path)
@@ -170,7 +164,7 @@ class Log(object):
         # Remove all digests the current user distrusts
         opinions = {
             digest: users for digest, users in opinions.items()
-            if not USER_ID in users[False]}
+            if not self.user['id'] in users[False]}
 
         # If there is no digest left, nothing is found.
         # If there is exactly one left, it can be used.
@@ -427,7 +421,6 @@ class Runner(object):
         self.log.save_request(
             comp_id=comp_id,
             time=time.time(),
-            user_id=USER_ID,
             digest=digest,
             path=path)
 
