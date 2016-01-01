@@ -21,7 +21,10 @@ setup(
     author_email='rasmus.einarsson@sp.se',
     description='Toolbox for optimization-based modelling and simulation.',
     install_requires=reqs,
-    scripts=['bin/gpc'],
+    entry_points='''
+        [console_scripts]
+        gpc=gpc.cli.main:main_group
+    ''',
     extras_require = {
         },
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers

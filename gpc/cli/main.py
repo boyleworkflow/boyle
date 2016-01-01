@@ -5,10 +5,10 @@ from gpc import spec_reader
 from gpc.tests import default_user
 
 @click.group()
-def gpc():
+def main_group():
     pass
 
-@gpc.command()
+@main_group.command()
 @click.argument('target', nargs=-1)
 def make(target):
     '''Make target files. Run necessary calculations to generate the target
@@ -28,5 +28,3 @@ def make(target):
         for r in responsible_runs:
             print(r)
 
-if __name__ == '__main__':
-    gpc()
