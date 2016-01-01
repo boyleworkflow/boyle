@@ -16,20 +16,24 @@ class Database(object):
     def __init__(self, path):
         """Open a database"""
         super(Database, self).__init__()
+        path = abspath(path)
         self._data_path = Database._data_path(path)
         self._transaction = []
 
-        self._conn = sqlite3.connect(':memory:')
+        try:
+            schema = open(Database._schema_path(path), 'r').read()
 
-        schema = open(Database._schema_path(path), 'r').read()
+            self._conn = sqlite3.connect(':memory:')
+            with self._conn as conn:
+                conn.executescript(schema)
 
-        with self._conn as conn:
-            conn.executescript(schema)
-
-            for filename in os.listdir(self._data_path):
-                path = os.path.join(self._data_path, filename)
-                sql = open(path, 'r').read()
-                conn.execute(sql)
+                for filename in os.listdir(self._data_path):
+                    path = os.path.join(self._data_path, filename)
+                    sql = open(path, 'r').read()
+                    conn.execute(sql)
+        except Exception as e:
+            msg = "Database at '{}' could not be opened".format(path)
+            raise DatabaseError(msg) from e
 
         self._conn.set_trace_callback(self._handle_stmt)
 
