@@ -1,0 +1,1 @@
+default_user = dict(id=1234, name='aoeu')
