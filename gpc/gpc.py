@@ -56,59 +56,60 @@ class Log(object):
         self._db = fsdb.Database.load(self.path)
 
         count = self._db.execute(
-            'select count(id) from usr where id = ?',
+            'SELECT COUNT(user_id) FROM user WHERE user_id = ?',
             (USER_ID,)).fetchone()[0]
 
         if not count:
             with self._db:
                 self._db.execute(
-                    'insert into usr(id, name) values(?, ?)',
+                    'INSERT INTO user(user_id, name) VALUES (?, ?)',
                     (USER_ID, USER_NAME))
 
-    def save_calculation(self, calc_id=None, task=None, inputs=None):
+    def save_calculation(self, calc_id=None, task_id=None, inputs=None):
         with suppress(sqlite3.IntegrityError), self._db as db:
             db.execute(
-                'INSERT OR ABORT INTO calculation(id, task) values(?, ?)',
-                (calc_id, task))
+                'INSERT OR ABORT INTO calculation(calc_id, task_id) '
+                'VALUES (?, ?)',
+                (calc_id, task_id))
 
             db.executemany(
-                'INSERT INTO uses (calculation, path, digest) '
-                'values (?, ?, ?)',
+                'INSERT INTO uses (calc_id, path, digest) '
+                'VALUES (?, ?, ?)',
                 [(calc_id, p, d) for p, d in inputs.items()])
 
 
-    def save_composition(self, comp_id=None, calc_id=None, inputs=None):
+    def save_composition(self, comp_id=None, calc_id=None, subcomp_ids=None):
         with suppress(sqlite3.IntegrityError), self._db as db:
             db.execute(
-                'INSERT OR ABORT INTO composition(id, calculation) '
-                'values(?, ?)', (comp_id, calc_id))
+                'INSERT OR ABORT INTO composition(comp_id, calc_id) '
+                'VALUES (?, ?)', (comp_id, calc_id))
 
             db.executemany(
-                'INSERT INTO input (composition, inputcomposition) '
-                'values (?, ?)',
-                [(comp_id, inputcomp_id) for inputcomp_id in inputs])
+                'INSERT INTO subcomposition (comp_id, subcomp_id) '
+                'VALUES (?, ?)',
+                [(comp_id, subcomp_id) for subcomp_id in subcomp_ids])
 
-    def save_request(self, path=None, comp_id=None, time=None, usr=None, digest=None):
+    def save_request(self, path=None, comp_id=None, time=None, user_id=None, digest=None):
         """Note: only saves the first time a user requests"""
         with suppress(sqlite3.IntegrityError), self._db as db:
             db.execute(
                 'INSERT OR ABORT INTO '
-                'requested(path, digest, usr, firsttime, composition) '
-                'values(?, ?, ?, ?, ?)',
-                (path, digest, usr, time, comp_id))
+                'requested(path, digest, user_id, firsttime, comp_id) '
+                'VALUES (?, ?, ?, ?, ?)',
+                (path, digest, user_id, time, comp_id))
 
 
     def save_run(self, run_id=None, info=None, time=None,
-                 calculation=None, digests=None):
+                 calc_id=None, digests=None):
 
         with self._db as db:
             db.execute(
-                'INSERT INTO run(id, usr, info, time, calculation) '
-                'values(?, ?, ?, ?, ?)',
-                (run_id, USER_ID, info, time, calculation))
+                'INSERT INTO run(run_id, user_id, info, time, calc_id) '
+                'VALUES (?, ?, ?, ?, ?)',
+                (run_id, USER_ID, info, time, calc_id))
 
             db.executemany(
-                'INSERT INTO created(run, path, digest) values(?, ?, ?)',
+                'INSERT INTO created(run_id, path, digest) VALUES (?, ?, ?)',
                 [(run_id, p, d) for p, d in digests.items()])
 
 
@@ -129,15 +130,15 @@ class Log(object):
         """
 
         candidates = self._db.execute(
-            'SELECT DISTINCT digest, trust.usr, correct FROM created '
-            'INNER JOIN run ON created.run = run.id '
-            'LEFT OUTER JOIN trust USING (calculation, digest, path) '
-            'WHERE (path = ? AND calculation = ?)',
+            'SELECT DISTINCT digest, trust.user_id, correct FROM created '
+            'INNER JOIN run USING (run_id) '
+            'LEFT OUTER JOIN trust USING (calc_id, digest, path) '
+            'WHERE (path = ? AND calc_id = ?)',
             (path, calc_id))
 
         opinions = defaultdict(lambda: defaultdict(list))
-        for digest, usr, correct in candidates:
-            opinions[digest][correct].append(usr)
+        for digest, user, correct in candidates:
+            opinions[digest][correct].append(user)
 
         # If there are any digests which the current user does not
         # explicitly think anything about, and for which other users
@@ -368,7 +369,7 @@ class Runner(object):
 
         self.log.save_calculation(
             calc_id=calc_id,
-            task=task.id,
+            task_id=task.id,
             inputs=inp_digests)
 
         logger.debug('calc_id decided:\n\ttask: {}\n\tcalc_id: {}'.format(task, calc_id))
@@ -378,15 +379,15 @@ class Runner(object):
 
     def get_comp_id(self, task):
         input_tasks = [self.graph.get_task(path) for path in task.inputs]
-        input_comp_ids = [self.get_comp_id(task) for task in input_tasks]
+        subcomp_ids = [self.get_comp_id(task) for task in input_tasks]
 
         calc_id = self.get_calc_id(task)
-        comp_id = get_comp_id(calc_id, input_comp_ids)
+        comp_id = get_comp_id(calc_id, subcomp_ids)
 
         self.log.save_composition(
             comp_id=comp_id,
             calc_id=calc_id,
-            inputs=input_comp_ids)
+            subcomp_ids=subcomp_ids)
 
         return comp_id
 
@@ -422,7 +423,7 @@ class Runner(object):
         self.log.save_request(
             comp_id=comp_id,
             time=time.time(),
-            usr=USER_ID,
+            user_id=USER_ID,
             digest=digest,
             path=path)
 
@@ -509,7 +510,7 @@ class Runner(object):
             run_id=str(uuid4()),
             info='changeme',
             time=time.time(),
-            calculation=calc_id,
+            calc_id=calc_id,
             digests=digests
             )
 

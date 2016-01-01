@@ -1,1 +1,0 @@
-INSERT OR ABORT INTO calculation(id, task) values('ace5ab6167e7f742486bc144e72508adf385f087', 'cat a b > c')
