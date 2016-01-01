@@ -21,7 +21,8 @@ class Database(object):
         self._transaction = []
 
         try:
-            schema = open(Database._schema_path(path), 'r').read()
+            with open(Database._schema_path(path), 'r') as f:
+                schema = f.read()
 
             self._conn = sqlite3.connect(':memory:')
             with self._conn as conn:
@@ -29,7 +30,8 @@ class Database(object):
 
                 for filename in os.listdir(self._data_path):
                     path = os.path.join(self._data_path, filename)
-                    sql = open(path, 'r').read()
+                    with open(path, 'r') as f:
+                        sql = f.read()
                     conn.execute(sql)
         except Exception as e:
             msg = "Database at '{}' could not be opened".format(path)
