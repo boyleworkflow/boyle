@@ -20,6 +20,8 @@ from gpc import fsdb
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+class GenericError(Exception): pass
+
 
 class NotFoundException(Exception): pass
 
@@ -201,8 +203,23 @@ class Log(object):
 class Storage(object):
     """docstring for Storage"""
     def __init__(self, path):
+        """
+        Open a storage.
+        """
         super(Storage, self).__init__()
         self.path = os.path.abspath(path)
+        if not os.path.isdir(self.path):
+            raise GenericError('No storage at {}'.format(self.path))
+
+    @staticmethod
+    def create(path):
+        """
+        Create a storage.
+        """
+        path = os.path.abspath(path)
+        if os.path.exists(path):
+            raise GenericError('Path {} already exists'.format(path))
+        os.makedirs(path)
 
     def has_file(self, digest):
         """Check if a file exists in the storage.
