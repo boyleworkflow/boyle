@@ -13,12 +13,39 @@ from enum import Enum
 from contextlib import suppress
 import sqlite3
 from collections import defaultdict
+import configparser
+import getpass
 
 from gpc.common import hexdigest, digest_file, unique_json
 from gpc import fsdb
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+GLOBAL_CONFIG_FILE_PATH = os.path.expanduser('~/.config/gpc/config')
+LOCAL_CONFIG_FILE_PATH = '.gpc/config'
+
+def ensure_installed():
+    if os.path.exists(GLOBAL_CONFIG_FILE_PATH):
+        return
+
+    dirname = os.path.dirname(GLOBAL_CONFIG_FILE_PATH)
+    if not os.path.isdir(dirname):
+        os.makedirs(dirname)
+
+    config = configparser.ConfigParser()
+    config['user'] = {
+        'id': uuid4(),
+        'name': getpass.getuser()
+        }
+    with open(GLOBAL_CONFIG_FILE_PATH, 'w') as configfile:
+        config.write(configfile)
+
+ensure_installed()
+
+config = configparser.ConfigParser()
+config.read(GLOBAL_CONFIG_FILE_PATH)
+config.read(LOCAL_CONFIG_FILE_PATH)
 
 class GenericError(Exception): pass
 

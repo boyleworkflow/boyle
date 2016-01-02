@@ -2,7 +2,6 @@
 import click
 from gpc.gpc import *
 from gpc import spec_reader
-from gpc.tests import default_user
 import shutil
 
 DEFAULT_LOG_PATH = 'log'
@@ -21,7 +20,7 @@ def make(target):
     Run necessary calculations to generate the target
     files. If the target files already exist in cache, simply copy them into
     working directory.'''
-    user = default_user
+    user = config['user']
     log = Log(DEFAULT_LOG_PATH, user)
     storage = Storage(DEFAULT_STORAGE_PATH)
     graph = spec_reader.graph_from_spec('gpc.yaml')
