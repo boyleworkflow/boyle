@@ -14,7 +14,7 @@ from contextlib import suppress
 import sqlite3
 from collections import defaultdict
 import configparser
-import getpass
+import pkg_resources
 
 from gpc.common import hexdigest, digest_file, unique_json
 from gpc import fsdb
@@ -23,25 +23,7 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 GLOBAL_CONFIG_FILE_PATH = os.path.expanduser('~/.config/gpc/config')
-LOCAL_CONFIG_FILE_PATH = '.gpc/config'
-
-def ensure_installed():
-    if os.path.exists(GLOBAL_CONFIG_FILE_PATH):
-        return
-
-    dirname = os.path.dirname(GLOBAL_CONFIG_FILE_PATH)
-    if not os.path.isdir(dirname):
-        os.makedirs(dirname)
-
-    config = configparser.ConfigParser()
-    config['user'] = {
-        'id': uuid4(),
-        'name': getpass.getuser()
-        }
-    with open(GLOBAL_CONFIG_FILE_PATH, 'w') as configfile:
-        config.write(configfile)
-
-ensure_installed()
+LOCAL_CONFIG_FILE_PATH = os.path.abspath('.gpc/config')
 
 config = configparser.ConfigParser()
 config.read(GLOBAL_CONFIG_FILE_PATH)
@@ -86,9 +68,7 @@ class Log(object):
     @staticmethod
     def create(path):
         """Create a log"""
-        schema_path = os.path.join(
-            os.path.dirname(__file__),
-            '../database.sql')
+        schema_path = pkg_resources.resource_filname(__name__, "database.sql")
         schema = open(schema_path, 'r').read()
         fsdb.Database.create(path, schema)
 

@@ -5,22 +5,49 @@ from os import path
 from setuptools import setup, find_packages
 from pip.req import parse_requirements
 from pip.download import PipSession
+from setuptools.command.install import install
+from setuptools.command.develop import develop
+from subprocess import call, check_call
+import getpass
+from uuid import uuid4
 
-here = path.abspath(path.dirname(__file__))
+def create_user():
+    call(['gpc', 'config', '--global', 'user.name', getpass.getuser()])
+    call(['gpc', 'config', '--global', 'user.id', str(uuid4())])
+
+class CustomInstall(install):
+
+    def run(self):
+        install.run(self)
+        create_user()
+
+class CustomDevelop(develop):
+
+    def run(self):
+        develop.run(self)
+        create_user()
 
 install_reqs = parse_requirements('requirements.txt', session=PipSession())
 reqs = [str(ir.req) for ir in install_reqs]
 
+PACKAGE_NAME = 'gpc'
+
 setup(
+    cmdclass={
+        'install': CustomInstall,
+        'develop': CustomDevelop
+    },
     name='gpc',
     version='0.0.1',
-    packages=find_packages(exclude=["*.tests", "*.tests.*", "tests.*", "tests"]),
     url='http://friendly-sam.readthedocs.org',
     license='LGPLv3',
     author='Rasmus Einarsson',
     author_email='rasmus.einarsson@sp.se',
     description='Toolbox for optimization-based modelling and simulation.',
     install_requires=reqs,
+    packages=['gpc'],
+    package_dir={'gpc': 'gpc'},
+    package_data={'gpc': ['resources/**/*']},
     entry_points='''
         [console_scripts]
         gpc=gpc.cli.main:main_group
