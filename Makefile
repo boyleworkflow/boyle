@@ -1,5 +1,5 @@
 test:
-	python -m unittest discover -s gpc/tests/
+	python setup.py test
 
 install:
-	pip install -r develop.txt
+	python setup.py develop

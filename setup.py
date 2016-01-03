@@ -47,8 +47,9 @@ setup(
     description='Toolbox for optimization-based modelling and simulation.',
     install_requires=reqs,
     packages=['gpc'],
-    package_dir={'gpc': 'gpc'},
+    package_dir={'gpc': 'gpc', 'tests': 'tests'},
     package_data={'gpc': ['resources/**/*']},
+    test_suite='tests',
     entry_points='''
         [console_scripts]
         gpc=gpc.cli.main:main_group

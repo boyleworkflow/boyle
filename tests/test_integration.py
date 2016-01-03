@@ -3,7 +3,7 @@ from scripttest import TestFileEnvironment
 from subprocess import call
 
 test_path = './test-output'
-template_path = './gpc/tests/templates'
+template_path = './tests/templates'
 
 class TestIntegration(unittest.TestCase):
     def setUp(self):
