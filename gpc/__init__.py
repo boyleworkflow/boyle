@@ -1,4 +1,4 @@
-from gpc.gpc import *
+from gpc.core import *
 from gpc.log import Log
 from gpc.storage import Storage
 from gpc.spec_reader import graph_from_spec

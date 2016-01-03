@@ -1,5 +1,6 @@
 import click
 from gpc import *
+import gpc
 import shutil
 
 DEFAULT_LOG_PATH = 'log'
