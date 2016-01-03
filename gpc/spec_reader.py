@@ -1,5 +1,5 @@
 import yaml
-from gpc.gpc import ShellTask
+from gpc import ShellTask
 from gpc.graph import Graph
 
 def graph_from_spec(yaml_file):

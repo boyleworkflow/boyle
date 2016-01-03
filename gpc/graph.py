@@ -1,5 +1,6 @@
 import networkx as nx
-from gpc.gpc import ShellTask, Task, CopyTask
+from gpc import ShellTask, Task, CopyTask
+
 
 class GraphError(Exception): pass
 

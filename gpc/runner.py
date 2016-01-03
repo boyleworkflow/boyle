@@ -1,7 +1,6 @@
 from enum import Enum
 import logging
-import gpc
-from gpc.gpc import get_calc_id, get_comp_id
+from gpc import get_calc_id, get_comp_id
 import time
 
 logging.basicConfig(level=logging.DEBUG)
