@@ -1,5 +1,5 @@
 import unittest
-from gpc.gpc import *
+from gpc.graph import *
 
 class TestGraph(unittest.TestCase):
     def test_add_task(self):

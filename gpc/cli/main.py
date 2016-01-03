@@ -1,8 +1,11 @@
 #! /usr/bin/env python
 import click
 import gpc
-from gpc.gpc import *
 from gpc import spec_reader
+from gpc.log import *
+from gpc.storage import *
+from gpc.runner import *
+from gpc.gpc import digest_file
 import shutil
 
 DEFAULT_LOG_PATH = 'log'
