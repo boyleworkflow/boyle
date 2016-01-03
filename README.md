@@ -6,7 +6,7 @@
  python setup.py develop
  ```
 
- ## Run tests
+## Run tests
 
  ```
  python setup.py test

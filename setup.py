@@ -13,8 +13,15 @@ from uuid import uuid4
 
 def create_user():
     import gpc
-    gpc.set_config('global', 'user', 'name', getpass.getuser())
-    gpc.set_config('global', 'user', 'id', str(uuid4()))
+    set_user_name = True
+    set_user_id = True
+    if config.has_section('user'):
+        set_user_name = ('name' not in config['user'])
+        set_user_id = ('id' not in config['user'])
+    if set_user_name:
+        set_config('global', 'user', 'name', getpass.getuser())
+    if set_user_id:
+        set_config('global', 'user', 'id', str(uuid4()))
 
 class CustomInstall(install):
 
@@ -40,11 +47,14 @@ setup(
     },
     name='gpc',
     version='0.0.1',
-    url='http://friendly-sam.readthedocs.org',
+    url='',
     license='LGPLv3',
-    author='Rasmus Einarsson',
-    author_email='rasmus.einarsson@sp.se',
-    description='Toolbox for optimization-based modelling and simulation.',
+    author='Rasmus Einarsson and Jonatan Kallus',
+    author_email=(
+        'rasmus [at] einarsson [dot] net, mr [at] jkallus [dot] se'),
+    description=(
+        'A tool for provenance and caching '
+        'in computational workflows'),
     install_requires=reqs,
     packages=['gpc'],
     package_dir={'gpc': 'gpc', 'tests': 'tests'},
