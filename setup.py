@@ -47,11 +47,14 @@ setup(
     },
     name='gpc',
     version='0.0.1',
-    url='http://friendly-sam.readthedocs.org',
+    url='',
     license='LGPLv3',
-    author='Rasmus Einarsson',
-    author_email='rasmus.einarsson@sp.se',
-    description='Toolbox for optimization-based modelling and simulation.',
+    author='Rasmus Einarsson and Jonatan Kallus',
+    author_email=(
+        'rasmus [at] einarsson [dot] net, mr [at] jkallus [dot] se',
+    description=(
+        'A tool for provenance and caching '
+        'in computational workflows'),
     install_requires=reqs,
     packages=['gpc'],
     package_dir={'gpc': 'gpc', 'tests': 'tests'},
