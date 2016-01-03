@@ -13,8 +13,15 @@ from uuid import uuid4
 
 def create_user():
     import gpc.gpc
-    gpc.gpc.set_config('global', 'user', 'name', getpass.getuser())
-    gpc.gpc.set_config('global', 'user', 'id', str(uuid4()))
+    set_user_name = True
+    set_user_id = True
+    if gpc.gpc.config.has_section('user'):
+        set_user_name = ('name' not in gpc.gpc.config['user'])
+        set_user_id = ('id' not in gpc.gpc.config['user'])
+    if set_user_name:
+        gpc.gpc.set_config('global', 'user', 'name', getpass.getuser())
+    if set_user_id:
+        gpc.gpc.set_config('global', 'user', 'id', str(uuid4()))
 
 class CustomInstall(install):
 
