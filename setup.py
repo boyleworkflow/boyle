@@ -12,8 +12,9 @@ import getpass
 from uuid import uuid4
 
 def create_user():
-    call(['gpc', 'config', 'set', '--global', 'user.name', getpass.getuser()])
-    call(['gpc', 'config', 'set', '--global', 'user.id', str(uuid4())])
+    import gpc.gpc
+    gpc.gpc.set_config('global', 'user', 'name', getpass.getuser())
+    gpc.gpc.set_config('global', 'user', 'id', str(uuid4()))
 
 class CustomInstall(install):
 

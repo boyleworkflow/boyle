@@ -1,4 +1,3 @@
-#! /usr/bin/env python
 import click
 import gpc
 from gpc.gpc import *
@@ -54,38 +53,35 @@ def init():
             shutil.rmtree(DEFAULT_STORAGE_PATH)
         raise e
 
-SETTINGS = {
-    'user.name': str,
-    'user.id': str
-}
-
 @main_group.group()
 def config():
     pass
 
+def name_param(f):
+    def validate(ctx, param, name):
+        if not '.' in name:
+            raise click.BadParameter(
+                "gpc config items are named like 'section.item'")
+        return name
+
+    decorator = click.argument('name', callback=validate)
+    return decorator(f)
+
 @config.command()
 @click.option('--local', 'file', flag_value='local', default=True)
 @click.option('--global', 'file', flag_value='global')
-@click.argument('name')
+@name_param
 @click.argument('value')
 def set(file, name, value):
-    path = (
-        LOCAL_CONFIG_FILE_PATH if file == 'local' else GLOBAL_CONFIG_FILE_PATH)
-
-    if name not in SETTINGS:
-        raise click.BadParameter("unknown name '{}'".format(name))
-
-    dirname = os.path.dirname(path)
-    if not os.path.isdir(dirname):
-        os.makedirs(dirname)
-
-    configuration = configparser.ConfigParser()
-    configuration.read(path)
-
     section, item = name.split('.', 1)
-    if section not in configuration:
-        configuration.add_section(section)
-    configuration[section][item] = value
+    gpc.gpc.set_config(file, section, item, value)
 
-    with open(path, 'w') as configfile:
-        configuration.write(configfile)
+
+@config.command()
+@name_param
+def get(name):
+    section, item = name.split('.', 1)
+    try:
+        click.echo(gpc.gpc.config[section][item])
+    except KeyError:
+        raise click.BadParameter("config item '{}' is not set".format(name))
