@@ -59,22 +59,22 @@ SETTINGS = {
     'user.id': str
 }
 
-class NoValue(object): pass
+@main_group.group()
+def config():
+    pass
 
-NoValue = NoValue()
-
-@main_group.command()
-@click.option('--local', 'local_file', flag_value=True, default=True)
-@click.option('--global', 'local_file', flag_value=False)
-@click.option('--set', 'set_mode', flag_value=True, default=True)
-@click.option('--get', 'set_mode', flag_value=False)
+@config.command()
+@click.option('--local', 'file', flag_value='local', default=True)
+@click.option('--global', 'file', flag_value='global')
 @click.argument('name')
-@click.argument('value', default=NoValue)
-def config(local_file, set_mode, name, value):
-    raise ValueError()
+@click.argument('value')
+def set(file, name, value):
+    path = (
+        LOCAL_CONFIG_FILE_PATH if file == 'local' else GLOBAL_CONFIG_FILE_PATH)
+
     if name not in SETTINGS:
         raise click.BadParameter("unknown name '{}'".format(name))
-    path = GLOBAL_CONFIG_FILE_PATH if set_global else LOCAL_CONFIG_FILE_PATH
+
     dirname = os.path.dirname(path)
     if not os.path.isdir(dirname):
         os.makedirs(dirname)
