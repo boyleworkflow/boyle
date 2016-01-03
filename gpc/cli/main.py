@@ -1,10 +1,5 @@
 import click
-import gpc
-from gpc import spec_reader
-from gpc.log import *
-from gpc.storage import *
-from gpc.runner import *
-from gpc.gpc import digest_file
+from gpc import *
 import shutil
 
 DEFAULT_LOG_PATH = 'log'
@@ -23,10 +18,10 @@ def make(target):
     Run necessary calculations to generate the target
     files. If the target files already exist in cache, simply copy them into
     working directory.'''
-    user = gpc.gpc.config['user']
+    user = gpc.config['user']
     log = Log(DEFAULT_LOG_PATH, user)
     storage = Storage(DEFAULT_STORAGE_PATH)
-    graph = spec_reader.graph_from_spec('gpc.yaml')
+    graph = graph_from_spec('gpc.yaml')
 
     runner = Runner(log, storage, graph)
     for t in list(target):

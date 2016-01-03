@@ -11,8 +11,6 @@ import pkg_resources
 import hashlib
 import json
 
-from gpc import fsdb
-
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 

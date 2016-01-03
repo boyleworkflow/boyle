@@ -4,9 +4,6 @@ import sqlite3
 import functools
 from os.path import abspath
 
-from gpc import common
-
-##from gpc.common import unique_json, hexdigest
 
 class DatabaseError(Exception): pass
 
