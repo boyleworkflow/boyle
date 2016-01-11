@@ -30,7 +30,7 @@ class Log(object):
     @staticmethod
     def create(path):
         """Create a log"""
-        schema_path = pkg_resources.resource_filname(__name__, "database.sql")
+        schema_path = pkg_resources.resource_filename(__name__, "database.sql")
         schema = open(schema_path, 'r').read()
         fsdb.Database.create(path, schema)
 
