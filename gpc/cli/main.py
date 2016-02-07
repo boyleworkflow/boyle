@@ -54,6 +54,9 @@ def init():
 
 @main_group.group()
 def config():
+    '''
+    Get or set configuration options.
+    '''
     pass
 
 def name_param(f):
