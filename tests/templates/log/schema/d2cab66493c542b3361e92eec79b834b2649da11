@@ -1,0 +1,6 @@
+CREATE TABLE created (
+  run_id text references run,
+  path text,
+  digest text,
+  primary key (run_id, path, digest)
+);

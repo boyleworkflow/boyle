@@ -1,1 +1,0 @@
-INSERT INTO uses (calc_id, path, digest) VALUES ('ace5ab6167e7f742486bc144e72508adf385f087', 'a', 'f572d396fae9206628714fb2ce00f72e94f2258f')

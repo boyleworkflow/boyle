@@ -1,0 +1,4 @@
+CREATE TABLE composition (
+  comp_id text primary key,
+  calc_id text references calculation
+);

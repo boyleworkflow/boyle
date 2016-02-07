@@ -1,0 +1,5 @@
+CREATE TABLE subcomposition (
+  comp_id text references composition,
+  subcomp_id text references composition,
+  primary key (comp_id, subcomp_id)
+);

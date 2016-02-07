@@ -1,1 +1,0 @@
-INSERT OR ABORT INTO calculation(calc_id, task_id) VALUES ('6fe789716fa3addeb196b97bbbe3dae4a39e306a', 'echo world > b')

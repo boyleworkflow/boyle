@@ -1,0 +1,8 @@
+CREATE TABLE requested (
+  path text,
+  digest text,
+  user_id text references user,
+  firsttime timestamp with time zone,
+  comp_id text references composition,
+  primary key (path, digest, user_id, comp_id)
+);

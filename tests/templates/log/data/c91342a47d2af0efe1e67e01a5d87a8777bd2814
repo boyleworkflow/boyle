@@ -1,1 +1,0 @@
-INSERT OR ABORT INTO requested(path, digest, user_id, firsttime, comp_id) VALUES ('c', '58853e8a5e8272b1012f9a52a80758b27bd0d3cb', '1234', 1451675874.72417, 'ff4768bdad12bd8ec98ef644485ea3c5d8fb89af')

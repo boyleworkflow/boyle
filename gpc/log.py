@@ -24,17 +24,24 @@ class Log(object):
 
         self.user = user
 
-        with self._db:
-            self._db.execute(
-                'INSERT OR REPLACE INTO user(user_id, name) VALUES (?, ?)',
-                (user['id'], user['name']))
+        self._db.execute(
+            'INSERT OR REPLACE INTO user(user_id, name) VALUES (?, ?)',
+            (user['id'], user['name']))
 
     @staticmethod
     def create(path):
         """Create a log"""
-        schema_path = pkg_resources.resource_filename(__name__, "resources/database.sql")
+        schema_path = pkg_resources.resource_filename(
+            __name__, "resources/database.sql")
         schema = open(schema_path, 'r').read()
-        fsdb.Database.create(path, schema)
+        fsdb.Database.create(path)
+        db = fsdb.Database(path)
+        db.executescript(schema)
+        db.write()
+
+
+    def write(self):
+        self._db.write()
 
 
     def save_calculation(self, calc_id, task_id, inputs):
@@ -51,6 +58,8 @@ class Log(object):
 
 
     def save_composition(self, comp_id, calc_id, subcomp_ids):
+        # Suppress IntegrityError to silently abort the whole operation
+        # if the composition already exists in the database.
         with suppress(sqlite3.IntegrityError), self._db as db:
             db.execute(
                 'INSERT OR ABORT INTO composition(comp_id, calc_id) '
@@ -63,6 +72,8 @@ class Log(object):
 
     def save_request(self, path, comp_id, time, digest):
         """Note: only saves the first time a user requests"""
+
+        # Suppress IntegrityError to silently abort if the request exists.
         with suppress(sqlite3.IntegrityError), self._db as db:
             db.execute(
                 'INSERT OR ABORT INTO '

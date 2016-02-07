@@ -1,0 +1,4 @@
+CREATE TABLE calculation (
+  calc_id text primary key, -- id based on task and inputs
+  task_id text references task
+);

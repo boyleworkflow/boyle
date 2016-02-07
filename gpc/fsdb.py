@@ -13,35 +13,6 @@ logger = logging.getLogger(__name__)
 
 class DatabaseError(Exception): pass
 
-class Transaction(object):
-    """docstring for Transaction"""
-    def __init__(self, connection):
-        super(Transaction, self).__init__()
-        self._conn = connection
-        self._open = False
-
-    def __enter__(self, *args, **kwargs):
-        self._conn.__enter__(*args, **kwargs)
-        return self._conn
-
-    def __exit__(self, *args, **kwargs):
-        self._conn.__exit__(*args, **kwargs)
-
-    def execute(self, sql, parameters=()):
-        if not self._open:
-            raise DatabaseError('Transaction not open')
-        return self._conn.execute(sql, parameters)
-
-    def executemany(self, sql, parameters=()):
-        if not self._open:
-            raise DatabaseError('Transaction not open')
-        return self._conn.executemany(sql, parameters)
-
-    def executescript(self, script):
-        if not self._open:
-            raise DatabaseError('Transaction not open')
-        return self._conn.executescript(script)
-
 
 class Database(object):
     """Class to interact with the file-backed SQLlite database."""
@@ -82,8 +53,7 @@ class Database(object):
     def _get_schema_dir(path):
         return abspath(os.path.join(path, 'schema'))
 
-
-    def _write_to_disk(self):
+    def write(self):
         statements = self._conn.iterdump()
         assert next(statements) == 'BEGIN TRANSACTION;'
         for stmt in statements:
@@ -106,13 +76,19 @@ class Database(object):
             pass
 
     def __enter__(self):
-        return self
+        return self._conn.__enter__()
 
     def __exit__(self, *args, **kwargs):
-        self._write_to_disk()
+        self._conn.__exit__(*args, **kwargs)
 
-    def transaction(self):
-        return Transaction(self._conn)
+    def execute(self, *args, **kwargs):
+        return self._conn.execute(*args, **kwargs)
+
+    def executemany(self, *args, **kwargs):
+        return self._conn.executemany(*args, **kwargs)
+
+    def executescript(self, *args, **kwargs):
+        return self._conn.executescript(*args, **kwargs)
 
     @classmethod
     def create(cls, path):

@@ -21,18 +21,17 @@ class TestFSDB(unittest.TestCase):
               );
             '''
 
-        with Database(self.dbdir) as db:
-            with db.transaction() as tr:
-                tr.executescript(schema)
-                tr.execute(
-                    'INSERT OR ABORT INTO some_table (some_id, some_text) '
-                    'VALUES (?, ?)', ('abc', 'def'))
+        db = Database(self.dbdir)
+        db.executescript(schema)
+        db.execute(
+            'INSERT OR ABORT INTO some_table (some_id, some_text) '
+            'VALUES (?, ?)', ('abc', 'def'))
+        db.write()
 
     def test_write_read(self):
-        with Database(self.dbdir) as db:
-            with db.transaction() as tr:
-                row, = tr.execute('SELECT * FROM some_table')
-                self.assertTrue(row == ('abc', 'def'))
+        db = Database(self.dbdir)
+        row, = db.execute('SELECT * FROM some_table')
+        self.assertTrue(row == ('abc', 'def'))
 
     def tearDown(self):
         shutil.rmtree(self.tempdir)

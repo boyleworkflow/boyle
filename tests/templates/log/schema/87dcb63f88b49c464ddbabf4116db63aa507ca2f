@@ -1,0 +1,5 @@
+CREATE TABLE task (
+  task_id text primary key,
+  definition text,
+  sysstate text
+);

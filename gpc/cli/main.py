@@ -33,6 +33,8 @@ def make(target):
         for r in responsible_runs:
             print(r)
 
+    log.write()
+
 @main_group.command()
 def init():
     '''

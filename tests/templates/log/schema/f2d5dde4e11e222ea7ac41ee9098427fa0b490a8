@@ -1,0 +1,7 @@
+CREATE TABLE run (
+  run_id text primary key,
+  user_id text references user,
+  info text,
+  time timestamp with time zone,
+  calc_id text references calculation
+);
