@@ -7,7 +7,6 @@ import logging
 from uuid import uuid4
 from itertools import chain
 import configparser
-import pkg_resources
 import hashlib
 import json
 
@@ -60,6 +59,10 @@ class ConflictException(Exception):
         super(ConflictException, self).__init__()
         self.calc_id = calc_id
         self.path = path
+
+
+class NotFoundException(Exception): pass
+
 
 
 def unique_json(obj):

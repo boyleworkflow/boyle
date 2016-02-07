@@ -1,3 +1,4 @@
+from gpc import digest_file
 import os
 import shutil
 
