@@ -1,5 +1,4 @@
 import click
-from gpc import *
 import gpc
 import shutil
 
@@ -20,15 +19,15 @@ def make(target):
     files. If the target files already exist in cache, simply copy them into
     working directory.'''
     user = gpc.config['user']
-    log = Log(DEFAULT_LOG_PATH, user)
-    storage = Storage(DEFAULT_STORAGE_PATH)
-    graph = graph_from_spec('gpc.yaml')
+    log = gpc.Log(DEFAULT_LOG_PATH, user)
+    storage = gpc.Storage(DEFAULT_STORAGE_PATH)
+    graph = gpc.graph_from_spec('gpc.yaml')
 
-    runner = Runner(log, storage, graph)
+    runner = gpc.Runner(log, storage, graph)
     for t in list(target):
         runner.make(t)
 
-        responsible_runs = log.get_provenance(digest_file(t))
+        responsible_runs = log.get_provenance(gpc.digest_file(t))
         print('The file was produced by %i run(s):' % len(responsible_runs))
         for r in responsible_runs:
             print(r)
@@ -43,9 +42,9 @@ def init():
     log_created = False
     storage_created = False
     try:
-        Log.create(DEFAULT_LOG_PATH)
+        gpc.Log.create(DEFAULT_LOG_PATH)
         log_created = True
-        Storage.create(DEFAULT_STORAGE_PATH)
+        gpc.Storage.create(DEFAULT_STORAGE_PATH)
         storage_created = True
     except Exception as e:
         if log_created:
@@ -78,7 +77,7 @@ def name_param(f):
 @click.argument('value')
 def set(file, name, value):
     section, item = name.split('.', 1)
-    gpc.gpc.set_config(file, section, item, value)
+    gpc.set_config(file, section, item, value)
 
 
 @config.command()
@@ -86,6 +85,6 @@ def set(file, name, value):
 def get(name):
     section, item = name.split('.', 1)
     try:
-        click.echo(gpc.gpc.config[section][item])
+        click.echo(gpc.config[section][item])
     except KeyError:
         raise click.BadParameter("config item '{}' is not set".format(name))

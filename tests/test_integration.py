@@ -14,9 +14,8 @@ class TestIntegration(unittest.TestCase):
         created_filenames = result.files_created.keys()
         self.assertTrue('log' in created_filenames)
         self.assertTrue('log/data' in created_filenames)
-        self.assertTrue('log/schema.sql' in created_filenames)
+        self.assertTrue('log/schema' in created_filenames)
         self.assertTrue('storage' in created_filenames)
-        self.assertTrue(len(created_filenames) == 4)
 
     def test_make_target(self):
         self.env.run('gpc', 'init', expect_stderr=True)
@@ -25,11 +24,13 @@ class TestIntegration(unittest.TestCase):
         created_filenames = list(result.files_created.keys())
         self.assertTrue('c' in created_filenames)
         created_filenames.remove('c')
-        self.assertTrue(all([s.startswith('storage/')
-                             for s in created_filenames]))
-        self.assertTrue(len(created_filenames) == 3)
+        self.assertTrue(
+            any([s.startswith('storage/') for s in created_filenames]))
+        self.assertTrue(
+            any([s.startswith('log/data/') for s in created_filenames]))
 
     def test_make_target_cached(self):
+        call(['cp', '-r', template_path+'/.gpc', test_path])
         call(['cp', '-r', template_path+'/log', test_path])
         call(['cp', '-r', template_path+'/storage', test_path])
         self.env.writefile('gpc.yaml', frompath='simple.yaml')
