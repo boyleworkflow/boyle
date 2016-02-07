@@ -1,9 +1,11 @@
 import os
 from gpc import fsdb
+from gpc import NotFoundException
 import sqlite3
 from contextlib import suppress
 from collections import defaultdict
 import logging
+import pkg_resources
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -30,7 +32,7 @@ class Log(object):
     @staticmethod
     def create(path):
         """Create a log"""
-        schema_path = pkg_resources.resource_filename(__name__, "database.sql")
+        schema_path = pkg_resources.resource_filename(__name__, "resources/database.sql")
         schema = open(schema_path, 'r').read()
         fsdb.Database.create(path, schema)
 
@@ -165,5 +167,5 @@ class Log(object):
 
 
     def get_provenance(self, digest):
-        return 'Placeholder provenance'
+        return ['Placeholder provenance']
         raise NotImplementedError()

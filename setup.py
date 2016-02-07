@@ -15,9 +15,9 @@ def create_user():
     import gpc
     set_user_name = True
     set_user_id = True
-    if config.has_section('user'):
-        set_user_name = ('name' not in config['user'])
-        set_user_id = ('id' not in config['user'])
+    if gpc.config.has_section('user'):
+        set_user_name = ('name' not in gpc.config['user'])
+        set_user_id = ('id' not in gpc.config['user'])
     if set_user_name:
         set_config('global', 'user', 'name', getpass.getuser())
     if set_user_id:

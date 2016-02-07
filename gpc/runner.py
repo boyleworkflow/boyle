@@ -1,13 +1,13 @@
 from enum import Enum
 import logging
-from gpc import get_calc_id, get_comp_id
+import os
+from gpc import get_calc_id, get_comp_id, NotFoundException
 import time
+from uuid import uuid4
+import shutil
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-
-
-class NotFoundException(Exception): pass
 
 
 class Status(Enum):
