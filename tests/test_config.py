@@ -27,6 +27,21 @@ class TestConfig(unittest.TestCase):
             with self.assertRaises(yaml.representer.RepresenterError):
                 gpc.config.set('?global', 'some key', bad_value)
 
+    def test_unset(self):
+        key = 'some key'
+        value = 3
+        gpc.config.set('?global', key, value)
+        self.assertTrue(gpc.config.load()[key] == value)
+        
+        gpc.config.unset('?global', key)
+        self.assertTrue(key not in gpc.config.load())
+
+        with self.assertRaises(KeyError):
+            gpc.config.unset('?global', key)
+
+        with self.assertRaises(IOError):
+            gpc.config.unset('some/other/path', key)
+
 
     def test_priority(self):        
         conf = gpc.config.load()

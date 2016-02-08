@@ -65,8 +65,6 @@ def set(path, key, value):
         path = LOCAL_PATH
     elif path == '?global':
         path = GLOBAL_PATH
-    else:
-        raise ValueError("there is no config file at {}".format(path))
 
     dirname = os.path.dirname(path)
     if not os.path.isdir(dirname):
@@ -79,16 +77,27 @@ def set(path, key, value):
         yaml.safe_dump(config, configfile, indent=2, default_flow_style=False)
 
 def unset(path, key):
+    """
+    Remove a value from the configuration dictionary.
+
+    Args:
+        path (str): The config file to alter. The values ?local and ?global
+            are treated specially: they are changed to
+            gpc.config.LOCAL_PATH and gpc.config.GLOBAL_PATH, respectively.
+        key (str): The config item to remove.
+
+    Raises:
+        IOError: If file does not exist.
+        KeyError: If key does not exist.
+
+    """
     if path == '?local':
         path = LOCAL_PATH
     elif path == '?global':
         path = GLOBAL_PATH
-    else:
-        raise ValueError("there is no config file at {}".format(path))
 
-    dirname = os.path.dirname(path)
-    if not os.path.isdir(dirname):
-        os.makedirs(dirname)
+    if not os.path.exists(path):
+        raise IOError('The file {} does not exist.'.format(path))
 
     config = _read_config_if_exists(path)
     del config[key]
