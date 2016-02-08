@@ -52,7 +52,7 @@ setup(
     license='LGPLv3',
     author='Rasmus Einarsson and Jonatan Kallus',
     author_email=(
-        'rasmus [at] einarsson [dot] net, mr [at] jkallus [dot] se'),
+        'mr [at] rasmuseinarsson [dot] se, mr [at] jkallus [dot] se'),
     description=(
         'A tool for provenance and caching '
         'in computational workflows'),
