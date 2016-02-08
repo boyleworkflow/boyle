@@ -20,6 +20,14 @@ class TestConfig(unittest.TestCase):
         call(['gpc', 'config', 'set', '--global', 'user.name', NAME])
         call(['gpc', 'config', 'set', '--global', 'user.id', ID])
 
+
+    def test_bad_value(self):        
+        bad_values = [lambda x: x, shutil, complex(1, 2)]
+        for bad_value in bad_values:
+            with self.assertRaises(yaml.representer.RepresenterError):
+                gpc.config.set('?global', 'some key', bad_value)
+
+
     def test_priority(self):        
         conf = gpc.config.load()
 
@@ -38,6 +46,7 @@ class TestConfig(unittest.TestCase):
         conf = gpc.config.load()
         self.assertTrue(conf['user.name'] == NAME + 'local')
         self.assertTrue(conf['user.id'] == ID)
+
 
     def test_complex(self):
         complex_value = dict(abc=1, cde=["str", 123])
