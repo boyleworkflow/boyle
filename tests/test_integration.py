@@ -14,7 +14,7 @@ class TestIntegration(unittest.TestCase):
         created_filenames = result.files_created.keys()
         self.assertTrue('log' in created_filenames)
         self.assertTrue('log/data' in created_filenames)
-        self.assertTrue('log/schema' in created_filenames)
+        self.assertTrue('log/schema.sql' in created_filenames)
         self.assertTrue('storage' in created_filenames)
 
     def test_make_target(self):

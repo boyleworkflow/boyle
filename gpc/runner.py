@@ -34,6 +34,11 @@ class Runner(object):
 
         calc_id = get_calc_id(task, inp_digests)
 
+        self.log.save_task(
+            task_id=task.id,
+            definition='changeme',
+            sysstate='changeme')
+
         self.log.save_calculation(
             calc_id=calc_id,
             task_id=task.id,

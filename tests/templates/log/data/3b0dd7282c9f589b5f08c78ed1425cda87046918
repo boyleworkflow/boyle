@@ -1,0 +1,1 @@
+INSERT INTO "task" VALUES('echo world > b','changeme','changeme');

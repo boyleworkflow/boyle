@@ -3,6 +3,7 @@ import json
 import sqlite3
 import functools
 import itertools
+import shutil
 from os.path import abspath
 import logging
 from gpc import hexdigest
@@ -15,34 +16,28 @@ class DatabaseError(Exception): pass
 
 
 class Database(object):
-    """Class to interact with the file-backed SQLlite database."""
+    """Class to interact with the plain text-backed sqlite database."""
     def __init__(self, path):
         """Open a database"""
         super(Database, self).__init__()
         path = abspath(path)
-        self._schema_dir = Database._get_schema_dir(path)
+
+        schema_script = Database._get_schema_script(path)
         self._data_dir = Database._get_data_dir(path)
 
-        def statements():
-            dirs = (
-                self._schema_dir,
-                self._data_dir)
+        def data_statements():
+            for file in os.listdir(self._data_dir):
+                stmt_path = os.path.join(self._data_dir, file)
+                with open(stmt_path, 'r') as f:
+                    sql = f.read()
+                yield sql
 
-            for d in dirs:
-                for file in os.listdir(d):
-                    stmt_path = os.path.join(d, file)
-                    with open(stmt_path, 'r') as f:
-                        sql = f.read()
-                    yield sql
+        self._conn = sqlite3.connect(':memory:')
+        with self._conn as conn:
+            conn.executescript(schema_script)
 
-        try:
-            self._conn = sqlite3.connect(':memory:')
-            with self._conn as conn:
-                for stmt in statements():
-                    conn.execute(stmt)
-        except Exception as e:
-            msg = "Database at '{}' could not be opened".format(path)
-            raise DatabaseError(msg) from e
+            for stmt in data_statements():
+                conn.execute(stmt)
 
 
     @staticmethod
@@ -50,30 +45,28 @@ class Database(object):
         return abspath(os.path.join(path, 'data'))
 
     @staticmethod
-    def _get_schema_dir(path):
-        return abspath(os.path.join(path, 'schema'))
+    def _get_schema_script(path):
+        with open(Database._get_schema_path(path), 'r') as f:
+            return f.read()
+
+
+    @staticmethod
+    def _get_schema_path(path):
+        return abspath(os.path.join(path, 'schema.sql'))
 
     def write(self):
         statements = self._conn.iterdump()
-        assert next(statements) == 'BEGIN TRANSACTION;'
-        for stmt in statements:
-            if stmt == 'COMMIT;':
-                break
-            if stmt.lower().startswith('create table'):
-                target_dir = self._schema_dir
-            else:
-                target_dir = self._data_dir
+        def should_be_saved(stmt):
+            return stmt.startswith('INSERT')
+
+        for stmt in filter(should_be_saved, statements):
             digest = hexdigest(stmt)
-            path = os.path.join(target_dir, digest)
+            path = os.path.join(self._data_dir, digest)
             if not os.path.exists(path):
                 with open(path, 'w') as file:
                     file.write(stmt)
                     file.write('\n')
-        try:
-            next_stmt = next(statements)
-            raise DatabaseError('unexpected statement {}'.format(next_stmt))
-        except StopIteration:
-            pass
+
 
     def __enter__(self):
         return self._conn.__enter__()
@@ -91,7 +84,7 @@ class Database(object):
         return self._conn.executescript(*args, **kwargs)
 
     @classmethod
-    def create(cls, path):
+    def create(cls, path, schema):
         """
         Create a new database
 
@@ -102,5 +95,14 @@ class Database(object):
         path = abspath(path)
         if os.path.exists(path):
             raise DatabaseError('Path must not exist when creating database!')
-        os.makedirs(Database._get_schema_dir(path))
+
         os.makedirs(Database._get_data_dir(path))
+        with open(Database._get_schema_path(path), 'w') as f:
+            f.write(schema)
+
+        # Test it
+        try:
+            db = Database(path)
+        except Exception as e:
+            shutil.rmtree(path)
+            raise e

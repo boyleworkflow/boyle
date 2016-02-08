@@ -1,6 +1,0 @@
-CREATE TABLE uses (
-  calc_id text references calculation,
-  path text,
-  digest text,
-  primary key (calc_id, path, digest)
-);

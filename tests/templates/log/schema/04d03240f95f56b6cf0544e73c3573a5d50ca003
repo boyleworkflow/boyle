@@ -1,4 +1,0 @@
-CREATE TABLE user (
-  user_id text primary key,
-  name text
-);

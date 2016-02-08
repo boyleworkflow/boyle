@@ -2,13 +2,14 @@ import os
 from gpc import fsdb
 from gpc import NotFoundException
 import sqlite3
-from contextlib import suppress
 from collections import defaultdict
 import logging
 import pkg_resources
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+SCHEMA_VERSION = 'v0.0.0'
 
 class Log(object):
     def __init__(self, path, user):
@@ -32,51 +33,55 @@ class Log(object):
     def create(path):
         """Create a log"""
         schema_path = pkg_resources.resource_filename(
-            __name__, "resources/database.sql")
-        schema = open(schema_path, 'r').read()
-        fsdb.Database.create(path)
-        db = fsdb.Database(path)
-        db.executescript(schema)
-        db.write()
+            __name__, "resources/schema-{}.sql".format(SCHEMA_VERSION))
+        with open(schema_path, 'r') as f:
+            schema_script = f.read()
+
+        fsdb.Database.create(path, schema_script)
 
 
     def write(self):
         self._db.write()
 
 
-    def save_calculation(self, calc_id, task_id, inputs):
-        with suppress(sqlite3.IntegrityError), self._db as db:
+    def save_task(self, task_id, definition, sysstate):
+        with self._db as db:
             db.execute(
-                'INSERT OR ABORT INTO calculation(calc_id, task_id) '
+                'INSERT OR IGNORE INTO task(task_id, definition, sysstate) '
+                'VALUES (?, ?, ?)',
+                (task_id, definition, sysstate))
+
+
+    def save_calculation(self, calc_id, task_id, inputs):
+        with self._db as db:
+            db.execute(
+                'INSERT OR IGNORE INTO calculation(calc_id, task_id) '
                 'VALUES (?, ?)',
                 (calc_id, task_id))
 
             db.executemany(
-                'INSERT INTO uses (calc_id, path, digest) '
+                'INSERT OR IGNORE INTO uses (calc_id, path, digest) '
                 'VALUES (?, ?, ?)',
                 [(calc_id, p, d) for p, d in inputs.items()])
 
 
     def save_composition(self, comp_id, calc_id, subcomp_ids):
-        # Suppress IntegrityError to silently abort the whole operation
-        # if the composition already exists in the database.
-        with suppress(sqlite3.IntegrityError), self._db as db:
+        with self._db as db:
             db.execute(
-                'INSERT OR ABORT INTO composition(comp_id, calc_id) '
+                'INSERT OR IGNORE INTO composition(comp_id, calc_id) '
                 'VALUES (?, ?)', (comp_id, calc_id))
 
             db.executemany(
-                'INSERT INTO subcomposition (comp_id, subcomp_id) '
+                'INSERT OR IGNORE INTO subcomposition (comp_id, subcomp_id) '
                 'VALUES (?, ?)',
                 [(comp_id, subcomp_id) for subcomp_id in subcomp_ids])
 
     def save_request(self, path, comp_id, time, digest):
         """Note: only saves the first time a user requests"""
 
-        # Suppress IntegrityError to silently abort if the request exists.
-        with suppress(sqlite3.IntegrityError), self._db as db:
+        with self._db as db:
             db.execute(
-                'INSERT OR ABORT INTO '
+                'INSERT OR IGNORE INTO '
                 'requested(path, digest, user_id, firsttime, comp_id) '
                 'VALUES (?, ?, ?, ?, ?)',
                 (path, digest, self.user['id'], time, comp_id))

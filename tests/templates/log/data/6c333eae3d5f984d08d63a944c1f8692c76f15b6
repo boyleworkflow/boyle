@@ -1,1 +1,0 @@
-CREATE INDEX run_calculation on run (calc_id);

@@ -12,7 +12,6 @@ class TestFSDB(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.mkdtemp()
         self.dbdir = os.path.join(self.tempdir, 'my_db')
-        Database.create(self.dbdir)
 
         schema = '''
             create table some_table (
@@ -21,8 +20,8 @@ class TestFSDB(unittest.TestCase):
               );
             '''
 
+        Database.create(self.dbdir, schema)
         db = Database(self.dbdir)
-        db.executescript(schema)
         db.execute(
             'INSERT OR ABORT INTO some_table (some_id, some_text) '
             'VALUES (?, ?)', ('abc', 'def'))

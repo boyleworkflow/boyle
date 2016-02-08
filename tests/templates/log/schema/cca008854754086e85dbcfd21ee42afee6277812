@@ -1,9 +1,0 @@
-CREATE TABLE trust (
-  path text,
-  digest text,
-  calc_id text references calculation,
-  user_id text references user,
-  time timestamp with time zone,
-  correct boolean,
-  primary key (path, digest, calc_id, user_id, time)
-);
