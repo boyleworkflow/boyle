@@ -22,7 +22,8 @@ def make(target):
 
     Run necessary calculations to generate the target
     files. If the target files already exist in cache, simply copy them into
-    working directory.'''
+    working directory.
+    '''
     user = dict(name=settings['user.name'], id=settings['user.id'])
     log = gpc.Log(DEFAULT_LOG_PATH, user)
     storage = gpc.Storage(DEFAULT_STORAGE_PATH)
@@ -88,7 +89,12 @@ def value_param(f):
 @key_param
 @value_param
 def set(file, key, value):
-    """Set a configuration item."""
+    """
+    Set a configuration item.
+
+    The key can be any string. The value is represented as YAML
+    in the config file and this command fails if that can't be done.
+    """
     gpc.config.set(file, key, value)
 
 
@@ -111,7 +117,12 @@ def unset(file, key):
     '--output-format', '-f',
     type=click.Choice(['yaml', 'json']), default='yaml')
 def get(key, output_format):
-    """Get a configuration item."""
+    """
+    Get a configuration item.
+
+    The value is output on stdout. Use the -f flag to choose
+    between YAML and JSON output.
+    """
     try:
         value = settings[key]
     except KeyError:

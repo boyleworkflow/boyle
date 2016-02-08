@@ -15,9 +15,26 @@ def _read_config_if_exists(path):
         return {}
 
     with open(path, 'r') as f:
-        return dict(yaml.safe_load(f))
+        config = yaml.safe_load(f.read())
+        return config if config else {}
 
 def load():
+    """
+    Load the configuration dictionary.
+
+    The configuration is a stupid dictionary, simply read from files.
+    Changing the dictionary has no effect on the files.
+
+    The configuration is read in sequence from the following places:
+
+        * gpc.config.DEFAULT_PATH
+        * gpc.config.GLOBAL_PATH
+        * gpc.config.LOCAL_PATH
+
+    Each read overrides previously defined values.
+
+    """
+
     config = {}
     for path in (DEFAULT_PATH, GLOBAL_PATH, LOCAL_PATH):
         config.update(_read_config_if_exists(path))
@@ -33,19 +50,23 @@ def set(path, key, value):
             are treated specially: they are changed to
             gpc.config.LOCAL_PATH and gpc.config.GLOBAL_PATH, respectively.
         key (str): The config item to change.
-        value: Can be anything PyYAML can make into a string. In other
-            words, any combination of dict, list, string or numeric literal.
+        value: Anything PyYAML can represent as a string. In other
+            words, at least all combinations of dict, list, string and
+            numeric literals.
 
     Raises:
-        Some error
+        yaml.representer.RepresenterError: If the value cannot be represented
+            as YAML.
 
     """
+    test_dump = yaml.safe_dump(value)
+
     if path == '?local':
         path = LOCAL_PATH
     elif path == '?global':
         path = GLOBAL_PATH
     else:
-        raise ValueError("there is no config file '{}'".format(path))
+        raise ValueError("there is no config file at {}".format(path))
 
     dirname = os.path.dirname(path)
     if not os.path.isdir(dirname):
@@ -57,13 +78,13 @@ def set(path, key, value):
     with open(path, 'w') as configfile:
         yaml.safe_dump(config, configfile, indent=2, default_flow_style=False)
 
-def unset(file, key):
-    if file == 'local':
+def unset(path, key):
+    if path == '?local':
         path = LOCAL_PATH
-    elif file == 'global':
+    elif path == '?global':
         path = GLOBAL_PATH
     else:
-        raise ValueError("there is no config file '{}'".format(file))
+        raise ValueError("there is no config file at {}".format(path))
 
     dirname = os.path.dirname(path)
     if not os.path.isdir(dirname):

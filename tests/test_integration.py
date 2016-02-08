@@ -37,7 +37,6 @@ class TestIntegration(unittest.TestCase):
         result = self.env.run('gpc', 'make', 'c', expect_stderr=True)
         created_filenames = result.files_created.keys()
         self.assertTrue('c' in created_filenames)
-        print(created_filenames)
         self.assertTrue(len(created_filenames) == 1)
 
 if __name__ == '__main__':
