@@ -42,7 +42,7 @@ class TestConfig(unittest.TestCase):
     def test_complex(self):
         complex_value = dict(abc=1, cde=["str", 123])
         key = 'abc'
-        gpc.config.set('local', key, complex_value)
+        gpc.config.set('?local', key, complex_value)
 
         conf = gpc.config.load()
         self.assertTrue(complex_value == gpc.config.load()[key])

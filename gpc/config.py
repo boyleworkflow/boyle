@@ -24,13 +24,28 @@ def load():
     return config
 
 
-def set(file, key, value):
-    if file == 'local':
+def set(path, key, value):
+    """
+    Set a value in the configuration dictionary.
+
+    Args:
+        path (str): The config file to alter. The values ?local and ?global
+            are treated specially: they are changed to
+            gpc.config.LOCAL_PATH and gpc.config.GLOBAL_PATH, respectively.
+        key (str): The config item to change.
+        value: Can be anything PyYAML can make into a string. In other
+            words, any combination of dict, list, string or numeric literal.
+
+    Raises:
+        Some error
+
+    """
+    if path == '?local':
         path = LOCAL_PATH
-    elif file == 'global':
+    elif path == '?global':
         path = GLOBAL_PATH
     else:
-        raise ValueError("there is no config file '{}'".format(file))
+        raise ValueError("there is no config file '{}'".format(path))
 
     dirname = os.path.dirname(path)
     if not os.path.isdir(dirname):

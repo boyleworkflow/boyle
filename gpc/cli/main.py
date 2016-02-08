@@ -83,8 +83,8 @@ def value_param(f):
     return decorator(f)
 
 @config.command()
-@click.option('--local', 'file', flag_value='local')
-@click.option('--global', 'file', flag_value='global', default=True)
+@click.option('--local', 'file', flag_value='?local')
+@click.option('--global', 'file', flag_value='?global', default=True)
 @key_param
 @value_param
 def set(file, key, value):
@@ -93,8 +93,8 @@ def set(file, key, value):
 
 
 @config.command()
-@click.option('--local', 'file', flag_value='local')
-@click.option('--global', 'file', flag_value='global', default=True)
+@click.option('--local', 'file', flag_value='?local')
+@click.option('--global', 'file', flag_value='?global', default=True)
 @key_param
 def unset(file, key):
     """Remove a configuration item."""
@@ -107,7 +107,9 @@ def unset(file, key):
 
 @config.command()
 @key_param
-@click.option('--output-format', '-f', type=click.Choice(['yaml', 'json']), default='yaml')
+@click.option(
+    '--output-format', '-f',
+    type=click.Choice(['yaml', 'json']), default='yaml')
 def get(key, output_format):
     """Get a configuration item."""
     try:
@@ -124,7 +126,9 @@ def get(key, output_format):
     click.echo(value)
 
 @config.command()
-@click.option('--output-format', '-f', type=click.Choice(['yaml', 'json']), default='yaml')
+@click.option(
+    '--output-format', '-f',
+    type=click.Choice(['yaml', 'json']), default='yaml')
 def lst(output_format):
     """List all configuration items."""
     value = settings
