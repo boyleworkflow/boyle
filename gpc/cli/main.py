@@ -2,8 +2,10 @@ import click
 import gpc
 import shutil
 import gpc.config
+import yaml
+import json
 
-settings = gpc.config.load_settings()
+settings = gpc.config.load()
 
 DEFAULT_LOG_PATH = 'log'
 DEFAULT_STORAGE_PATH = 'storage'
@@ -21,7 +23,7 @@ def make(target):
     Run necessary calculations to generate the target
     files. If the target files already exist in cache, simply copy them into
     working directory.'''
-    user = settings['user']
+    user = dict(name=settings['user.name'], id=settings['user.id'])
     log = gpc.Log(DEFAULT_LOG_PATH, user)
     storage = gpc.Storage(DEFAULT_STORAGE_PATH)
     graph = gpc.graph_from_spec('gpc.yaml')
@@ -63,30 +65,73 @@ def config():
     '''
     pass
 
-def name_param(f):
-    def validate(ctx, param, name):
-        if not '.' in name:
-            raise click.BadParameter(
-                "gpc config items are named like 'section.item'")
-        return name
+def key_param(f):
+    decorator = click.argument('key')
+    return decorator(f)
 
-    decorator = click.argument('name', callback=validate)
+def value_param(f):
+    def validate(ctx, param, value):
+        try:
+            value = yaml.safe_load(value)
+        except (yaml.scanner.ScannerError, yaml.parser.ParserError) as e:
+            msg = 'The value is not valid YAML.\n\n{}\n{}'.format(
+                e.problem, e.problem_mark)
+            raise click.BadParameter(msg)
+        return value
+
+    decorator = click.argument('value', callback=validate)
     return decorator(f)
 
 @config.command()
 @click.option('--local', 'file', flag_value='local')
 @click.option('--global', 'file', flag_value='global', default=True)
-@name_param
-@click.argument('value')
-def set(file, name, value):
-    gpc.config.set_config(file, name, value)
+@key_param
+@value_param
+def set(file, key, value):
+    """Set a configuration item."""
+    gpc.config.set(file, key, value)
 
 
 @config.command()
-@name_param
-def get(name):
+@click.option('--local', 'file', flag_value='local')
+@click.option('--global', 'file', flag_value='global', default=True)
+@key_param
+def unset(file, key):
+    """Remove a configuration item."""
     try:
-        value = gpc.config.get_location(settings, name)
-        click.echo(value)
+        gpc.config.unset(file, key)
     except KeyError:
-        raise click.BadParameter("config item '{}' is not set".format(name))
+        raise click.BadParameter(
+            "config item '{}' is not set ({} file)".format(key, file))
+
+
+@config.command()
+@key_param
+@click.option('--output-format', '-f', type=click.Choice(['yaml', 'json']), default='yaml')
+def get(key, output_format):
+    """Get a configuration item."""
+    try:
+        value = settings[key]
+    except KeyError:
+        raise click.BadParameter(
+            "config item '{}' is not set ({} file)".format(key, file))
+
+    if output_format == 'yaml':
+        value = yaml.safe_dump(value, indent=2, default_flow_style=False)
+    elif output_format == 'json':
+        value = json.dumps(value)
+
+    click.echo(value)
+
+@config.command()
+@click.option('--output-format', '-f', type=click.Choice(['yaml', 'json']), default='yaml')
+def lst(output_format):
+    """List all configuration items."""
+    value = settings
+
+    if output_format == 'yaml':
+        value = yaml.safe_dump(value, indent=2, default_flow_style=False)
+    elif output_format == 'json':
+        value = json.dumps(value)
+
+    click.echo(value)

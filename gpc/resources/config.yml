@@ -1,0 +1,28 @@
+logging:
+  version: 1
+  formatters:
+    brief:
+      format: '%(levelname)-8s %(message)s'
+    multi-line:
+      format: '%(asctime)s  %(levelname)-8s %(name)s
+
+      %(message)s
+
+      '
+  handlers:
+    console:
+      class: logging.StreamHandler
+      formatter: brief
+      level: INFO
+      stream: ext://sys.stdout
+    file:
+      level: DEBUG
+      class : logging.handlers.RotatingFileHandler
+      formatter: multi-line
+      filename: gpc.log
+      maxBytes: 100000
+      backupCount: 0
+  loggers:
+    gpc:
+      level: DEBUG
+      handlers: [console, file]

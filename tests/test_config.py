@@ -21,11 +21,11 @@ class TestConfig(unittest.TestCase):
         call(['gpc', 'config', 'set', '--global', 'user.id', ID])
 
     def test_priority(self):        
-        conf = gpc.config.load_settings()
+        conf = gpc.config.load()
 
         # From global file
-        self.assertTrue(conf == dict(user=dict(name=NAME, id=ID)))
-
+        self.assertTrue(conf['user.name'] == NAME)
+        self.assertTrue(conf['user.id'] == ID)
 
         # No local file exists
         self.assertTrue(not os.path.exists(gpc.config.LOCAL_PATH))
@@ -35,31 +35,20 @@ class TestConfig(unittest.TestCase):
         self.assertTrue(os.path.exists(gpc.config.LOCAL_PATH))
 
         # Check that local file overrides
-        conf = gpc.config.load_settings()
-        self.assertTrue(conf == dict(user=dict(name=NAME + 'local', id=ID)))
-
-    def test_nested(self):
-        # Write nested
-        call('gpc config set a.b.c.d 123'.split(' '))
-
-        # Read with API
-        conf = gpc.config.load_settings()
-        self.assertTrue(conf['a'] == {'b':{'c':{'d': '123'}}})
-
-        # Read with CLI
-        value = check_output('gpc config get a.b.c.d'.split(' ')).decode()
-        self.assertTrue(value.strip() == '123')
+        conf = gpc.config.load()
+        self.assertTrue(conf['user.name'] == NAME + 'local')
+        self.assertTrue(conf['user.id'] == ID)
 
     def test_complex(self):
         complex_value = dict(abc=1, cde=["str", 123])
-        loc = 'a.b.c.d'
-        gpc.config.set_config('local', loc, complex_value)
+        key = 'abc'
+        gpc.config.set('local', key, complex_value)
 
-        conf = gpc.config.load_settings()
-        self.assertTrue(complex_value == gpc.config.get_location(conf, loc))
-        val = yaml.load(
-            check_output('gpc config get a.b'.split(' ')).decode())
-        self.assertTrue(val == conf['a']['b'])
+        conf = gpc.config.load()
+        self.assertTrue(complex_value == gpc.config.load()[key])
+        val = yaml.safe_load(
+            check_output('gpc config get {}'.format(key).split(' ')).decode())
+        self.assertTrue(val == conf[key])
 
     def tearDown(self):
         os.chdir(self.origdir)

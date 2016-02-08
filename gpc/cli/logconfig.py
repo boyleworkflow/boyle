@@ -1,25 +1,12 @@
 import logging
 from logging.config import dictConfig
+import gpc
 
-DEFAULT_FORMAT = (
-            '%(asctime)s   %(levelname)-8s %(name)s\n'
-            '%(message)s\n')
+logging_config = gpc.config.load()['logging']
 
-
-logging_config = dict(
-    version = 1,
-    formatters = {
-        'two_line_format': {'format': DEFAULT_FORMAT}
-        },
-    handlers = {
-        'console_handler': {'class': 'logging.StreamHandler',
-              'formatter': 'two_line_format',
-              'level': 'DEBUG'}
-        },
-    loggers = {
-        'gpc': {'handlers': ['console_handler'],
-                 'level': 'INFO'}
-        }
-)
-
-dictConfig(logging_config)
+if logging_config is not None:
+    try:
+        dictConfig(logging_config)
+    except Exception as e:
+        msg = 'Could not initialize logging with current logging config.'
+        raise gpc.GenericError(msg) from e
