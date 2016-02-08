@@ -2,52 +2,12 @@
 
 import os
 import subprocess
-import json
 import logging
 from uuid import uuid4
-from itertools import chain
-import configparser
 import hashlib
 import json
 
 logger = logging.getLogger(__name__)
-
-GLOBAL_CONFIG_FILE_PATH = os.path.expanduser('~/.config/gpc/config')
-LOCAL_CONFIG_FILE_PATH = os.path.abspath('.gpc/config')
-
-config = configparser.ConfigParser()
-
-def load_config():
-    global config
-    config.read(GLOBAL_CONFIG_FILE_PATH)
-    config.read(LOCAL_CONFIG_FILE_PATH)
-
-load_config()
-
-def set_config(file, section, item, value):
-    if file == 'local':
-        path = LOCAL_CONFIG_FILE_PATH
-    elif file == 'global':
-        path = GLOBAL_CONFIG_FILE_PATH
-    else:
-        raise ValueError("there is no config file '{}'".format(file))
-
-    dirname = os.path.dirname(path)
-    if not os.path.isdir(dirname):
-        os.makedirs(dirname)
-
-    config = configparser.ConfigParser()
-    config.read(path)
-
-    if section not in config:
-        config.add_section(section)
-    config[section][item] = value
-
-    with open(path, 'w') as configfile:
-        config.write(configfile)
-
-    load_config()
-
 
 class GenericError(Exception): pass
 
@@ -61,7 +21,6 @@ class ConflictException(Exception):
 
 
 class NotFoundException(Exception): pass
-
 
 
 def unique_json(obj):

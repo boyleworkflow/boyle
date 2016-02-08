@@ -1,6 +1,9 @@
 import click
 import gpc
 import shutil
+import gpc.config
+
+settings = gpc.config.load_settings()
 
 DEFAULT_LOG_PATH = 'log'
 DEFAULT_STORAGE_PATH = 'storage'
@@ -18,7 +21,7 @@ def make(target):
     Run necessary calculations to generate the target
     files. If the target files already exist in cache, simply copy them into
     working directory.'''
-    user = gpc.config['user']
+    user = settings['user']
     log = gpc.Log(DEFAULT_LOG_PATH, user)
     storage = gpc.Storage(DEFAULT_STORAGE_PATH)
     graph = gpc.graph_from_spec('gpc.yaml')
@@ -71,20 +74,19 @@ def name_param(f):
     return decorator(f)
 
 @config.command()
-@click.option('--local', 'file', flag_value='local', default=True)
-@click.option('--global', 'file', flag_value='global')
+@click.option('--local', 'file', flag_value='local')
+@click.option('--global', 'file', flag_value='global', default=True)
 @name_param
 @click.argument('value')
 def set(file, name, value):
-    section, item = name.split('.', 1)
-    gpc.set_config(file, section, item, value)
+    gpc.config.set_config(file, name, value)
 
 
 @config.command()
 @name_param
 def get(name):
-    section, item = name.split('.', 1)
     try:
-        click.echo(gpc.config[section][item])
+        value = gpc.config.get_location(settings, name)
+        click.echo(value)
     except KeyError:
         raise click.BadParameter("config item '{}' is not set".format(name))

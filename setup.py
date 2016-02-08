@@ -15,13 +15,14 @@ def create_user():
     import gpc
     set_user_name = True
     set_user_id = True
-    if gpc.config.has_section('user'):
-        set_user_name = ('name' not in gpc.config['user'])
-        set_user_id = ('id' not in gpc.config['user'])
+    settings = gpc.config.load_settings()
+    if 'user' in settings:
+        set_user_name = ('name' not in settings['user'])
+        set_user_id = ('id' not in settings['user'])
     if set_user_name:
-        set_config('global', 'user', 'name', getpass.getuser())
+        gpc.config.set_config('global', 'user.name', getpass.getuser())
     if set_user_id:
-        set_config('global', 'user', 'id', str(uuid4()))
+        gpc.config.set_config('global', 'user.id', str(uuid4()))
 
 class CustomInstall(install):
 
