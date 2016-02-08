@@ -6,7 +6,6 @@ from collections import defaultdict
 import logging
 import pkg_resources
 
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 'v0.0.0'

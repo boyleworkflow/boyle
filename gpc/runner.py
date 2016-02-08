@@ -1,12 +1,11 @@
-import enum
 import logging
+import enum
 import os
 from gpc import get_calc_id, get_comp_id, NotFoundException
 import time
 from uuid import uuid4
 import shutil
 
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 @enum.unique

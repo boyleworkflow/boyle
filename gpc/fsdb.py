@@ -8,7 +8,6 @@ from os.path import abspath
 import logging
 from gpc import hexdigest
 
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 

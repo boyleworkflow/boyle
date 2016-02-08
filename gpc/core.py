@@ -10,7 +10,6 @@ import configparser
 import hashlib
 import json
 
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 GLOBAL_CONFIG_FILE_PATH = os.path.expanduser('~/.config/gpc/config')
