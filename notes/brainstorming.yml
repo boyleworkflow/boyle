@@ -1,0 +1,127 @@
+settings:
+  input_dirs: # priorities for where to search for input files
+    - .
+    - /other/path
+  python_preamble: >
+    import my_module
+
+vars:
+  my_list: [1,2,3]
+  my_list_2: os.listdir()
+  some_dict: {a: 2, b: 3}
+
+paths:
+  zipfiles: indata/eu.*.zip
+
+import os
+zipfiles = os.listdir('.')
+
+tasks:
+  - input:
+      - a
+      - xyz
+    output: b
+    shell: echo aoeu > temp && cat a xyz > b
+
+  # What to do about templates??
+  # - input:
+  #     a: a_{{ item }}
+  #     b: b_{{ item }}
+  #   output:
+  #     c: c_{{ item }}
+  #   shell: do_your_thing_baby --fast
+  #   foreach: item in my_list
+
+  - input: z
+    output: uz
+    shell: unzip z -o uz
+
+  - map: file in zipfiles
+    input:
+      z: {file.path}
+    output:
+      uz: outdir/unzipped/{file.basename}.txt
+
+  - input: eurostat/*
+
+  - map: (key, value) in product(my_list, my_list_2)
+    input:
+      - abc: "path/to/bla_{ key }.txt"
+      - c: "{{ otheritem }}.txt"
+    output:
+      - xyz: other/path/to-{{ item }}_{{ otheritem }}.txt
+
+
+  - input:
+      abc: path/to/bla_*.txt
+      c: ...
+    output: dir/
+    python:
+
+  - input:
+      - stack
+      - element
+    output:
+      - newstack
+    shell: add_to stack element > newstack
+
+  - merge: name in other/path/to-*.txt
+    input:
+      stack: empty_array.hdf5
+      element: { name }
+    output:
+      newstack: my_array.hdf5
+
+  - input:
+      a: path_to_full_array.hdf5
+      b: other/path/to-*.txt
+    output: outdatadir/nested/nested/my_array.hdf5
+    python: >
+      indata = pandas.read_hdf5(input.a)
+      value = my_module.make_horrible_calculation(indata)
+      pandas.to_hdf5(value, output)
+
+  cp /tmp/gpc/a /outdatadir...
+
+  - input:
+      somename: /some/long/tedious/path
+    shell: cat $somename > outfile
+
+  - input:
+      a: my_array.hdf5
+    output: cleaned_plot_data.hdf5
+    python: prep_plot_data(a)
+
+  - input:
+      - somedir/{name}
+      - c
+    output:
+      - xyz{name}
+      - zzz/{name}
+    shell: >
+      do_thing abc # creates file "output.csv"
+      mv output.csv xyz
+
+  - input: eurostat
+    output: my_list
+    shell: ls eurostat
+
+  - input: a
+    output: b
+    shell: cmd1
+
+  - input: b
+    output: c
+    shell: cmd2
+
+  - foreach: item in my_list
+    input:
+      a: my/a/dir/{{item}}
+    output:
+      c: my/c/dir/{{item}}
+
+  - foreach: item in listdir('eurostat')
+    input:
+      a: my/alternative_a/dir/{{item}}
+    output:
+      c: my/alternative_c/dir/{{item}}
