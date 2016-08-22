@@ -1,7 +1,7 @@
 tasks:
 
   # List all property files (grease.csv, salt.csv etc.) and return as list of strings
-  - python: utils.list_files(in)
+  - python: utils.list_files(uri)
     in:
       uri: csv_files
     out:
@@ -15,15 +15,16 @@ tasks:
       var: filename
 
   # List all pids in a property file
-  - python: peanuts.list_pids(os.path.join(var[0], uri[0]))
+  - python: peanuts.list_pids(os.path.join(var, uri[0]))
     in:
       var: filename
-      uri: csv_files
+      uri:
+        - csv_files
     out:
       var: pids
 
   # Likewise for nids
-  - python: peanuts.list_nids(os.path.join(var[0], uri[0]))
+  - python: peanuts.list_nids(os.path.join(var, uri))
     in:
       var: filename
       uri: csv_files
@@ -53,7 +54,7 @@ tasks:
       var: unique_nids
 
   # Likewise for pids
-  - python: peanuts.unique(ppids)
+  - python: peanuts.unique(var['ppids'])
     in:
       var:
         ppids: properties_pids
