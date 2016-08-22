@@ -1,0 +1,77 @@
+tasks:
+
+  # List all property files (grease.csv, salt.csv etc.) and return as list of strings
+  - python: utils.list_files(in)
+    in:
+      uri: csv_files
+    out:
+      var: filenames
+
+  # Split so that we can map over each filename
+  - split: property
+    in:
+      var: filenames
+    out:
+      var: filename
+
+  # List all pids in a property file
+  - python: peanuts.list_pids(os.path.join(var[0], uri[0]))
+    in:
+      var: filename
+      uri: csv_files
+    out:
+      var: pids
+
+  # Likewise for nids
+  - python: peanuts.list_nids(os.path.join(var[0], uri[0]))
+    in:
+      var: filename
+      uri: csv_files
+    out:
+      var: nids
+
+  # Collect so that we can operate on (reduce) all lists of nids
+  - collect: property
+    in:
+      var: nids
+    out:
+      var: properties_nids
+
+  # Likewise for pids
+  - collect: property
+    in:
+      var: pids
+    out:
+      var: properties_pids
+
+  # List all unique nids
+  - python: peanuts.unique(var['pnids'])
+    in:
+      var:
+        pnids: properties_nids
+    out:
+      var: unique_nids
+
+  # Likewise for pids
+  - python: peanuts.unique(ppids)
+    in:
+      var:
+        ppids: properties_pids
+    out:
+      var: unique_pids
+
+  # Use lists of unique pids and nids to create a matrix for each property file
+  # so that each property matrix has the same rows and columns, in the same order
+  - python: >
+      peanuts.make_matrix(var['rows'], var['cols'],
+      os.path.join(uri['csv_files'], var['file']))
+    in:
+      var:
+        rows: unique_pids
+        cols: unique_nids
+        file: filename
+      uri:
+        csv_files
+    out:
+      var: matrix
+
