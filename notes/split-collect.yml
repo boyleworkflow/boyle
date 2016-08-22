@@ -1,3 +1,7 @@
+# This is an example workflow specification to describe split and collect (map
+# and reduce) features. The example converts csv files from a peanut testing
+# party into matrices.
+
 tasks:
 
   # List all property files (grease.csv, salt.csv etc.) and return as list of strings
@@ -75,3 +79,23 @@ tasks:
     out:
       var: matrix
 
+  # Now, assume that there is a directory that contains property files with
+  # scores from many peanut testing parties. Then, without altering the above
+  # workflow, we can add the following two tasks so that the new kind of files
+  # are splitted and the above workflow is mapped over each of the different
+  # parties
+  - python: peanuts.split_parties(uri[0])
+    in:
+      uri: csv_files_many_parties
+    out:
+      uri: csv_files_splitted
+
+  - split: party
+    in:
+      uri: csv_files_splitted
+    out:
+      uri: csv_files
+
+  # If we only want to make the computation for a specific party and property
+  # we can run the following:
+  # >> boyle make --filter party=rasmus28 --filter property=salt.csv matrix
