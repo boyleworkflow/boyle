@@ -1,9 +1,10 @@
 from boyle import *
 
+w = Workflow()
+
 define([w.csv_files, LocalFiles('path/to/csv_files', '*.csv')])
 
 with Each(w.csv_files) as file:
-
     define(
         [
             w.pids ~ Value(),
