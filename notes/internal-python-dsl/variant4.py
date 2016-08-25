@@ -38,7 +38,7 @@ with Each(csv_files) as f:
 
 # The handlers/task functions should be composable, e.g. in sequences
 # Then, a terrible little tool with return value and 
-# some side effect could be used as follows:
+# some side effect could perhaps be used as follows:
 
 p = Promise(
     some_inputs,
@@ -52,3 +52,32 @@ p = Promise(
 # be accessed like p[0] and p[1]. Or, if the Promise is iterable one could
 # even write
 # value, file = Promise(..., [..., ...])
+
+
+# Not only did the syntax become clearer and shorter,
+# but this also looks more compatible with a "composition over inheritance"
+# philosophy. Everything can be rather loosely coupled here.
+
+# The Promise type should probably not be called "Promise" in the end,
+# but I wanted to empasize that its function is to promise that some object
+# can produce some output given some input.
+
+# First example, this LocalDir object will help to deliver/hash/archive/etc
+# the contents of 'path/to/dir' without any input.
+# p1 = Promise(None, LocalDir('path/to/dir'))
+
+# And this Python object will help to deliver/hash/archive/etc
+# some value given that input directory
+# p2 = Promise(p1, Python('out = call_some_function(inp)'))
+
+# The system can be completely agnostic as to the "content" of
+# the returned objects. The `LocalDir`, `Python` etc objects are only
+# responsible for delivering *something*, and of course for hashing, caching,
+# etc as appropriate.
+
+# Not sure yet how to handle shell commands... they will typically only
+# create files.
+
+Promise(
+    some_inputs,
+    Shell()???)
