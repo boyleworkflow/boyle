@@ -7,8 +7,8 @@ define([w.csv_files, LocalFiles('path/to/csv_files', '*.csv')])
 with Each(w.csv_files) as file:
     define(
         [
-            w.pids ~ Value(),
-            w.nids ~ Value()
+            [w.pids, Value()],
+            [w.nids, Value()]
         ],
         file,
         Python("""
@@ -18,12 +18,12 @@ with Each(w.csv_files) as file:
             """))
 
 define(
-    w.unique_nids ~ Value(),
+    [w.unique_nids, Value()],
     collect(w.nids),
     Python('out = peanuts.unique(inp)'))
 
 define(
-    w.unique_nids ~ Value(),
+    [w.unique_nids, Value()],
     collect(w.nids),
     Python('out = peanuts.unique(inp)'))
 
@@ -31,8 +31,8 @@ define(
 #
 # define(
 #     [
-#         w.unique_nids ~ Value(),
-#         w.unique_pids ~ Value()
+#         [w.unique_nids, Value()],
+#         [w.unique_pids, Value()]
 #     ],
 #     [collect(w.nids), collect(w.pids)],
 #     Python('''
@@ -42,7 +42,7 @@ define(
 
 with Each(w.csv_files) as file:
     define(
-        w.matrix ~ Value(),
+        [w.matrix, Value()],
         {
             'rows': w.unique_pids,
             'cols': w.unique_nids,
