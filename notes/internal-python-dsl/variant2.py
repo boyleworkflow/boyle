@@ -20,12 +20,12 @@ lists_of_nids = collect(nids)
 unique_nids = define(
     Value(),
     lists_of_nids,
-    Python('out = peanuts.unique(lists_of_nids)'))
+    Python('out = peanuts.unique(inp)'))
 
 unique_pids = define(
     Value(),
     lists_of_pids,
-    Python('out = peanuts.unique(lists_of_pids)'))
+    Python('out = peanuts.unique(inp)'))
 
 
 with Each(csv_files) as file:

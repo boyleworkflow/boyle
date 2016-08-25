@@ -34,12 +34,12 @@ w.define(
 w.define(
     out='unique_nids',
     inp='lists_of_nids',
-    Python('out = peanuts.unique(lists_of_nids)'))
+    Python('out = peanuts.unique(inp)'))
 
 w.define(
     out='unique_pids',
     inp='lists_of_pids',
-    Python('out = peanuts.unique(lists_of_pids)'))
+    Python('out = peanuts.unique(inp)'))
 
 with w.each('csv_files', file):
     w.define(
