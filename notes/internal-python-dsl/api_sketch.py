@@ -35,7 +35,19 @@ def define(out):
     return Definition(name=out.name)
 
 
-# create temp directory and cd
-# restore all inputs
-# run all operations
-# save output
+# Examples of classes that would implement Resource and Operation interfaces
+
+# Resource:
+#     File
+#     Files
+#     Directory
+#     Value
+#     YAMLValue
+#     Values
+#     Http
+#     HDFS
+#     ...
+
+# Operation:
+#     Shell
+#     Python
