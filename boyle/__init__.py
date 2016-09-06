@@ -5,7 +5,7 @@ import os
 import shutil
 import subprocess
 import logging
-import shlex
+import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,7 @@ def get_sorted_upstream(definitions):
 
 def deliver(requested_defs, delivery_dir):
     storages = {}
+    digests = {}
 
     def setup_storage(definition, graph_dir):
         assert definition not in storages
@@ -35,13 +36,15 @@ def deliver(requested_defs, delivery_dir):
 
     def restore(definition, destination_dir):
         d = definition
+        assert d in digests
         assert d in storages
-        d.resource_handler.restore(storages[d], destination_dir)
+        d.resource_handler.restore(digests[d], storages[d], destination_dir)
 
     def save(definition, work_dir):
         d = definition
         assert d in storages
-        d.resource_handler.save(work_dir, storages[d])
+        assert d not in digests
+        digests[d] = d.resource_handler.save(work_dir, storages[d])
 
     if isinstance(requested_defs, ResourceDefinition):
         requested_defs = (requested_defs,)
@@ -101,23 +104,37 @@ class ResourceDefinition:
         self.recipe = recipe
 
 
+
+def digest_file(path):
+    with open(path, 'rb') as f:
+        return hashlib.sha1(f.read()).hexdigest()
+
+
 class File:
 
     def __init__(self, relpath):
         self._relpath = relpath
 
+    def _make_storage_path(self, storage_dir, digest):
+        return os.path.join(storage_dir, digest)
+
     def create_temp_storage(self, store_dir):
         return store_dir
 
-    def restore(self, storage_dir, work_dir):
-        file_path = os.path.join(storage_dir, self._relpath)
-        logger.debug('restoring from {} to {}'.format(file_path, work_dir))
-        shutil.copy(file_path, work_dir)
+    def restore(self, digest, storage_dir, work_dir):
+        storage_path = self._make_storage_path(storage_dir, digest)
+        restore_path = os.path.join(work_dir, self._relpath)
+        logger.debug(
+            'restoring from {} to {}'.format(storage_path, restore_path))
+        shutil.copy(storage_path, restore_path)
 
     def save(self, work_dir, storage_dir):
         file_path = os.path.join(work_dir, self._relpath)
-        logger.debug('saving from {} to {}'.format(file_path, storage_dir))
-        shutil.copy(file_path, storage_dir)
+        digest = digest_file(file_path)
+        storage_path = self._make_storage_path(storage_dir, digest)
+        logger.debug('saving from {} to {}'.format(file_path, storage_path))
+        shutil.copy(file_path, storage_path)
+        return digest
 
 
 class Shell:
