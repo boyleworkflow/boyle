@@ -23,7 +23,7 @@ class TestBoyle(unittest.TestCase):
         boyle.deliver(foo, self.tempdir)
 
         with open(os.path.join(self.tempdir, filename)) as f:
-            self.assertTrue(f.read() == file_contents)
+            self.assertTrue(f.read().strip() == file_contents)
 
     def tearDown(self):
         shutil.rmtree(self.tempdir)
