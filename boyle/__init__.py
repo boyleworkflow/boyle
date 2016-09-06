@@ -32,21 +32,21 @@ def deliver(requested_defs, delivery_dir):
     def setup_storage(definition, graph_dir):
         assert definition not in storages
         store_dir = tempfile.mkdtemp(prefix='store_', dir=graph_dir)
-        storages[d] = d.resource_handler.create_temp_storage(store_dir)
+        storages[d] = d.resource.create_temp_storage(store_dir)
 
     def restore(definition, destination_dir):
         d = definition
         assert d in digests
         assert d in storages
-        d.resource_handler.restore(digests[d], storages[d], destination_dir)
+        d.resource.restore(digests[d], storages[d], destination_dir)
 
     def save(definition, work_dir):
         d = definition
         assert d in storages
         assert d not in digests
-        digests[d] = d.resource_handler.save(work_dir, storages[d])
+        digests[d] = d.resource.save(work_dir, storages[d])
 
-    if isinstance(requested_defs, ResourceDefinition):
+    if isinstance(requested_defs, Definition):
         requested_defs = (requested_defs,)
     delivery_dir = os.path.abspath(delivery_dir)
     with tempfile.TemporaryDirectory() as graph_dir:
@@ -58,8 +58,8 @@ def deliver(requested_defs, delivery_dir):
             for inp in d.inputs:
                 restore(inp, work_dir)
 
-            for item in d.recipe:
-                item.run(work_dir)
+            for op in d.operations:
+                op.run(work_dir)
 
             save(d, work_dir)
 
@@ -76,7 +76,7 @@ def define(inp=None, out=None, do=None):
     inp = () if inp is None else tuple(inp)
     do = () if do is None else tuple(do)
     if not all(callable(item.run) for item in do):
-        raise ValueError('all the recipe items must be callable')
+        raise ValueError('all the operations must be callable')
 
     # TODO: Which sorts of inputs could out be, really? It seems to make sense
     # that it can be compositions of lists/tuples and dicts, where all leaf
@@ -84,7 +84,7 @@ def define(inp=None, out=None, do=None):
     if not isinstance(out, collections.Sequence):
         out = (out,)
 
-    defs = tuple(ResourceDefinition(inp, out_item, do) for out_item in out)
+    defs = tuple(Definition(inp, out_item, do) for out_item in out)
 
     if len(defs) == 1:
         return defs[0]
@@ -92,16 +92,16 @@ def define(inp=None, out=None, do=None):
         return defs
 
 
-class ResourceDefinition:
+class Definition:
 
     inputs = None
-    resource_handler = None
-    recipe = None
+    resource = None
+    operations = None
 
-    def __init__(self, inputs, resource_handler, recipe):
+    def __init__(self, inputs, resource, operations):
         self.inputs = inputs
-        self.resource_handler = resource_handler
-        self.recipe = recipe
+        self.resource = resource
+        self.operations = operations
 
 
 
