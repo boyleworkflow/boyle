@@ -26,26 +26,42 @@ def get_sorted_upstream(definitions):
     return list(_walk_backwards(definitions))[-1::-1]
 
 def deliver(requested_defs, delivery_dir):
+    storages = {}
+
+    def setup_storage(definition, graph_dir):
+        assert definition not in storages
+        store_dir = tempfile.mkdtemp(prefix='store_', dir=graph_dir)
+        storages[d] = d.resource_handler.create_temp_storage(store_dir)
+
+    def restore(definition, destination_dir):
+        d = definition
+        assert d in storages
+        d.resource_handler.restore(storages[d], destination_dir)
+
+    def save(definition, work_dir):
+        d = definition
+        assert d in storages
+        d.resource_handler.save(work_dir, storages[d])
+
     if isinstance(requested_defs, ResourceDefinition):
         requested_defs = (requested_defs,)
     delivery_dir = os.path.abspath(delivery_dir)
-    storages = {}
     with tempfile.TemporaryDirectory() as graph_dir:
         graph_dir = os.path.abspath(graph_dir)
         for d in get_sorted_upstream(requested_defs):
-            store_dir = tempfile.mkdtemp(prefix='store_', dir=graph_dir)
-            storages[d] = d.resource_handler.create_temp_storage(store_dir)
-            
+            setup_storage(d, graph_dir)
             work_dir = tempfile.mkdtemp(prefix='work_', dir=graph_dir)
+
             for inp in d.inputs:
-                inp.resource_handler.restore(storages[inp], work_dir)
+                restore(inp, work_dir)
 
             for item in d.recipe:
                 item.run(work_dir)
 
-            d.resource_handler.save(work_dir, storages[d])
+            save(d, work_dir)
+
             if d in requested_defs:
-                d.resource_handler.restore(storages[d], delivery_dir)
+                restore(d, delivery_dir)
 
 def define(inp=None, out=None, do=None):
     # TODO: Plenty more input validation, since this is the most central
