@@ -132,4 +132,5 @@ class Shell:
         # Boyle cannot and should not prevent arbitrary code execution, but
         # chroot and/or similar measures could at least prevent some mistakes.
         logger.debug("running cmd '{}' in '{}'".format(self._cmd, work_dir))
-        subprocess.Popen(self._cmd, shell=True, cwd=work_dir)
+        proc = subprocess.Popen(self._cmd, shell=True, cwd=work_dir)
+        proc.wait()
