@@ -12,17 +12,17 @@ import getpass
 from uuid import uuid4
 
 def create_user():
-    import gpc
+    import boyle
     set_user_name = True
     set_user_id = True
-    settings = gpc.config.load()
+    settings = boyle.config.load()
     if 'user' in settings:
         set_user_name = ('name' not in settings['user'])
         set_user_id = ('id' not in settings['user'])
     if set_user_name:
-        gpc.config.set('?global', 'user.name', getpass.getuser())
+        boyle.config.set('?global', 'user.name', getpass.getuser())
     if set_user_id:
-        gpc.config.set('?global', 'user.id', str(uuid4()))
+        boyle.config.set('?global', 'user.id', str(uuid4()))
 
 class CustomInstall(install):
 
@@ -39,14 +39,14 @@ class CustomDevelop(develop):
 install_reqs = parse_requirements('requirements.txt', session=PipSession())
 reqs = [str(ir.req) for ir in install_reqs]
 
-PACKAGE_NAME = 'gpc'
+PACKAGE_NAME = 'boyle'
 
 setup(
-    cmdclass={
-        'install': CustomInstall,
-        'develop': CustomDevelop
-    },
-    name='gpc',
+    # cmdclass={
+    #     'install': CustomInstall,
+    #     'develop': CustomDevelop
+    # },
+    name='boyle',
     version='0.0.1',
     url='',
     license='LGPLv3',
@@ -54,16 +54,15 @@ setup(
     author_email=(
         'mr [at] rasmuseinarsson [dot] se, mr [at] jkallus [dot] se'),
     description=(
-        'A tool for provenance and caching '
-        'in computational workflows'),
+        'A tool for provenance and caching in computational workflows'),
     install_requires=reqs,
-    packages=['gpc'],
-    package_dir={'gpc': 'gpc', 'tests': 'tests'},
-    package_data={'gpc': ['resources/**/*']},
+    packages=['boyle'],
+    package_dir={'boyle': 'boyle', 'tests': 'tests'},
+    package_data={'boyle': ['resources/**/*']},
     test_suite='tests',
     entry_points='''
         [console_scripts]
-        gpc=gpc.cli.main:main_group
+        boyle=boyle.cli.main:main_group
     ''',
     extras_require = {
         },
