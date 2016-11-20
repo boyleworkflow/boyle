@@ -46,7 +46,6 @@ def _resolve(requested_defs, ctx):
             calculation=get_calculation(definition),
             instrument=definition.instrument,
             tmax=time,
-            user=ctx.user,
             )
 
     requested_defs = set(requested_defs)
