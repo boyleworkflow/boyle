@@ -8,9 +8,7 @@ Thus, 'Instrument` instances are used to specify the expected outputs of a calcu
 
 ## Operation
 
-Operations are things that can be done. For example run a shell command or an R script. To be useful in a Boyle workflow, any operation should help to create one or more resources.
-
-A "recipe" (to borrow a word from GNU Make) is simply a sequence of operations that together create some set of resources (as indicated by `Instrument` objects).
+Operations are things that can be done. For example run a shell command or an R script. To be useful in a Boyle workflow, any operation should help to create one or more resources. The Operation of a definition is the equivalent of the "recipe" in GNU Make.
 
 ## Definition
 
@@ -24,13 +22,13 @@ Assume there is an environment, or context, where resources (like files and valu
 
 
 Definition is essentially a tuple
-    (Instrument instr, Definition[] dependencies, Operation[] recipe)
+    (Instrument instr, Definition[] dependencies, Operation recipe)
 
 Resource is a tuple
     (Instrument instr, String digest)
 
 What is run is a Calculation, a tuple
-    (Resource[] inputs, Operation[] recipe)
+    (Resource[] inputs, Operation recipe)
 
 Result is a tuple
     (Calculation calc, Resource r)
