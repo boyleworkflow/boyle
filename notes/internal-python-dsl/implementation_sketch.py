@@ -3,7 +3,7 @@ class Context:
     def get_result(calculation, instrument, tmax): pass
 
 
-def _run(calculation, output_instruments, storage):
+def _run(calculation, output_instruments, log, storage):
     with Context() as context:
         for r in calculation.inputs:
             r.restore(storage, context)
@@ -15,12 +15,16 @@ def _run(calculation, output_instruments, storage):
             '''.format(calculation.procedure.to_json())
         subprocess.run('python -c "{}"'.format(run_script), context.workdir)
 
-        results = {
-            instrument: instrument.save(context, storage)
-            for instrument in output_instruments
-            }
+        output_resources = [
+            Resource(instrument, instrument.digest(context))
+            for instrument in output_instruments]
 
-        return results
+        for r in output_resources:
+            r.save(context, storage)
+
+        # save calculation -> output resources links in log
+        # save run meta data in log (execution time, etc, etc)
+
 
 
 
@@ -53,12 +57,12 @@ def _run(calculation, output_instruments, storage):
 #     {% endfor %}
 #     '''
 
-def ensure_restorable(requested_defs, storage):
+def ensure_restorable(requested_defs, log, storage):
 
     run_needed = {}
     while True:
         for calc, instruments in run_needed.items():
-            _run(calc, mommy)
+            _run(calc, instruments, log, storage)
         try:
             return _resolve(requested_defs, log, storage)
         except RunRequired as e:

@@ -75,6 +75,14 @@ class Resource:
     def unique_str(self):
         return {k: v.unique_str for k, v in attr.asdict(self).items}
 
+    def save(self, context, storage):
+        storage_dir = storage.get_dir(self)
+        self.instrument.save(context, storage_dir)
+
+    def restore(self, storage, context):
+        storage_dir = storage.get_dir(self)
+        self.instrument.restore(storage_dir, context)
+
 @attr.s
 class Calculation:
     procedure = attr.ib()
