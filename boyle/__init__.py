@@ -1,70 +1,89 @@
 import collections
-from itertools import chain
-import tempfile
 import os
 import shutil
 import subprocess
 import logging
 import hashlib
 
+import attr
+
 logger = logging.getLogger(__name__)
 
-def _walk_backwards(definitions):
-    layer = definitions[:]
-    next_layer = set()
-    visited = set()
-    while len(layer) > 0:
-        for d in layer:
-            if d in visited:
-                raise ValueError('the definitions have circular dependencies')
-            next_layer.update(d.inputs)
-            visited.add(d)
-            yield d
-        layer = next_layer
+def digest_str(s):
+    hashlib.sha1(s.encode('utf-8')).hexdigest()
 
-def get_sorted_upstream(definitions):
-    return list(_walk_backwards(definitions))[-1::-1]
+def unique_json(obj):
+    return json.dumps(obj, sort_keys=True)
 
-def deliver(requested_defs, delivery_dir):
-    storages = {}
-    digests = {}
+def _apply_leaves(func, obj):
+    if isinstance(obj, dict):
+        return {k: _apply_leaves(v, func) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_apply_leaves(v, func) for v in obj]
+    elif isinstance(obj, tuple):
+        return tuple(_apply_leaves(v, func) for v in obj)
+    else:
+        return func(obj)
 
-    def setup_storage(definition, graph_dir):
-        assert definition not in storages
-        store_dir = tempfile.mkdtemp(prefix='store_', dir=graph_dir)
-        storages[d] = d.resource.create_temp_storage(store_dir)
+def unique_str_helper(func):
+    @functools.wraps(func)
+    def wrapper(obj):
+        return unique_json([obj.__qualname__, func(obj)])
 
-    def restore(definition, destination_dir):
-        d = definition
-        assert d in digests
-        assert d in storages
-        d.resource.restore(digests[d], storages[d], destination_dir)
+    return wrapper
 
-    def save(definition, work_dir):
-        d = definition
-        assert d in storages
-        assert d not in digests
-        digests[d] = d.resource.save(work_dir, storages[d])
+class Storage:
+    def __init__(storage_dir):
+        self._storage_dir = storage_dir
 
-    if isinstance(requested_defs, Definition):
-        requested_defs = (requested_defs,)
-    delivery_dir = os.path.abspath(delivery_dir)
-    with tempfile.TemporaryDirectory() as graph_dir:
-        graph_dir = os.path.abspath(graph_dir)
-        for d in get_sorted_upstream(requested_defs):
-            setup_storage(d, graph_dir)
-            work_dir = tempfile.mkdtemp(prefix='work_', dir=graph_dir)
+    def get_dir(obj):
+        """
+        Get a directory devoted to an object.
+        Args:
+            obj: Any object which has a unique_str attribute.
 
-            for inp in d.inputs:
-                restore(inp, work_dir)
+        Returns:
+            Path to the directory reserved for the object in this storage,
+            or actually reserved for the unique_str value.
+        """
+        path = os.path.join(self._storage_dir, digest_str(obj.unique_str))
+        os.makedirs(path, exist_ok=True)
+        return path
 
-            for op in d.operations:
-                op.run(work_dir)
 
-            save(d, work_dir)
+class Log:
+    def __init__(log_dir):
+        self._log_dir = log_dir
+        self._results = {}
 
-            if d in requested_defs:
-                restore(d, delivery_dir)
+    def get_result(calculation, instrument, tmax):
+        return self._results[(calculation, instrument)]
+
+@attr.s
+class Definition:
+    inputs = attr.ib()
+    procedure = attr.ib()
+    instrument = attr.ib()
+
+@attr.s
+class Resource:
+    instrument = attr.ib()
+    digest = attr.ib()
+
+    @property
+    @unique_str_helper
+    def unique_str(self):
+        return {k: v.unique_str for k, v in attr.asdict(self).items}
+
+@attr.s
+class Calculation:
+    procedure = attr.ib()
+    inputs = attr.ib()
+
+    @property
+    @unique_str_helper
+    def unique_str(self):
+        return _apply_leaves(lambda x: x.unique_str, attr.asdict(self))
 
 def define(inp=None, out=None, do=None):
     # TODO: Plenty more input validation, since this is the most central
@@ -84,7 +103,9 @@ def define(inp=None, out=None, do=None):
     if not isinstance(out, collections.Sequence):
         out = (out,)
 
-    defs = tuple(Definition(inp, out_item, do) for out_item in out)
+    defs = tuple(
+        Definition(inputs=inp, procedure=do, instrument=out_item)
+        for out_item in out)
 
     if len(defs) == 1:
         return defs[0]
@@ -92,55 +113,53 @@ def define(inp=None, out=None, do=None):
         return defs
 
 
-class Definition:
-
-    inputs = None
-    resource = None
-    operations = None
-
-    def __init__(self, inputs, resource, operations):
-        self.inputs = inputs
-        self.resource = resource
-        self.operations = operations
-
-
-
-def digest_file(path):
+def _digest_file(path):
     with open(path, 'rb') as f:
         return hashlib.sha1(f.read()).hexdigest()
 
 
+@attr.s
 class File:
+    relpath = attr.ib()
 
-    def __init__(self, relpath):
-        self._relpath = relpath
+    @property
+    @unique_str_helper
+    def unique_str(self):
+        return self.relpath
 
-    def _make_storage_path(self, storage_dir, digest):
-        return os.path.join(storage_dir, digest)
+    def _storage_path(self, storage_dir):
+        return os.path.join(storage_dir, self.relpath)
 
-    def create_temp_storage(self, store_dir):
-        return store_dir
+    def _context_path(self, context):
+        os.path.join(context.work_dir, self.relpath)
 
-    def restore(self, digest, storage_dir, work_dir):
-        storage_path = self._make_storage_path(storage_dir, digest)
-        restore_path = os.path.join(work_dir, self._relpath)
+    def digest(self, context):
+        file_path = self._context_path(context)
+        digest = _digest_file(file_path)
+        return digest
+
+    def restore(self, storage_dir, context):
+        storage_path = self._storage_path(storage_dir)
+        restore_path = self._context_path(context)
         logger.debug(
             'restoring from {} to {}'.format(storage_path, restore_path))
         shutil.copy(storage_path, restore_path)
 
-    def save(self, work_dir, storage_dir):
-        file_path = os.path.join(work_dir, self._relpath)
-        digest = digest_file(file_path)
-        storage_path = self._make_storage_path(storage_dir, digest)
+    def save(self, context, storage_dir):
+        file_path = self._context_path(context)
+        storage_path = self._storage_path(storage_dir)
         logger.debug('saving from {} to {}'.format(file_path, storage_path))
         shutil.copy(file_path, storage_path)
-        return digest
 
 
+@attr.s
 class Shell:
+    cmd = attr.ib()
 
-    def __init__(self, cmd):
-        self._cmd = cmd
+    @property
+    @unique_str_helper
+    def unique_str(self):
+        return self.cmd
 
     def run(self, work_dir):
         # TODO: Think about safety here.
@@ -148,6 +167,6 @@ class Shell:
         # Perhaps at least chroot the subprocess by default?
         # Boyle cannot and should not prevent arbitrary code execution, but
         # chroot and/or similar measures could at least prevent some mistakes.
-        logger.debug("running cmd '{}' in '{}'".format(self._cmd, work_dir))
-        proc = subprocess.Popen(self._cmd, shell=True, cwd=work_dir)
+        logger.debug("running cmd '{}' in '{}'".format(self.cmd, work_dir))
+        proc = subprocess.Popen(self.cmd, shell=True, cwd=work_dir)
         proc.wait()
