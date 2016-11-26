@@ -126,6 +126,122 @@ def _digest_file(path):
         return hashlib.sha1(f.read()).hexdigest()
 
 
+def _known_unknown(requested, is_known):
+    root_nodes = set()
+    children = collections.defaultdict(set)
+
+    visited = set()
+    candidates = set(requested_defs)
+    while candidates:
+        d = candidates.pop()
+        if d in visited:
+            continue
+
+        if d.inputs:
+            candidates.update(d.inputs)
+            for parent in d.inputs:
+                children[parent].add(d)
+        else:
+            root_nodes.add(d)
+
+    known = set()
+    unknown = set()
+
+    nodes = root_nodes
+    while nodes:
+        new_known = {d for d in nodes if is_known(d)}
+        known.update(new_known)
+        unknown.update(nodes - new_known)
+        nodes = set.union(*children(d) for d in new_known)
+
+    return known, unknown
+
+
+def _resolve(requested_defs, log, storage):
+    """
+    Tries to resolve the Resources defined by Definitions defs.
+
+    Args:
+        requested_defs: An iterable of requested Definitions.
+        log: A Log to read from and write in.
+        storage: A Storage for resources.
+
+    Returns:
+        A dictionary of {definition: resource} pairs.
+
+    Raises:
+        RunRequired, if additional calculations must be run before
+        the defs can be resolved.
+    """
+
+    # Mathematically this is seen as a function mapping
+    # (Time, User, Definition) -> Resource | Requirement[]
+    # So the first thing to note is
+    # time = now
+    # user = ctx.user
+
+    def get_calculation(definition):
+        return Calculation(
+            definition.procedure,
+            [get_result(inp) for inp in definition.inputs])
+
+    def get_result(definition):
+        log.get_result(
+            calculation=get_calculation(definition),
+            instrument=definition.instrument,
+            tmax=time,
+            )
+
+    def is_known(definition):
+        try:
+            get_result(definition)
+            return True
+        except NoResult:
+            return False
+
+    def is_restorable(definition):
+        resource = get_result(definition)
+        return definition.instrument.can_restore(storage)
+
+    def find_more_needed(initial):
+        new = initial
+        needed = set()
+        while new:
+            needed.update(new)
+            children = candidates[-1]
+            all_parents = set.union(*set(c.inputs) for c in children)
+            new = {p for p in all_parents if not is_restorable(p)}
+        return needed
+
+    requested_defs = set(requested_defs)
+    known, unknown = _known_unknown(requested_defs, is_known)
+    definitely_needed = (
+        {d for d in (requested_defs & known) if not is_restorable(definition)}
+        | unknown
+        )
+    run_needed = find_more_needed(definitely_needed)
+
+    if run_needed:
+        needed_and_possible = filter(is_runnable, run_needed)
+        calcs_instruments = collections.defaultdict(set)
+        for d in needed_and_possible:
+            calcs_instruments[get_calculation(d)].add(d.instrument)
+        raise RunRequired(calcs_instruments)
+
+    return {d: get_result(d) for d in requested_defs}
+
+
+def ensure_restorable(requested_defs, log, storage):
+    run_needed = {}
+    while True:
+        for calc, instruments in run_needed.items():
+            _run(calc, instruments, log, storage)
+        try:
+            return _resolve(requested_defs, log, storage)
+        except RunRequired as e:
+            run_needed = e.calculations
+
+
 @attr.s
 class File:
     relpath = attr.ib()
