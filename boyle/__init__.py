@@ -25,7 +25,7 @@ def _apply_leaves(func, obj):
     else:
         return func(obj)
 
-def unique_str_helper(func):
+def _unique_str_helper(func):
     @functools.wraps(func)
     def wrapper(obj):
         return unique_json([obj.__qualname__, func(obj)])
@@ -71,7 +71,7 @@ class Resource:
     digest = attr.ib()
 
     @property
-    @unique_str_helper
+    @_unique_str_helper
     def unique_str(self):
         return {k: v.unique_str for k, v in attr.asdict(self).items}
 
@@ -89,7 +89,7 @@ class Calculation:
     inputs = attr.ib()
 
     @property
-    @unique_str_helper
+    @_unique_str_helper
     def unique_str(self):
         return _apply_leaves(lambda x: x.unique_str, attr.asdict(self))
 
@@ -131,7 +131,7 @@ class File:
     relpath = attr.ib()
 
     @property
-    @unique_str_helper
+    @_unique_str_helper
     def unique_str(self):
         return self.relpath
 
@@ -165,7 +165,7 @@ class Shell:
     cmd = attr.ib()
 
     @property
-    @unique_str_helper
+    @_unique_str_helper
     def unique_str(self):
         return self.cmd
 
