@@ -36,7 +36,7 @@ U_{i+1} = C_{i+1} \cap Unknown
 
 This way, K_0 \cup K_1 \cup \cdots \cup K_N is the set of known nodes reached in N steps, and U_0 \cup \cdots \cup U_N are the unknown nodes. If C_N = \varnothing then so is K_N and therefore also C_{N+j} = \varnothing for j > 0.
 
-If C_{N+1} = \varnothing, can we possibly have Known \ (K_0 \cup \ldots \cup K_N) \neq \varnothing ? Does not seem so, but can we prove it?
+If C_{N+1} = \varnothing, can we possibly have Known \setminus (K_0 \cup \ldots \cup K_N) \neq \varnothing ? Does not seem so, but can we prove it?
 
 ## Algorithm for finding nonempty A \subseteq (RunNeeded \cap Runnable)
 
