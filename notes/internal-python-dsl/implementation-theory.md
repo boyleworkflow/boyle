@@ -21,7 +21,7 @@ While Requested \nsubseteq Restorable, find and run a nonempty A \subseteq RunNe
 
 ## Algorithm for Known/Unknown/Undecidable
 
-Partitions a set of definitions into {Known, Unknown, Undecidable}. The algorithm guarantees that Unknown = \varnothing \implies Undecidable = \varnothing.
+Partitions a set of definitions into {Known, Unknown, Undecidable}. The algorithm guarantees that Unknown = \varnothing \implies Undecidable = \varnothing. In other words, in a set of definitions, at least one will be Known or Unknown. They can not all be Undecidable.
 
 Take C_0 = root nodes
 
