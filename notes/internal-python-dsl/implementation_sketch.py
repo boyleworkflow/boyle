@@ -1,3 +1,6 @@
+import tempfile
+import time
+
 import attr
 
 @attr.s
@@ -33,10 +36,16 @@ class Calculation:
     inputs = attr.ib()
     operation = attr.ib()
 
+
 @attr.s
-class Result:
+class Run:
     calculation = attr.ib()
-    resource = attr.ib()
+    results = attr.ib()
+    start_time = attr.ib()
+    end_time = attr.ib()
+
+    def __attrs_post_init__(self):
+        self.unique_str = uuid.uuid4()
 
 
 def _get_ancestors(defs):
@@ -47,19 +56,59 @@ def _get_ancestors(defs):
         new_defs = set.union(*(d.parents for d in new_defs)) - defs
     return defs
 
+def digest_str(s):
+    hashlib.sha1(s.encode('utf-8')).hexdigest()
+
+def unique_json(obj):
+    return json.dumps(obj, sort_keys=True)
+
+def get_id_str(obj):
+    id_obj = {
+        'type': type(object).__qualname__,
+        'unique_str': object.unique_str
+        }
+    return digest_str(unique_json(id_obj))
+
 
 @attr.s
 class Scheduler:
 
     log = attr.ib()
     storage = attr.ib()
+    project_dir = attr.ib()
+    work_base_dir = attr.ib()
 
-    def _can_restore(resource):
+    def __attrs_post_init__(self):
+        self.tempdir = tempfile.mkdtemp(prefix='temp', dir=self.work_base_dir)
+
+    def _has_stored_copy(self, resource):
         try:
             storage_meta = self.log.get_storage_meta(resource)
         except NotFound:
             return False
         return resource.instrument.can_restore(storage_meta, self.storage)
+
+    def _resource_temp_dir(self, resource):
+        return os.path.join(self.tempdir, get_id_str(resource))
+
+    def _can_place(self, resource):
+        return self._has_temp_copy(resource) or self._has_stored_copy(resource)
+
+    def _has_temp_copy(self, resource):
+        temp_src_dir = self._resource_temp_dir(resource)
+        return os.path.exists(temp_src_dir)
+
+    def _place_resource(self, resource, dst_dir):
+        if self._has_temp_copy(resource):
+            temp_src_dir = self._resource_temp_dir(resource)
+            resource.instrument.copy(temp_src_dir, dst_dir)
+
+        else:
+            storage_meta = self.log.get_storage_meta(resource)
+            resource.instrument.restore(storage_meta, self.storage, dst_dir)
+
+        assert resource.instrument.digest(dst_dir) == resource.digest
+
 
     def _determine_sets(self, defs):
         defs = topological_sort(defs)
@@ -99,7 +148,7 @@ class Scheduler:
                 sets['Known'].add(d)
                 trusted_result, = trusted_results
 
-            if self._can_restore(trusted_result.resource):
+            if self._can_place(trusted_result):
                 sets['Restorable'].add(d)
 
         return sets
@@ -128,16 +177,56 @@ class Scheduler:
         assert len(final) > 0
         return final
 
-    def _ensure_restorable(requested, path, log):
+    def _ensure_available(requested):
         while True:
             defs_to_run = self._get_ready_and_needed(requested)
             if not defs_to_run:
                 break
 
+            defs_by_calc = defaultdict(set)
             for d in defs_to_run:
-                run_def(d)
+                calc = self.log.get_calculation(d)
+                defs_by_calc[calc].add(d)
 
-        
+            for calc, instruments in defs_by_calc.items():
+                self._run_calc(calc, instruments)
+
+
+    def _run_calc(self, calc, instruments):
+        with tempdir.TemporaryDirectory(
+                prefix=get_id_str(calc),
+                dir=self.work_base_dir) as work_dir:
+            
+            for inp in calc.inputs:
+                self._place_resource(inp, work_dir)
+            
+            start_time = time.time()
+            calc.operation.run(work_dir)
+            end_time = time.time()
+
+            results = [
+                Resource(instrument, instrument.digest(work_dir))
+                for instrument in instruments]
+
+            for res in results:
+                if not self._has_temp_copy(res):
+                    instrument.copy(work_dir, self._resource_temp_dir(res))
+
+            run = Run(
+                calculation=calc,
+                start_time=start_time,
+                end_time=end_time,
+                results=results,
+                )
+
+            self.log.save_run(run)
+            
+
+
+
+
+
+
 
 class Log:
 
