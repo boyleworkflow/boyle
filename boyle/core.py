@@ -109,7 +109,7 @@ class User:
 
 @attr.s
 class Run:
-    run_id = attr.ib(default=None)
+    run_id = attr.ib()
     calc = attr.ib()
     results = attr.ib()
     start_time = attr.ib()
@@ -118,6 +118,3 @@ class Run:
 
     def __attrs_post_init__(self):
         self.results = tuple(self.results)
-        if self.run_id == None:
-            self.run_id = str(uuid.uuid4())
-
