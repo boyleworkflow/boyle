@@ -16,7 +16,7 @@ def id_property(func):
 
     @property
     @functools.wraps(func)
-    def id_func(self, cache=[]):
+    def id_func(self):
         id_obj = func(self)
         try:
             json = unique_json(id_obj)
@@ -31,15 +31,16 @@ def id_property(func):
 
     return id_func
 
+class NotFoundException(Exception): pass
 
 @attr.s
-class ConflictError(Exception):
-    defs = attr.ib()
+class ConflictException(Exception):
+    resources = attr.ib()
 
 
 @attr.s
 class Definition:
-    instrument = attr.ib()
+    instr = attr.ib()
     parents = attr.ib()
     task = attr.ib()
 
@@ -51,11 +52,11 @@ class Definition:
         return other_def not in my_ancestors
 
     @id_property
-    def __id__(self):
+    def def_id(self):
         return {
-            'instrument': self.instrument.__id__,
-            'parents': [p.__id__ for p in self.parents],
-            'task': self.task.__id__
+            'instr': self.instr.instr_id,
+            'parents': [p.def_id for p in self.parents],
+            'task': self.task.task_id
         }
 
     @staticmethod
@@ -73,16 +74,15 @@ class Definition:
         defs.sort()
         return defs
 
-
 @attr.s
 class Resource:
-    instrument = attr.ib()
+    instr = attr.ib()
     digest = attr.ib()
 
     @id_property
-    def __id__(self):
+    def resource_id(self):
         return {
-            'instrument': self.instrument.__id__,
+            'instr': self.instr.instr_id,
             'digest': self.digest
         }
 
@@ -95,23 +95,29 @@ class Calculation:
         self.inputs = tuple(self.inputs)
 
     @id_property
-    def __id__(self):
+    def calc_id(self):
         return {
-            'inputs': [inp.__id__ for inp in self.inputs],
-            'task': self.task.__id__
+            'inputs': [inp.resource_id for inp in self.inputs],
+            'task': self.task.task_id
         }
 
 @attr.s
+class User:
+    user_id = attr.ib()
+    name = attr.ib()
+
+
+@attr.s
 class Run:
-    calculation = attr.ib()
+    run_id = attr.ib(default=None)
+    calc = attr.ib()
     results = attr.ib()
     start_time = attr.ib()
     end_time = attr.ib()
+    user = attr.ib()
 
     def __attrs_post_init__(self):
         self.results = tuple(self.results)
-        self._uuid = str(uuid.uuid4())
+        if self.run_id == None:
+            self.run_id = str(uuid.uuid4())
 
-    @id_property
-    def __id__(self):
-        return self._uuid

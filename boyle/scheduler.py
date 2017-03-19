@@ -76,20 +76,15 @@ class Scheduler:
                 sets['Runnable'].add(d)
 
             calc = self.log.get_calculation(d)
-            trusted_results = self.log.get_trusted_results(calc, d.instrument)
-            num_trusted = len(trusted_results)
-
-            if num_trusted == 0:
-                sets['Unknown'].add(d)
-                continue
-            elif num_trusted > 2:
-                sets['Conflict'].add(d)
-                continue
-            elif num_trusted == 1:
+            try:
+                resource = self.log.get_result(calc, d.instr, self.user)
                 sets['Known'].add(d)
-                trusted_result, = trusted_results
+            except ConflictException as e:
+                sets['Conflict'].add(d)
+            except NotFoundException as e:
+                sets['Unknown'].add(d)
 
-            if self._can_place(trusted_result):
+            if d in sets['Known'] and self._can_place(resource):
                 sets['Restorable'].add(d)
 
         return sets
