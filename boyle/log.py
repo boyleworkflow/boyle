@@ -60,7 +60,7 @@ class Log:
             get_unique_trusted_result(self.get_calculation(p), p.instrument)
             for p in d.parents
             ]
-        return Calculation(inputs=inputs, operation=d.operation)
+        return Calculation(inputs=inputs, task=d.task)
 
 
     def get_storage_meta(self, resource):

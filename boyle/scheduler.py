@@ -144,7 +144,7 @@ class Scheduler:
                 self._place_resource(inp, work_dir)
 
             start_time = time.time()
-            calc.operation.run(work_dir)
+            calc.task.run(work_dir)
             print(work_dir)
             print(os.listdir(work_dir))
             end_time = time.time()

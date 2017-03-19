@@ -41,7 +41,7 @@ class ConflictError(Exception):
 class Definition:
     instrument = attr.ib()
     parents = attr.ib()
-    operation = attr.ib()
+    task = attr.ib()
 
     def __attrs_post_init__(self):
         self.parents = tuple(self.parents)
@@ -55,7 +55,7 @@ class Definition:
         return {
             'instrument': self.instrument.__id__,
             'parents': [p.__id__ for p in self.parents],
-            'operation': self.operation.__id__
+            'task': self.task.__id__
         }
 
     @staticmethod
@@ -89,7 +89,7 @@ class Resource:
 @attr.s
 class Calculation:
     inputs = attr.ib()
-    operation = attr.ib()
+    task = attr.ib()
 
     def __attrs_post_init__(self):
         self.inputs = tuple(self.inputs)
@@ -98,7 +98,7 @@ class Calculation:
     def __id__(self):
         return {
             'inputs': [inp.__id__ for inp in self.inputs],
-            'operation': self.operation.__id__
+            'task': self.task.__id__
         }
 
 @attr.s
