@@ -1,22 +1,22 @@
 import os
-import yaml
+import json
 import logging
 import pkg_resources
 
 DEFAULT_PATH = os.path.abspath(
-    pkg_resources.resource_filename(__name__, 'resources/config.yml'))
-GLOBAL_PATH = os.path.expanduser('~/.config/boyle/config.yml')
+    pkg_resources.resource_filename(__name__, 'resources/boyleconfig.json'))
+GLOBAL_PATH = os.path.expanduser('~/.config/boyle/boyleconfig.json')
 
 # This should be relative! To follow along if one changes the working directory.
-LOCAL_PATH = '.boyle/config.yml'
+LOCAL_PATH = 'boyleconfig.json'
 
 def _read_config_if_exists(path):
     if not os.path.exists(path):
         return {}
 
     with open(path, 'r') as f:
-        config = yaml.safe_load(f.read())
-        return config if config else {}
+        config = json.load(f)
+        return config
 
 def load():
     """
@@ -40,6 +40,30 @@ def load():
         config.update(_read_config_if_exists(path))
     return config
 
+def _get_config_path(path):
+    if path == '?local':
+        path = LOCAL_PATH
+    elif path == '?global':
+        path = GLOBAL_PATH
+
+    return path
+
+def _load_config_file(path):
+    path = _get_config_path(path)
+    config = _read_config_if_exists(path)
+    return config
+
+def _overwrite_config_file(path, config):
+    path = _get_config_path(path)
+
+    dirname = os.path.dirname(path)
+    if not os.path.isdir(dirname):
+        os.makedirs(dirname)
+
+    with open(path, 'w') as configfile:
+        json.dump(config, configfile, indent=4)
+        configfile.write(os.linesep)
+
 
 def set(path, key, value):
     """
@@ -50,31 +74,13 @@ def set(path, key, value):
             are treated specially: they are changed to
             boyle.config.LOCAL_PATH and boyle.config.GLOBAL_PATH, respectively.
         key (str): The config item to change.
-        value: Anything PyYAML can represent as a string. In other
-            words, at least all combinations of dict, list, string and
-            numeric literals.
-
-    Raises:
-        yaml.representer.RepresenterError: If the value cannot be represented
-            as YAML.
+        value: Anything json-encodable.
 
     """
-    test_dump = yaml.safe_dump(value)
-
-    if path == '?local':
-        path = LOCAL_PATH
-    elif path == '?global':
-        path = GLOBAL_PATH
-
-    dirname = os.path.dirname(path)
-    if not os.path.isdir(dirname):
-        os.makedirs(dirname)
-
-    config = _read_config_if_exists(path)
+    config = _load_config_file(path)
     config[key] = value
+    _overwrite_config_file(path, config)
 
-    with open(path, 'w') as configfile:
-        yaml.safe_dump(config, configfile, indent=2, default_flow_style=False)
 
 def unset(path, key):
     """
@@ -91,16 +97,11 @@ def unset(path, key):
         KeyError: If key does not exist.
 
     """
-    if path == '?local':
-        path = LOCAL_PATH
-    elif path == '?global':
-        path = GLOBAL_PATH
-
+    path = _get_config_path(path)
     if not os.path.exists(path):
         raise IOError('The file {} does not exist.'.format(path))
 
-    config = _read_config_if_exists(path)
+    config = _load_config_file(path)
     del config[key]
 
-    with open(path, 'w') as configfile:
-        yaml.safe_dump(config, configfile, indent=2, default_flow_style=False)
+    _overwrite_config_file(path, config)
