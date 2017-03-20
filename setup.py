@@ -42,10 +42,10 @@ reqs = [str(ir.req) for ir in install_reqs]
 PACKAGE_NAME = 'boyle'
 
 setup(
-    # cmdclass={
-    #     'install': CustomInstall,
-    #     'develop': CustomDevelop
-    # },
+    cmdclass={
+        'install': CustomInstall,
+        'develop': CustomDevelop
+    },
     name='boyle',
     version='0.0.1',
     url='',

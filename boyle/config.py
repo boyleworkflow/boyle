@@ -5,10 +5,10 @@ import pkg_resources
 
 DEFAULT_PATH = os.path.abspath(
     pkg_resources.resource_filename(__name__, 'resources/config.yml'))
-GLOBAL_PATH = os.path.expanduser('~/.config/gpc/config.yml')
+GLOBAL_PATH = os.path.expanduser('~/.config/boyle/config.yml')
 
 # This should be relative! To follow along if one changes the working directory.
-LOCAL_PATH = '.gpc/config.yml'
+LOCAL_PATH = '.boyle/config.yml'
 
 def _read_config_if_exists(path):
     if not os.path.exists(path):
@@ -27,9 +27,9 @@ def load():
 
     The configuration is read in sequence from the following places:
 
-        * gpc.config.DEFAULT_PATH
-        * gpc.config.GLOBAL_PATH
-        * gpc.config.LOCAL_PATH
+        * boyle.config.DEFAULT_PATH
+        * boyle.config.GLOBAL_PATH
+        * boyle.config.LOCAL_PATH
 
     Each read overrides previously defined values.
 
@@ -48,7 +48,7 @@ def set(path, key, value):
     Args:
         path (str): The config file to alter. The values ?local and ?global
             are treated specially: they are changed to
-            gpc.config.LOCAL_PATH and gpc.config.GLOBAL_PATH, respectively.
+            boyle.config.LOCAL_PATH and boyle.config.GLOBAL_PATH, respectively.
         key (str): The config item to change.
         value: Anything PyYAML can represent as a string. In other
             words, at least all combinations of dict, list, string and
@@ -83,7 +83,7 @@ def unset(path, key):
     Args:
         path (str): The config file to alter. The values ?local and ?global
             are treated specially: they are changed to
-            gpc.config.LOCAL_PATH and gpc.config.GLOBAL_PATH, respectively.
+            boyle.config.LOCAL_PATH and boyle.config.GLOBAL_PATH, respectively.
         key (str): The config item to remove.
 
     Raises:
