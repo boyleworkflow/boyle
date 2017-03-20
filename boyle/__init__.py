@@ -2,7 +2,9 @@ import logging
 
 import boyle.config
 from boyle.log import Log
-from boyle.core import User
+from boyle.core import User, Def, Calc, Resource, Run, ConflictException
+from boyle.instr import File
+from boyle.task import Shell
 
 logger = logging.getLogger(__name__)
 

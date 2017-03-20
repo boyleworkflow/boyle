@@ -2,14 +2,15 @@ import os
 import shutil
 import attr
 import boyle
+import boyle.core
 
 @attr.s
 class File:
 
     path = attr.ib()
 
-    @boyle.id_property
-    def __id__(self):
+    @boyle.core.id_property
+    def instr_id(self):
         return {'path': self.path}
 
     def digest(self, work_dir):

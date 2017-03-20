@@ -84,7 +84,7 @@ class Log:
     def save_user(self, user):
         with self.conn:
             self.conn.execute(
-                'INSERT INTO user(user_id, name) VALUES(?, ?)',
+                'INSERT OR REPLACE INTO user(user_id, name) VALUES(?, ?)',
                 (user.user_id, user.name))
 
     def get_user(self, user_id):
@@ -106,8 +106,8 @@ class Log:
                 'VALUES (?, ?, ?, ?, ?)',
                 (
                     run.run_id,
-                    calc.calc_id,
-                    user.user_id,
+                    run.calc.calc_id,
+                    run.user.user_id,
                     run.start_time,
                     run.end_time
                     )
@@ -142,7 +142,7 @@ class Log:
 
         return opinions
 
-    def get_result(self, calc, instr, user):
+    def get_trusted_result(self, calc, instr, user):
         opinions_by_resource = self._get_opinions_by_resource(calc, instr)
 
         def is_candidate(resource):
@@ -176,7 +176,7 @@ class Log:
             match, = candidates
             return match
         else:
-            raise ConflictException(candidates)
+            raise boyle.ConflictException(candidates)
 
     def get_calculation(self, d, user):
         inputs = [

@@ -37,9 +37,12 @@ class NotFoundException(Exception): pass
 class ConflictException(Exception):
     resources = attr.ib()
 
+    def __attrs_post_init__(self):
+        self.resources = tuple(self.resources)
+
 
 @attr.s
-class Definition:
+class Def:
     instr = attr.ib()
     parents = attr.ib()
     task = attr.ib()
@@ -87,7 +90,7 @@ class Resource:
         }
 
 @attr.s
-class Calculation:
+class Calc:
     inputs = attr.ib()
     task = attr.ib()
 
