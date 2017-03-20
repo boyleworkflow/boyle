@@ -23,7 +23,7 @@ create table input (
   instr_id text,
   digest text,
   foreign key(calc_id) references calc(calc_id) DEFERRABLE INITIALLY DEFERRED,
-  primary key (calc_id, path, digest)
+  primary key (calc_id, instr_id)
 );
 
 create table def (

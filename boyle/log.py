@@ -3,15 +3,13 @@ import sqlite3
 import logging
 import pkg_resources
 import boyle
+import attr
 
 logger = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 'v0.0.0'
 
-@attr.s
 class Log:
-
-    path = attr.ib()
 
     @staticmethod
     def create(path):
@@ -35,9 +33,9 @@ class Log:
         conn.close()
 
     def __init__(self, path):
-        if not os.path.exists(self.path):
-            Log.create(self.path)
-        self.conn = sqlite3.connect(self.path)
+        if not os.path.exists(path):
+            Log.create(path)
+        self.conn = sqlite3.connect(path)
 
     def close(self):
         self.conn.close()
@@ -88,6 +86,14 @@ class Log:
             self.conn.execute(
                 'INSERT INTO user(user_id, name) VALUES(?, ?)',
                 (user.user_id, user.name))
+
+    def get_user(self, user_id):
+        q = self.conn.execute(
+            'SELECT name FROM user WHERE (user_id = ?)',
+            (user_id,)
+            )
+        name, = q.fetchone()
+        return boyle.User(user_id=user_id, name=name)
 
     def save_run(self, run):
         self.save_calc(run.calc)
