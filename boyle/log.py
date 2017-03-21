@@ -121,6 +121,16 @@ class Log:
                     for resource in run.results
                 ])
 
+    def set_trust(self, calc_id, instr_id, digest, user_id, correct):
+        with self.conn:
+            self.conn.execute(
+                'INSERT OR REPLACE INTO trust '
+                '(calc_id, instr_id, digest, user_id, correct) '
+                'VALUES (?, ?, ?, ?, ?) ',
+                (calc_id, instr_id, digest, user_id, correct)
+                )
+
+
     def _get_opinions_by_resource(self, calc, instr):
         query = self.conn.execute(
             'SELECT DISTINCT digest, trust.user_id, correct FROM result '
@@ -171,7 +181,7 @@ class Log:
         # If there is more than one left, there is a conflict.
 
         if not candidates:
-            raise NotFoundException()
+            raise boyle.NotFoundException()
         elif len(candidates) == 1:
             match, = candidates
             return match
