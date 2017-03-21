@@ -46,11 +46,11 @@ create table trust (
   instr_id text,
   digest text,
   user_id text,
-  time timestamp with time zone,
+  -- time timestamp with time zone,
   correct boolean,
   foreign key(calc_id) references calc(calc_id) DEFERRABLE INITIALLY DEFERRED,
   foreign key(user_id) references user(user_id) DEFERRABLE INITIALLY DEFERRED,
-  primary key (calc_id, instr_id, digest, user_id, time)
+  primary key (calc_id, instr_id, digest, user_id) --, time)
 );
 
 create table run (
