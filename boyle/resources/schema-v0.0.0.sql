@@ -20,16 +20,16 @@ create table calc (
 
 create table input (
   calc_id text,
-  instr_id text,
+  uri text,
   digest text,
   foreign key(calc_id) references calc(calc_id) DEFERRABLE INITIALLY DEFERRED,
-  primary key (calc_id, instr_id)
+  primary key (calc_id, uri)
 );
 
 create table def (
   def_id text primary key,
   calc_id text,
-  instr_id text,
+  uri text,
   foreign key(calc_id) references calc(calc_id) DEFERRABLE INITIALLY DEFERRED
 );
 
@@ -43,14 +43,14 @@ create table parent (
 
 create table trust (
   calc_id text,
-  instr_id text,
+  uri text,
   digest text,
   user_id text,
   -- time timestamp with time zone,
   correct boolean,
   foreign key(calc_id) references calc(calc_id) DEFERRABLE INITIALLY DEFERRED,
   foreign key(user_id) references user(user_id) DEFERRABLE INITIALLY DEFERRED,
-  primary key (calc_id, instr_id, digest, user_id) --, time)
+  primary key (calc_id, uri, digest, user_id) --, time)
 );
 
 create table run (
@@ -67,10 +67,10 @@ create index run_calc on run (calc_id);
 
 create table result (
   run_id text,
-  instr_id text,
+  uri text,
   digest text,
   foreign key(run_id) references run(run_id) DEFERRABLE INITIALLY DEFERRED,
-  primary key (run_id, instr_id, digest)
+  primary key (run_id, uri, digest)
 );
 
 create table requested (

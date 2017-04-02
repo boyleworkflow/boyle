@@ -12,6 +12,10 @@ def digest_str(s):
 def unique_json(obj):
     return json.dumps(obj, sort_keys=True)
 
+def digest_file(path)
+    with open(path, 'rb') as f:
+        return boyle.digest_func(f.read()).hexdigest()
+
 
 def id_property(func):
 
@@ -54,7 +58,7 @@ class Task:
 
 @attr.s
 class Def:
-    instr = attr.ib()
+    path = attr.ib()
     parents = attr.ib()
     task = attr.ib()
 
@@ -68,7 +72,7 @@ class Def:
     @id_property
     def def_id(self):
         return {
-            'instr': self.instr.instr_id,
+            'path': self.path,
             'parents': [p.def_id for p in self.parents],
             'task': self.task.task_id
         }

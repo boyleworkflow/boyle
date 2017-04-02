@@ -5,7 +5,6 @@ from boyle.log import Log
 from boyle.core import (
     User, Def, Calc, Resource, Run, ConflictException, NotFoundException
     )
-from boyle.instr import File
 from boyle.task import Shell
 
 logger = logging.getLogger(__name__)

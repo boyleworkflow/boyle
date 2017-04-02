@@ -121,30 +121,30 @@ class Log:
                     for resource in run.results
                 ])
 
-    def set_trust(self, calc_id, instr_id, digest, user_id, correct):
+    def set_trust(self, calc_id, uri, digest, user_id, correct):
         with self.conn:
             self.conn.execute(
                 'INSERT OR REPLACE INTO trust '
-                '(calc_id, instr_id, digest, user_id, correct) '
+                '(calc_id, uri, digest, user_id, correct) '
                 'VALUES (?, ?, ?, ?, ?) ',
-                (calc_id, instr_id, digest, user_id, correct)
+                (calc_id, uri, digest, user_id, correct)
                 )
 
 
-    def _get_opinions_by_resource(self, calc, instr):
+    def _get_opinions_by_resource(self, calc, uri):
         query = self.conn.execute(
             'SELECT DISTINCT digest, trust.user_id, correct FROM result '
             'INNER JOIN run USING (run_id) '
-            'LEFT OUTER JOIN trust USING (calc_id, instr_id, digest) '
-            'WHERE (instr_id = ? AND calc_id = ?)',
-            (instr.instr_id, calc.calc_id))
+            'LEFT OUTER JOIN trust USING (calc_id, uri, digest) '
+            'WHERE (uri = ? AND calc_id = ?)',
+            (uri, calc.calc_id))
 
         opinions = {}
         logger.debug('Getting opinions')
         for digest, user_id, correct in query:
             logger.debug(
                 f'digest: {digest}, user_id: {user_id}, correct: {correct}')
-            resource = boyle.Resource(instr=instr, digest=digest)
+            resource = boyle.Resource(uri=uri, digest=digest)
             if not resource in opinions:
                 opinions[resource] = {}
             if user_id:
@@ -152,8 +152,8 @@ class Log:
 
         return opinions
 
-    def get_trusted_result(self, calc, instr, user):
-        opinions_by_resource = self._get_opinions_by_resource(calc, instr)
+    def get_trusted_result(self, calc, uri, user):
+        opinions_by_resource = self._get_opinions_by_resource(calc, uri)
 
         def is_candidate(resource):
             opinions = opinions_by_resource[resource]
@@ -189,10 +189,12 @@ class Log:
             raise boyle.ConflictException(candidates)
 
     def get_calculation(self, d, user):
-        inputs = [
-            self.get_result(self.get_calculation(p.calc, user), p.instr, user)
-            for p in d.parents
-            ]
+
+        def get_result(parent):
+            calc = self.get_calculation(parent, user)
+            return self.get_result(calc, parent.uri, user)
+
+        inputs = tuple(get_result(p) for p in d.parents)
         return Calculation(inputs=inputs, task=d.task)
 
 

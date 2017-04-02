@@ -1,5 +1,6 @@
 import attr
 import boyle
+import shutil
 
 @attr.s
 class Scheduler:
@@ -14,41 +15,6 @@ class Scheduler:
         self.project_dir = os.path.abspath(self.project_dir)
         self.work_base_dir = os.path.abspath(self.work_base_dir)
         self.outdir = os.path.abspath(self.outdir)
-        self.tempdir = tempfile.mkdtemp(prefix='temp', dir=self.work_base_dir)
-
-    def _has_stored_copy(self, resource):
-        try:
-            storage_meta = self.log.get_storage_meta(resource)
-        except NotFoundError:
-            return False
-        return resource.instrument.can_restore(storage_meta, self.storage)
-
-    def _resource_temp_dir(self, resource):
-        return os.path.join(self.tempdir, id_str(resource))
-
-    def _can_place(self, resource):
-        return self._has_temp_copy(resource) or self._has_stored_copy(resource)
-
-    def _create_resource_temp_dir(self, resource):
-        path = self._resource_temp_dir(resource)
-        assert not os.path.exists(path)
-        os.mkdir(path)
-
-    def _has_temp_copy(self, resource):
-        temp_src_dir = self._resource_temp_dir(resource)
-        return os.path.exists(temp_src_dir)
-
-    def _place_resource(self, resource, dst_dir):
-        if self._has_temp_copy(resource):
-            temp_src_dir = self._resource_temp_dir(resource)
-            resource.instrument.copy(temp_src_dir, dst_dir)
-
-        else:
-            storage_meta = self.log.get_storage_meta(resource)
-            resource.instrument.restore(storage_meta, self.storage, dst_dir)
-
-        assert resource.instrument.digest(dst_dir) == resource.digest
-
 
     def _determine_sets(self, defs):
         defs = boyle.Definition._topological_sort(defs)
@@ -84,7 +50,9 @@ class Scheduler:
             except NotFoundException as e:
                 sets['Unknown'].add(d)
 
-            if d in sets['Known'] and self._can_place(resource):
+            if (
+                d in sets['Known']
+                and self.storage.can_restore(resource, self.work_base_dir)):
                 sets['Restorable'].add(d)
 
         return sets
@@ -136,7 +104,7 @@ class Scheduler:
                 dir=self.work_base_dir) as work_dir:
 
             for inp in calc.inputs:
-                self._place_resource(inp, work_dir)
+                self.storage.restore(inp, work_dir)
 
             start_time = time.time()
             calc.task.run(work_dir)
@@ -168,9 +136,9 @@ class Scheduler:
         resources = set()
         for d in requested:
             calc = self.log.get_calculation(d)
-            results = self.log.get_trusted_results(calc, d.instrument)
+            results = self.log.get_trusted_results(calc, d.uri)
             assert len(results) == 1
             resources.update(results)
 
         for res in resources:
-            self._place_resource(res, self.outdir)
+            self.storage.restore(res, self.outdir)
