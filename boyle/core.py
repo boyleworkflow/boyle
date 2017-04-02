@@ -38,7 +38,19 @@ class NotFoundException(Exception): pass
 class ConflictException(Exception):
     resources = attr.ib(validator=instance_of(tuple))
 
+@attr.s
+class Task:
+    out = attr.ib(validator=instance_of(tuple))
+    inp = attr.ib(validator=instance_of(tuple))
+    op = attr.ib(validator=instance_of(tuple))
 
+    @id_property
+    def task_id(self):
+        return {
+            'out': self.out,
+            'inp': self.inp,
+            'op': self.op.op_id
+        }
 
 @attr.s
 class Def:
