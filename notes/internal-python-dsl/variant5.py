@@ -19,12 +19,12 @@ with Each(files) as f:
 
 
 unique_pids = define(
-    Value(),
+    Value('out'),
     collect(pids),
     Python('out = set.union(*(set(l) for l in inp'))
 
 unique_nids = define(
-    Value(),
+    Value('out'),
     collect(nids),
     Python('out = set.union(*(set(l) for l in inp'))
 
