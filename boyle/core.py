@@ -2,6 +2,7 @@ import functools
 import json
 import hashlib
 import attr
+from attr.validators import instance_of
 
 digest_func = hashlib.sha1
 
@@ -35,10 +36,8 @@ class NotFoundException(Exception): pass
 
 @attr.s
 class ConflictException(Exception):
-    resources = attr.ib()
+    resources = attr.ib(validator=instance_of(tuple))
 
-    def __attrs_post_init__(self):
-        self.resources = tuple(self.resources)
 
 
 @attr.s
@@ -79,23 +78,20 @@ class Def:
 
 @attr.s
 class Resource:
-    instr = attr.ib()
+    path = attr.ib()
     digest = attr.ib()
 
     @id_property
     def resource_id(self):
         return {
-            'instr': self.instr.instr_id,
+            'path': self.path,
             'digest': self.digest
         }
 
 @attr.s
 class Calc:
-    inputs = attr.ib()
+    inputs = attr.ib(validator=instance_of(tuple))
     task = attr.ib()
-
-    def __attrs_post_init__(self):
-        self.inputs = tuple(self.inputs)
 
     @id_property
     def calc_id(self):
@@ -114,10 +110,7 @@ class User:
 class Run:
     run_id = attr.ib()
     calc = attr.ib()
-    results = attr.ib()
+    results = attr.ib(validator=instance_of(tuple))
     start_time = attr.ib()
     end_time = attr.ib()
     user = attr.ib()
-
-    def __attrs_post_init__(self):
-        self.results = tuple(self.results)
