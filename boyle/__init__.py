@@ -3,7 +3,7 @@ import logging
 import boyle.config
 from boyle.log import Log
 from boyle.core import (
-    User, Def, Calc, Resource, Run, ConflictException, NotFoundException
+    User, Task, Def, Calc, Resource, Run, ConflictException, NotFoundException
     )
 from boyle.task import Shell
 

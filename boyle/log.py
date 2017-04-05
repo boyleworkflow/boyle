@@ -48,10 +48,10 @@ class Log:
                 (calc.calc_id, calc.task.task_id))
 
             self.conn.executemany(
-                'INSERT OR IGNORE INTO input (calc_id, instr_id, digest) '
+                'INSERT OR IGNORE INTO input (calc_id, uri, digest) '
                 'VALUES (?, ?, ?)',
                 [
-                    (calc.calc_id, inp.instr.instr_id, inp.digest)
+                    (calc.calc_id, inp.uri, inp.digest)
                     for inp in calc.inputs
                 ])
 
@@ -72,9 +72,9 @@ class Log:
 
         with self.conn:
             self.conn.execute(
-                'INSERT OR IGNORE INTO def(def_id, calc_id, instr_id) '
+                'INSERT OR IGNORE INTO def(def_id, calc_id, uri) '
                 'VALUES (?, ?, ?)',
-                (d.def_id, d.calc.calc_id, d.instr.instr_id))
+                (d.def_id, d.calc.calc_id, d.uri))
 
             self.conn.executemany(
                 'INSERT OR IGNORE INTO parent(def_id, parent_id) '
@@ -114,10 +114,10 @@ class Log:
                 )
 
             self.conn.executemany(
-                'INSERT OR IGNORE INTO result (run_id, instr_id, digest) '
+                'INSERT OR IGNORE INTO result (run_id, uri, digest) '
                 'VALUES (?, ?, ?)',
                 [
-                    (run.run_id, resource.instr.instr_id, resource.digest)
+                    (run.run_id, resource.uri, resource.digest)
                     for resource in run.results
                 ])
 
@@ -196,7 +196,3 @@ class Log:
 
         inputs = tuple(get_result(p) for p in d.parents)
         return Calculation(inputs=inputs, task=d.task)
-
-
-    def get_storage_meta(self, resource):
-        raise NotImplementedError()

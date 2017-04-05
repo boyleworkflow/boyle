@@ -43,7 +43,7 @@ class Scheduler:
 
             calc = self.log.get_calculation(d)
             try:
-                resource = self.log.get_result(calc, d.instr, self.user)
+                resource = self.log.get_result(calc, d.uri, self.user)
                 sets['Known'].add(d)
             except ConflictException as e:
                 sets['Conflict'].add(d)
@@ -95,13 +95,15 @@ class Scheduler:
                 defs_by_calc[calc].add(d)
 
             for calc, defs in defs_by_calc.items():
-                self._run_calc(calc, [d.instrument for d in defs])
+                self._run_calc(calc, [d.uri for d in defs])
 
 
-    def _run_calc(self, calc, instruments):
+    def _run_calc(self, calc, uris):
         with tempfile.TemporaryDirectory(
                 prefix=id_str(calc),
                 dir=self.work_base_dir) as work_dir:
+
+            uris = [os.path.join(work_dir, uri) for uri in uris]
 
             for inp in calc.inputs:
                 self.storage.restore(inp, work_dir)
@@ -113,8 +115,8 @@ class Scheduler:
             end_time = time.time()
 
             results = [
-                Resource(instrument, instrument.digest(work_dir))
-                for instrument in instruments]
+                Resource(uri, boyle.core.digest_file(uri))
+                for uri in uris]
 
             for res in results:
                 if not self._has_temp_copy(res):
