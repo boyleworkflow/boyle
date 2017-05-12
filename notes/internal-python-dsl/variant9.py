@@ -9,8 +9,6 @@ import boyle
 from glob import glob
 import os
 
-w = Workflow()
-
 # list_col_values could be written in two ways.
 # Either something like this:
 
@@ -39,17 +37,6 @@ def list_col_values(colname):
 
 # Note, the functions above are not tied to this workflow in any way.
 # They could be placed in a separate module, or even a general-purpose lib.
-
-# The Workflow object is probably not much more than a glorified dict
-# with keys to identify the targets/nodes of the graph.
-# It would be glorified at least in the sense that it prevents
-# accidental over-writing of definitions, which could cause some disorder.
-# Each value in the workflow dict is either a definition
-# or a list of definitions. The former will probably be the most common,
-# but the latter is useful when we want to map an operation over a set
-# of definitions (the boyle.each() function). Perhaps also as a sort of
-# meta-definition similar to GNU make. In this example, "boyle make files"
-# should spit out all the csv files.
 
 
 files = [boyle.project_dir(path) for path in glob('path/to/csv_files/*.csv')]
