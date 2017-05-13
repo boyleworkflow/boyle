@@ -96,6 +96,7 @@ class Log:
         return boyle.User(user_id=user_id, name=name)
 
     def save_run(self, run):
+        logger.debug(f'Saving run {run}')
         self.save_calc(run.calc)
         self.save_user(run.user)
 
@@ -152,7 +153,7 @@ class Log:
 
         return opinions
 
-    def get_trusted_result(self, calc, loc, user):
+    def get_result(self, calc, loc, user):
         opinions_by_resource = self._get_opinions_by_resource(calc, loc)
 
         def is_candidate(resource):
@@ -188,11 +189,12 @@ class Log:
         else:
             raise boyle.ConflictException(candidates)
 
-    def get_calculation(self, d, user):
+
+    def get_calculation(self, comp, user):
 
         def get_result(parent):
             calc = self.get_calculation(parent, user)
             return self.get_result(calc, parent.loc, user)
 
-        inputs = tuple(get_result(p) for p in d.parents)
-        return Calculation(inputs=inputs, task=d.task)
+        inputs = tuple(get_result(p) for p in comp.parents)
+        return boyle.Calc(inputs=inputs, op=comp.op)

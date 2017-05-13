@@ -1,4 +1,5 @@
 import functools
+import itertools
 import json
 import hashlib
 import attr
@@ -14,7 +15,7 @@ def unique_json(obj):
 
 def digest_file(path):
     with open(path, 'rb') as f:
-        return boyle.digest_func(f.read()).hexdigest()
+        return digest_func(f.read()).hexdigest()
 
 
 def id_property(func):
@@ -59,7 +60,7 @@ class Rule:
 @attr.s
 class Comp:
     parents = attr.ib()
-    rule = attr.ib()
+    op = attr.ib()
     loc = attr.ib()
 
     def __attrs_post_init__(self):
@@ -78,16 +79,40 @@ class Comp:
         }
 
     @staticmethod
-    def _get_ancestors(comps):
-        comps = set()
+    def get_ancestors(comps):
+        """
+        Get ancestors of a set of compositions.
+
+        The method is static. Call it like Comp.get_ancestors(...)
+
+        Args:
+            comps: an iterable of compositions
+
+        Returns: A set() of all ancestors of the passed compositions,
+            including the passed compositions.
+        """
+        ancestors = set()
         new_comps = set(comps)
         while new_comps:
-            comps.update(new_comps)
-            new_comps = set.union(*(d.parents for d in new_comps)) - comps
-        return comps
+            ancestors.update(new_comps)
+            new_comps = (
+                set(itertools.chain(*(comp.parents for comp in new_comps)))
+                - ancestors
+                )
+        return ancestors
 
     @staticmethod
-    def _topological_sort(comps):
+    def topological_sort(comps):
+        """
+        Sort compositions topologically.
+
+        The method is static. Call it like Comp.topological_sort(...)
+
+        Args:
+            comps: an iterable of Comp
+
+        Returns: a list with the compositions sorted topologically.
+        """
         comps = list(comps)
         comps.sort()
         return comps

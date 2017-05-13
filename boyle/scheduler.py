@@ -1,6 +1,25 @@
+import shutil
+import subprocess
+import os
+import uuid
+import itertools
+from collections import defaultdict
+import time
+import tempfile
+import logging
 import attr
 import boyle
-import shutil
+from boyle import ConflictException, NotFoundException
+
+logger = logging.getLogger(__name__)
+
+def _run_op(op, work_dir):
+    prev_dir = os.getcwd()
+    os.chdir(work_dir)
+    print(f'doing "{op}" in {work_dir}')
+    subprocess.run(op, shell=True)
+    os.chdir(prev_dir)
+
 
 @attr.s
 class Scheduler:
@@ -10,14 +29,16 @@ class Scheduler:
     project_dir = attr.ib()
     work_base_dir = attr.ib()
     outdir = attr.ib()
+    user = attr.ib()
 
     def __attrs_post_init__(self):
         self.project_dir = os.path.abspath(self.project_dir)
         self.work_base_dir = os.path.abspath(self.work_base_dir)
         self.outdir = os.path.abspath(self.outdir)
+        os.makedirs(self.work_base_dir, exist_ok=True)
 
-    def _determine_sets(self, defs):
-        defs = boyle.Definition._topological_sort(defs)
+    def _determine_sets(self, comps):
+        comps = boyle.Comp.topological_sort(comps)
 
         sets = {
             name: set() for name in (
@@ -31,37 +52,38 @@ class Scheduler:
                 )
             }
 
-        for d in defs:
-            if set(d.parents) <= sets['Known']:
-                sets['Concrete'].add(d)
+        for comp in comps:
+            if set(comp.parents) <= sets['Known']:
+                sets['Concrete'].add(comp)
             else:
-                sets['Abstract'].add(d)
+                sets['Abstract'].add(comp)
                 continue
 
-            if set(d.parents) <= sets['Restorable']:
-                sets['Runnable'].add(d)
+            if set(comp.parents) <= sets['Restorable']:
+                sets['Runnable'].add(comp)
 
-            calc = self.log.get_calculation(d)
+            calc = self.log.get_calculation(comp, self.user)
             try:
-                resource = self.log.get_result(calc, d.uri, self.user)
-                sets['Known'].add(d)
+                resource = self.log.get_result(calc, comp.loc, self.user)
+                sets['Known'].add(comp)
             except ConflictException as e:
-                sets['Conflict'].add(d)
+                sets['Conflict'].add(comp)
             except NotFoundException as e:
-                sets['Unknown'].add(d)
+                sets['Unknown'].add(comp)
 
             if (
-                d in sets['Known']
+                comp in sets['Known']
                 and self.storage.can_restore(resource, self.work_base_dir)):
-                sets['Restorable'].add(d)
+                sets['Restorable'].add(comp)
 
         return sets
 
     def _get_ready_and_needed(self, requested):
         requested = set(requested)
+        logger.debug(f'Requested: {requested}')
         assert len(requested) > 0
-        defs = boyle.Definition._get_ancestors(requested) | requested
-        sets = self._determine_sets(defs)
+        comps = boyle.Comp.get_ancestors(requested)
+        sets = self._determine_sets(comps)
 
         if sets['Conflict']:
             raise ConflictError(sets['Conflict'])
@@ -75,72 +97,69 @@ class Scheduler:
         while additional:
             candidates.update(additional)
             additional = (
-                set(itertools.chain(*(d.parents for d in candidates)))
+                set(itertools.chain(*(comp.parents for comp in additional)))
                 - sets['Restorable']
                 )
 
         final = candidates.intersection(sets['Runnable'])
         assert len(final) > 0
+        logging.debug(f'Ready and needed: {final}')
         return final
 
     def _ensure_available(self, requested):
         while True:
-            defs_to_run = self._get_ready_and_needed(requested)
-            if not defs_to_run:
+            comps_to_run = self._get_ready_and_needed(requested)
+            if not comps_to_run:
                 break
 
-            defs_by_calc = defaultdict(set)
-            for d in defs_to_run:
-                calc = self.log.get_calculation(d)
-                defs_by_calc[calc].add(d)
+            comps_by_calc = defaultdict(set)
+            for comp in comps_to_run:
+                calc = self.log.get_calculation(comp, self.user)
+                comps_by_calc[calc].add(comp)
 
-            for calc, defs in defs_by_calc.items():
-                self._run_calc(calc, [d.uri for d in defs])
+            for calc, comps in comps_by_calc.items():
+                self._run_calc(calc, [comp.loc for comp in comps])
 
 
-    def _run_calc(self, calc, uris):
+    def _run_calc(self, calc, out_locs):
         with tempfile.TemporaryDirectory(
-                prefix=id_str(calc),
+                prefix=calc.calc_id,
                 dir=self.work_base_dir) as work_dir:
 
-            uris = [os.path.join(work_dir, uri) for uri in uris]
+            out_paths = {loc: os.path.join(work_dir, loc) for loc in out_locs}
 
             for inp in calc.inputs:
                 self.storage.restore(inp, work_dir)
 
             start_time = time.time()
-            calc.task.run(work_dir)
-            print(work_dir)
-            print(os.listdir(work_dir))
+            _run_op(calc.op, work_dir)
             end_time = time.time()
 
-            results = [
-                Resource(uri, boyle.core.digest_file(uri))
-                for uri in uris]
+            results = tuple(
+                boyle.Resource(loc, boyle.core.digest_file(path))
+                for loc, path in out_paths.items())
 
             for res in results:
-                if not self._has_temp_copy(res):
-                    self._create_resource_temp_dir(res)
-                    res.instrument.copy(work_dir, self._resource_temp_dir(res))
+                self.storage.store(res, work_dir)
 
-            run = Run(
+            run = boyle.Run(
                 run_id=str(uuid.uuid4()),
-                calculation=calc,
+                calc=calc,
                 start_time=start_time,
                 end_time=end_time,
                 results=results,
+                user=self.user
                 )
 
             self.log.save_run(run)
 
-    def make(self, requested):
-        self._ensure_available(requested)
+    def make(self, requested_comps):
+        self._ensure_available(requested_comps)
         resources = set()
-        for d in requested:
-            calc = self.log.get_calculation(d)
-            results = self.log.get_trusted_results(calc, d.uri)
-            assert len(results) == 1
-            resources.update(results)
+        for comp in requested_comps:
+            calc = self.log.get_calculation(comp, self.user)
+            result = self.log.get_result(calc, comp.loc, self.user)
+            resources.add(result)
 
         for res in resources:
             self.storage.restore(res, self.outdir)
