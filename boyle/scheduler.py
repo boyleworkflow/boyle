@@ -169,7 +169,8 @@ class Scheduler:
             }
 
         time = datetime.datetime.utcnow()
-        for comp, result in all_results.items():
+        for comp in boyle.Comp.topological_sort(all_comps):
+            result = all_results[comp]
             self.log.save_response(comp, result, self.user, time)
 
         for comp in requested_comps:
