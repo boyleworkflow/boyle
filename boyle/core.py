@@ -43,13 +43,13 @@ class ConflictException(Exception):
     resources = attr.ib(validator=instance_of(tuple))
 
 @attr.s
-class Task:
+class Rule:
     out = attr.ib(validator=instance_of(tuple))
     inp = attr.ib(validator=instance_of(tuple))
-    op = attr.ib(validator=instance_of(tuple))
+    op = attr.ib()
 
     @id_property
-    def task_id(self):
+    def rule_id(self):
         return {
             'out': self.out,
             'inp': self.inp,
@@ -57,63 +57,63 @@ class Task:
         }
 
 @attr.s
-class Def:
-    path = attr.ib()
+class Comp:
     parents = attr.ib()
-    task = attr.ib()
+    rule = attr.ib()
+    loc = attr.ib()
 
     def __attrs_post_init__(self):
         self.parents = tuple(self.parents)
 
-    def __lt__(self, other_def):
+    def __lt__(self, other_comp):
         my_ancestors = _get_ancestors([self])
-        return other_def not in my_ancestors
+        return other_comp not in my_ancestors
 
     @id_property
-    def def_id(self):
+    def comp_id(self):
         return {
-            'path': self.path,
-            'parents': [p.def_id for p in self.parents],
-            'task': self.task.task_id
+            'loc': self.loc,
+            'parents': [p.comp_id for p in self.parents],
+            'rule': self.rule.rule_id
         }
 
     @staticmethod
-    def _get_ancestors(defs):
-        defs = set()
-        new_defs = set(defs)
-        while new_defs:
-            defs.update(new_defs)
-            new_defs = set.union(*(d.parents for d in new_defs)) - defs
-        return defs
+    def _get_ancestors(comps):
+        comps = set()
+        new_comps = set(comps)
+        while new_comps:
+            comps.update(new_comps)
+            new_comps = set.union(*(d.parents for d in new_comps)) - comps
+        return comps
 
     @staticmethod
-    def _topological_sort(defs):
-        defs = list(defs)
-        defs.sort()
-        return defs
+    def _topological_sort(comps):
+        comps = list(comps)
+        comps.sort()
+        return comps
 
 @attr.s
 class Resource:
-    path = attr.ib()
+    loc = attr.ib()
     digest = attr.ib()
 
     @id_property
     def resource_id(self):
         return {
-            'path': self.path,
+            'loc': self.loc,
             'digest': self.digest
         }
 
 @attr.s
 class Calc:
     inputs = attr.ib(validator=instance_of(tuple))
-    task = attr.ib()
+    rule = attr.ib()
 
     @id_property
     def calc_id(self):
         return {
             'inputs': [inp.resource_id for inp in self.inputs],
-            'task': self.task.task_id
+            'rule': self.rule.rule_id
         }
 
 @attr.s
