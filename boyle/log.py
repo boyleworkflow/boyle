@@ -38,7 +38,8 @@ class Log:
     def __init__(self, path):
         if not os.path.exists(path):
             Log.create(path)
-        self.conn = sqlite3.connect(path)
+        self.conn = sqlite3.connect(path, isolation_level='IMMEDIATE')
+        self.conn.execute('PRAGMA foreign_keys = ON;')
 
     def close(self):
         self.conn.close()
