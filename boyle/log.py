@@ -2,12 +2,15 @@ import os
 import sqlite3
 import logging
 import pkg_resources
+import datetime
 import boyle
 import attr
 
 logger = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 'v0.0.0'
+
+sqlite3.register_adapter(datetime.datetime, lambda dt: dt.isoformat())
 
 class Log:
 
@@ -43,9 +46,14 @@ class Log:
     def save_calc(self, calc):
         with self.conn:
             self.conn.execute(
-                'INSERT OR IGNORE INTO calc(calc_id, op) '
+                'INSERT OR IGNORE INTO op(op_id, definition) '
                 'VALUES (?, ?)',
-                (calc.calc_id, calc.op))
+                (calc.op.op_id, calc.op.definition))
+
+            self.conn.execute(
+                'INSERT OR IGNORE INTO calc(calc_id, op_id) '
+                'VALUES (?, ?)',
+                (calc.calc_id, calc.op.op_id))
 
             self.conn.executemany(
                 'INSERT OR IGNORE INTO input (calc_id, loc, digest) '
@@ -68,18 +76,7 @@ class Log:
                 raise ValueError(
                     f'parent {p} of composition {comp} must be saved first')
 
-        self.save_calc(comp.calc)
 
-        with self.conn:
-            self.conn.execute(
-                'INSERT OR IGNORE INTO comp(comp_id, calc_id, loc) '
-                'VALUES (?, ?, ?)',
-                (d.comp_id, d.calc.calc_id, d.loc))
-
-            self.conn.executemany(
-                'INSERT OR IGNORE INTO parent(comp_id, parent_id) '
-                'VALUES (?, ?)',
-                [(d.comp_id, p.comp_id) for p in d.parents])
 
     def save_user(self, user):
         with self.conn:
@@ -115,12 +112,31 @@ class Log:
                 )
 
             self.conn.executemany(
-                'INSERT OR IGNORE INTO result (run_id, loc, digest) '
+                'INSERT INTO result (run_id, loc, digest) '
                 'VALUES (?, ?, ?)',
                 [
                     (run.run_id, resource.loc, resource.digest)
                     for resource in run.results
                 ])
+
+    def save_response(self, comp, result, user, time):
+        with self.conn:
+            self.conn.execute(
+                'INSERT OR IGNORE INTO comp(comp_id, op_id, loc) '
+                'VALUES (?, ?, ?)',
+                (comp.comp_id, comp.op.op_id, comp.loc))
+
+            self.conn.executemany(
+                'INSERT OR IGNORE INTO parent(comp_id, parent_id) '
+                'VALUES (?, ?)',
+                [(comp.comp_id, p.comp_id) for p in comp.parents])
+
+            self.conn.execute(
+                'INSERT OR IGNORE INTO response '
+                '(comp_id, digest, user_id, first_time) '
+                'VALUES (?, ?, ?, ?)',
+                (comp.comp_id, result.digest, user.user_id, time))
+
 
     def set_trust(self, calc_id, loc, digest, user_id, opinion):
         with self.conn:

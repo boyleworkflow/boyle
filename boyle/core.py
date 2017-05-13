@@ -44,18 +44,12 @@ class ConflictException(Exception):
     resources = attr.ib(validator=instance_of(tuple))
 
 @attr.s
-class Rule:
-    out = attr.ib(validator=instance_of(tuple))
-    inp = attr.ib(validator=instance_of(tuple))
-    op = attr.ib()
+class Op:
+    definition = attr.ib()
 
     @id_property
-    def rule_id(self):
-        return {
-            'out': self.out,
-            'inp': self.inp,
-            'op': self.op.op_id
-        }
+    def op_id(self):
+        return {'definition': self.definition}
 
 @attr.s
 class Comp:
@@ -75,7 +69,7 @@ class Comp:
         return {
             'loc': self.loc,
             'parents': [p.comp_id for p in self.parents],
-            'rule': self.rule.rule_id
+            'op': self.op.op_id
         }
 
     @staticmethod
@@ -138,7 +132,7 @@ class Calc:
     def calc_id(self):
         return {
             'inputs': [inp.resource_id for inp in self.inputs],
-            'op': self.op
+            'op': self.op.op_id
         }
 
 @attr.s

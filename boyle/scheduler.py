@@ -4,9 +4,9 @@ import os
 import uuid
 import itertools
 from collections import defaultdict
-import time
 import tempfile
 import logging
+import datetime
 import attr
 import boyle
 from boyle import ConflictException, NotFoundException
@@ -17,7 +17,7 @@ def _run_op(op, work_dir):
     prev_dir = os.getcwd()
     os.chdir(work_dir)
     print(f'doing "{op}" in {work_dir}')
-    subprocess.run(op, shell=True)
+    subprocess.run(op.definition, shell=True)
     os.chdir(prev_dir)
 
 
@@ -126,14 +126,15 @@ class Scheduler:
                 prefix=calc.calc_id,
                 dir=self.work_base_dir) as work_dir:
 
+            assert len(out_locs) == len(set(out_locs))
             out_paths = {loc: os.path.join(work_dir, loc) for loc in out_locs}
 
             for inp in calc.inputs:
                 self.storage.restore(inp, work_dir)
 
-            start_time = time.time()
+            start_time = datetime.datetime.utcnow()
             _run_op(calc.op, work_dir)
-            end_time = time.time()
+            end_time = datetime.datetime.utcnow()
 
             results = tuple(
                 boyle.Resource(loc, boyle.core.digest_file(path))
@@ -148,7 +149,7 @@ class Scheduler:
                 start_time=start_time,
                 end_time=end_time,
                 results=results,
-                user=self.user
+                user=self.user,
                 )
 
             self.log.save_run(run)
@@ -156,10 +157,20 @@ class Scheduler:
     def make(self, requested_comps):
         self._ensure_available(requested_comps)
         resources = set()
-        for comp in requested_comps:
-            calc = self.log.get_calculation(comp, self.user)
-            result = self.log.get_result(calc, comp.loc, self.user)
-            resources.add(result)
 
-        for res in resources:
-            self.storage.restore(res, self.outdir)
+        all_comps = boyle.Comp.get_ancestors(requested_comps)
+        all_calcs = {
+            comp: self.log.get_calculation(comp, self.user)
+            for comp in all_comps
+            }
+        all_results = {
+            comp: self.log.get_result(all_calcs[comp], comp.loc, self.user)
+            for comp in all_comps
+            }
+
+        time = datetime.datetime.utcnow()
+        for comp, result in all_results.items():
+            self.log.save_response(comp, result, self.user, time)
+
+        for comp in requested_comps:
+            self.storage.restore(all_results[comp], self.outdir)

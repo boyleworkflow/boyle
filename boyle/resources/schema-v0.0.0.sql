@@ -12,10 +12,15 @@ create table user (
   name text
 );
 
+create table op (
+  op_id text primary key, -- id based on definition
+  definition text
+);
+
 create table calc (
   calc_id text primary key, -- id based on task and inputs
-  op text
-  -- foreign key(rule_id) references task(rule_id) DEFERRABLE INITIALLY DEFERRED
+  op_id text,
+  foreign key(op_id) references op(op_id) DEFERRABLE INITIALLY DEFERRED
 );
 
 -- An input to a calculation, i.e., a (Calc, Resource) pair
@@ -30,9 +35,9 @@ create table input (
 -- composition
 create table comp (
   comp_id text primary key,
-  calc_id text,
+  op_id text,
   loc text,
-  foreign key(calc_id) references calc(calc_id) DEFERRABLE INITIALLY DEFERRED
+  foreign key(op_id) references op(op_id) DEFERRABLE INITIALLY DEFERRED
 );
 
 -- Parent of a composition, i.e., a pair (Comp child, Comp parent)
@@ -49,7 +54,7 @@ create table trust (
   loc text,
   digest text,
   user_id text,
-  -- time timestamp with time zone,
+  -- time timestamp,
   opinion boolean,
   foreign key(calc_id) references calc(calc_id) DEFERRABLE INITIALLY DEFERRED,
   foreign key(user_id) references user(user_id) DEFERRABLE INITIALLY DEFERRED,
@@ -61,8 +66,8 @@ create table run (
   calc_id text,
   user_id text,
   -- info text,
-  start_time timestamp with time zone,
-  end_time timestamp with time zone,
+  start_time timestamp,
+  end_time timestamp,
   foreign key(user_id) references user(user_id) DEFERRABLE INITIALLY DEFERRED,
   foreign key(calc_id) references calc(calc_id) DEFERRABLE INITIALLY DEFERRED
 );
@@ -74,16 +79,16 @@ create table result (
   loc text,
   digest text,
   foreign key(run_id) references run(run_id) DEFERRABLE INITIALLY DEFERRED,
-  primary key (run_id, loc, digest)
+  primary key (run_id, loc)
 );
 
 -- A resource that was the response to a request of a composition,
 -- i.e., a record of which results have been received by different users.
-create table requested (
+create table response (
   comp_id text,
   digest text,
   user_id text,
-  first_time timestamp with time zone,
+  first_time timestamp,
   foreign key(user_id) references user(user_id) DEFERRABLE INITIALLY DEFERRED,
   foreign key(comp_id) references comp(comp_id) DEFERRABLE INITIALLY DEFERRED,
   primary key (comp_id, digest, user_id)

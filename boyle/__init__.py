@@ -2,7 +2,7 @@ import logging
 
 import boyle.config
 from boyle.core import (
-    User, Rule, Comp, Calc, Resource, Run, ConflictException, NotFoundException
+    User, Op, Comp, Calc, Resource, Run, ConflictException, NotFoundException
     )
 from boyle.log import Log
 from boyle.scheduler import Scheduler
