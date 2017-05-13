@@ -12,7 +12,7 @@ def digest_str(s):
 def unique_json(obj):
     return json.dumps(obj, sort_keys=True)
 
-def digest_file(path)
+def digest_file(path):
     with open(path, 'rb') as f:
         return boyle.digest_func(f.read()).hexdigest()
 
@@ -107,13 +107,13 @@ class Resource:
 @attr.s
 class Calc:
     inputs = attr.ib(validator=instance_of(tuple))
-    rule = attr.ib()
+    op = attr.ib()
 
     @id_property
     def calc_id(self):
         return {
             'inputs': [inp.resource_id for inp in self.inputs],
-            'rule': self.rule.rule_id
+            'op': self.op
         }
 
 @attr.s

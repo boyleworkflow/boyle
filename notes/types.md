@@ -1,5 +1,5 @@
 Comp d: (Comp[] parents, Rule r, Loc l)
 Rule r: (Loc[] inputs, Loc[] outputs, Operation op)
 Resource r: (Loc location, Digest digest)
-Calc c: (Resource[] inputs, Rule r)
+Calc c: (Resource[] inputs, Operation op)
 Run r: (Calc c, Resource[] results, User u)

@@ -28,12 +28,12 @@ def generate_conflict_cases(users, results):
         )
 
     for i, opinions in enumerate(opinion_cases):
-        calc = boyle.Calc(inputs=[], task=boyle.Shell(f'do_{i+1}'))
+        calc = boyle.Calc(inputs=(), op=f'do_{i+1}')
         runs = [
             boyle.Run(
                 run_id=f'run-{i}-{result.digest}',
                 calc=calc,
-                results=[result],
+                results=(result,),
                 start_time=datetime.datetime.utcnow(),
                 end_time=datetime.datetime.utcnow(),
                 user=run_user
@@ -85,7 +85,7 @@ class TestLog(unittest.TestCase):
 
     def test_conflict(self):
 
-        instr = boyle.File('something')
+        loc = 'path/to/something'
         num_users = 3
         num_results = 2
 
@@ -95,7 +95,7 @@ class TestLog(unittest.TestCase):
             ]
 
         results = [
-            boyle.Resource(instr=instr, digest=f'digest{i+1}')
+            boyle.Resource(loc=loc, digest=f'digest{i+1}')
             for i in range(num_results)
             ]
 
@@ -114,23 +114,23 @@ class TestLog(unittest.TestCase):
                     for user, opinion in user_opinions.items():
                         if opinion is not None:
                             log.set_trust(
-                                calc.calc_id,
-                                instr.instr_id,
-                                result.digest,
-                                the_user.user_id,
-                                opinion
+                                calc_id=calc.calc_id,
+                                loc=loc,
+                                digest=result.digest,
+                                user_id=the_user.user_id,
+                                opinion=opinion
                                 )
                 if expected_results == set():
                     with self.assertRaises(boyle.NotFoundException):
-                        log.get_trusted_result(calc, instr, the_user)
+                        log.get_trusted_result(calc, loc, the_user)
                 elif len(expected_results) == 1:
                     the_result, = expected_results
                     self.assertEqual(
                         the_result,
-                        log.get_trusted_result(calc, instr, the_user))
+                        log.get_trusted_result(calc, loc, the_user))
                 else:
                     with self.assertRaises(boyle.ConflictException):
-                        log.get_trusted_result(calc, instr, the_user)
+                        log.get_trusted_result(calc, loc, the_user)
 
 
 if __name__ == '__main__':

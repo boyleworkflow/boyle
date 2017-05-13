@@ -1,9 +1,9 @@
 PRAGMA foreign_keys = ON;
 
--- state of task when run
--- create table task (
+-- -- state of rule when run
+-- create table rule (
 --   rule_id text primary key,
---   compinition text,
+--   definition text,
 --   sysstate text
 -- );
 
@@ -14,8 +14,8 @@ create table user (
 
 create table calc (
   calc_id text primary key, -- id based on task and inputs
-  rule_id text,
-  foreign key(rule_id) references task(rule_id) DEFERRABLE INITIALLY DEFERRED
+  op text
+  -- foreign key(rule_id) references task(rule_id) DEFERRABLE INITIALLY DEFERRED
 );
 
 -- An input to a calculation, i.e., a (Calc, Resource) pair
@@ -50,7 +50,7 @@ create table trust (
   digest text,
   user_id text,
   -- time timestamp with time zone,
-  correct boolean,
+  opinion boolean,
   foreign key(calc_id) references calc(calc_id) DEFERRABLE INITIALLY DEFERRED,
   foreign key(user_id) references user(user_id) DEFERRABLE INITIALLY DEFERRED,
   primary key (calc_id, loc, digest, user_id) --, time)

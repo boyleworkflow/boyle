@@ -43,43 +43,43 @@ class Log:
     def save_calc(self, calc):
         with self.conn:
             self.conn.execute(
-                'INSERT OR IGNORE INTO calc(calc_id, task_id) '
+                'INSERT OR IGNORE INTO calc(calc_id, op) '
                 'VALUES (?, ?)',
-                (calc.calc_id, calc.task.task_id))
+                (calc.calc_id, calc.op))
 
             self.conn.executemany(
-                'INSERT OR IGNORE INTO input (calc_id, uri, digest) '
+                'INSERT OR IGNORE INTO input (calc_id, loc, digest) '
                 'VALUES (?, ?, ?)',
                 [
-                    (calc.calc_id, inp.uri, inp.digest)
+                    (calc.calc_id, inp.loc, inp.digest)
                     for inp in calc.inputs
                 ])
 
-    def _def_exists(self, d):
+    def _comp_exists(self, c):
         self.conn.execute(
-            'SELECT COUNT(def_id) FROM def WHERE (def_id = ?)',
-            (d.def_id,))
+            'SELECT COUNT(comp_id) FROM def WHERE (comp_id = ?)',
+            (d.comp_id,))
 
         return cur.fetchone() != None
 
-    def save_def(self, d):
-        for p in d.parents:
-            if not _def_exists(p):
+    def save_comp(self, comp):
+        for p in comp.parents:
+            if not _comp_exists(p):
                 raise ValueError(
-                    f'parent {p} of definition {d} must be saved first')
+                    f'parent {p} of composition {comp} must be saved first')
 
-        self.save_calc(d.calc)
+        self.save_calc(comp.calc)
 
         with self.conn:
             self.conn.execute(
-                'INSERT OR IGNORE INTO def(def_id, calc_id, uri) '
+                'INSERT OR IGNORE INTO comp(comp_id, calc_id, loc) '
                 'VALUES (?, ?, ?)',
-                (d.def_id, d.calc.calc_id, d.uri))
+                (d.comp_id, d.calc.calc_id, d.loc))
 
             self.conn.executemany(
-                'INSERT OR IGNORE INTO parent(def_id, parent_id) '
+                'INSERT OR IGNORE INTO parent(comp_id, parent_id) '
                 'VALUES (?, ?)',
-                [(d.def_id, p.def_id) for p in d.parents])
+                [(d.comp_id, p.comp_id) for p in d.parents])
 
     def save_user(self, user):
         with self.conn:
@@ -114,46 +114,46 @@ class Log:
                 )
 
             self.conn.executemany(
-                'INSERT OR IGNORE INTO result (run_id, uri, digest) '
+                'INSERT OR IGNORE INTO result (run_id, loc, digest) '
                 'VALUES (?, ?, ?)',
                 [
-                    (run.run_id, resource.uri, resource.digest)
+                    (run.run_id, resource.loc, resource.digest)
                     for resource in run.results
                 ])
 
-    def set_trust(self, calc_id, uri, digest, user_id, correct):
+    def set_trust(self, calc_id, loc, digest, user_id, opinion):
         with self.conn:
             self.conn.execute(
                 'INSERT OR REPLACE INTO trust '
-                '(calc_id, uri, digest, user_id, correct) '
+                '(calc_id, loc, digest, user_id, opinion) '
                 'VALUES (?, ?, ?, ?, ?) ',
-                (calc_id, uri, digest, user_id, correct)
+                (calc_id, loc, digest, user_id, opinion)
                 )
 
 
-    def _get_opinions_by_resource(self, calc, uri):
+    def _get_opinions_by_resource(self, calc, loc):
         query = self.conn.execute(
-            'SELECT DISTINCT digest, trust.user_id, correct FROM result '
+            'SELECT DISTINCT digest, trust.user_id, opinion FROM result '
             'INNER JOIN run USING (run_id) '
-            'LEFT OUTER JOIN trust USING (calc_id, uri, digest) '
-            'WHERE (uri = ? AND calc_id = ?)',
-            (uri, calc.calc_id))
+            'LEFT OUTER JOIN trust USING (calc_id, loc, digest) '
+            'WHERE (loc = ? AND calc_id = ?)',
+            (loc, calc.calc_id))
 
         opinions = {}
         logger.debug('Getting opinions')
-        for digest, user_id, correct in query:
+        for digest, user_id, opinion in query:
             logger.debug(
-                f'digest: {digest}, user_id: {user_id}, correct: {correct}')
-            resource = boyle.Resource(uri=uri, digest=digest)
+                f'digest: {digest}, user_id: {user_id}, opinion: {opinion}')
+            resource = boyle.Resource(loc=loc, digest=digest)
             if not resource in opinions:
                 opinions[resource] = {}
             if user_id:
-                opinions[resource][user_id] = correct
+                opinions[resource][user_id] = opinion
 
         return opinions
 
-    def get_trusted_result(self, calc, uri, user):
-        opinions_by_resource = self._get_opinions_by_resource(calc, uri)
+    def get_trusted_result(self, calc, loc, user):
+        opinions_by_resource = self._get_opinions_by_resource(calc, loc)
 
         def is_candidate(resource):
             opinions = opinions_by_resource[resource]
@@ -169,12 +169,12 @@ class Log:
             # Otherwise, let's see what others think
             # (if we come here, there must be at least one other opinion)
             those_in_favor = {
-                user_id for user_id, correct in opinions.items() if correct
+                user_id for user_id, opinion in opinions.items() if opinion
                 }
 
             return True if those_in_favor else False
 
-        candidates = [r for r in opinions_by_resource if is_candidate(r)]
+        candidates = tuple(r for r in opinions_by_resource if is_candidate(r))
 
         # If there is no digest left, nothing is found.
         # If there is exactly one left, it can be used.
@@ -192,7 +192,7 @@ class Log:
 
         def get_result(parent):
             calc = self.get_calculation(parent, user)
-            return self.get_result(calc, parent.uri, user)
+            return self.get_result(calc, parent.loc, user)
 
         inputs = tuple(get_result(p) for p in d.parents)
         return Calculation(inputs=inputs, task=d.task)
