@@ -64,21 +64,6 @@ class Log:
                     for inp in calc.inputs
                 ])
 
-    def _comp_exists(self, c):
-        self.conn.execute(
-            'SELECT COUNT(comp_id) FROM def WHERE (comp_id = ?)',
-            (d.comp_id,))
-
-        return cur.fetchone() != None
-
-    def save_comp(self, comp):
-        for p in comp.parents:
-            if not _comp_exists(p):
-                raise ValueError(
-                    f'parent {p} of composition {comp} must be saved first')
-
-
-
     def save_user(self, user):
         with self.conn:
             self.conn.execute(
@@ -121,6 +106,7 @@ class Log:
                 ])
 
     def save_response(self, comp, result, user, time):
+        logger.debug(f'Saving response {comp} {result}')
         with self.conn:
             self.conn.execute(
                 'INSERT OR IGNORE INTO comp(comp_id, op_id, loc) '
