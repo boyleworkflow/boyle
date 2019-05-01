@@ -56,3 +56,4 @@ docs/_build/
 # PyBuilder
 target/
 test-output
+.mypy_cache
