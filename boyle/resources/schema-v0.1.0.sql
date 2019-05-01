@@ -1,30 +1,18 @@
 PRAGMA foreign_keys = ON;
 
--- -- state of rule when run
--- create table rule (
---   rule_id text primary key,
---   definition text,
---   sysstate text
--- );
-
-create table user (
-  user_id text primary key,
-  name text
-);
-
-create table op (
-  op_id text primary key, -- id based on definition
+create table task (
+  task_id text primary key, -- id based on definition
   definition text
 );
 
 create table calc (
   calc_id text primary key, -- id based on task and inputs
-  op_id text,
-  foreign key(op_id) references op(op_id)
+  task_id text,
+  foreign key(task_id) references task(task_id)
 );
 
 -- An input to a calculation, i.e., a (Calc, Resource) pair
-create table input (
+create table calc_input (
   calc_id text,
   loc text,
   digest text,
@@ -35,40 +23,36 @@ create table input (
 -- composition
 create table comp (
   comp_id text primary key,
-  op_id text,
+  task_id text,
   loc text,
-  foreign key(op_id) references op(op_id)
+  foreign key(task_id) references task(task_id)
 );
 
--- Parent of a composition, i.e., a pair (Comp child, Comp parent)
-create table parent (
+-- An input to a composition, i.e., a tuple (Comp child, Loc input, Comp parent)
+create table comp_input (
   comp_id text,
-  parent_id text,
+  loc text,
+  input_comp_id text,
   foreign key(comp_id) references comp(comp_id),
-  foreign key(parent_id) references comp(comp_id),
-  primary key (comp_id, parent_id)
+  foreign key(input_comp_id) references comp(comp_id),
+  primary key (comp_id, loc)
 );
 
 create table trust (
   calc_id text,
   loc text,
   digest text,
-  user_id text,
-  -- time timestamp,
   opinion boolean,
   foreign key(calc_id) references calc(calc_id),
-  foreign key(user_id) references user(user_id),
-  primary key (calc_id, loc, digest, user_id) --, time)
+  primary key (calc_id, loc, digest) --, time)
 );
 
 create table run (
   run_id text primary key,
   calc_id text,
-  user_id text,
   -- info text,
   start_time timestamp,
   end_time timestamp,
-  foreign key(user_id) references user(user_id),
   foreign key(calc_id) references calc(calc_id)
 );
 create index run_calc on run (calc_id);
@@ -83,13 +67,11 @@ create table result (
 );
 
 -- A resource that was the response to a request of a composition,
--- i.e., a record of which results have been received by different users.
+-- i.e., a record of which results have been received.
 create table response (
   comp_id text,
   digest text,
-  user_id text,
   first_time timestamp,
-  foreign key(user_id) references user(user_id),
   foreign key(comp_id) references comp(comp_id),
-  primary key (comp_id, digest, user_id)
+  primary key (comp_id, digest)
 );
