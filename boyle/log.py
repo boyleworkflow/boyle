@@ -1,21 +1,28 @@
+from typing import Optional, Mapping
 import os
 import sqlite3
 import logging
 import pkg_resources
 import datetime
-import boyle
+import uuid
 import attr
+
+import boyle
+from boyle.core import Op, Calc, Comp, PathLike, Loc, Digest, ConflictException
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = 'v0.0.0'
+SCHEMA_VERSION = 'v0.1.0'
 
 sqlite3.register_adapter(datetime.datetime, lambda dt: dt.isoformat())
 
-class Log:
 
+Opinion = Optional[bool]
+
+
+class Log:
     @staticmethod
-    def create(path):
+    def create(path: PathLike):
         """
         Create a new Log database.
 
@@ -23,7 +30,8 @@ class Log:
             path (str): Where to create the database.
         """
         schema_path = pkg_resources.resource_filename(
-            __name__, "resources/schema-{}.sql".format(SCHEMA_VERSION))
+            __name__, "resources/schema-{}.sql".format(SCHEMA_VERSION)
+        )
 
         with open(schema_path, 'r') as f:
             schema_script = f.read()
@@ -35,7 +43,7 @@ class Log:
 
         conn.close()
 
-    def __init__(self, path):
+    def __init__(self, path: PathLike):
         if not os.path.exists(path):
             Log.create(path)
         self.conn = sqlite3.connect(path, isolation_level='IMMEDIATE')
@@ -44,141 +52,109 @@ class Log:
     def close(self):
         self.conn.close()
 
-    def save_calc(self, calc):
+    def save_calc(self, calc: Calc):
         with self.conn:
             self.conn.execute(
-                'INSERT OR IGNORE INTO op(op_id, definition) '
-                'VALUES (?, ?)',
-                (calc.op.op_id, calc.op.definition))
+                'INSERT OR IGNORE INTO op(op_id, cmd) ' 'VALUES (?, ?)',
+                (calc.op.op_id, calc.op.cmd),
+            )
 
             self.conn.execute(
-                'INSERT OR IGNORE INTO calc(calc_id, op_id) '
-                'VALUES (?, ?)',
-                (calc.calc_id, calc.op.op_id))
+                'INSERT OR IGNORE INTO calc(calc_id, op_id) ' 'VALUES (?, ?)',
+                (calc.calc_id, calc.op.op_id),
+            )
 
             self.conn.executemany(
-                'INSERT OR IGNORE INTO input (calc_id, loc, digest) '
+                'INSERT OR IGNORE INTO calc_input (calc_id, loc, digest) '
                 'VALUES (?, ?, ?)',
                 [
-                    (calc.calc_id, inp.loc, inp.digest)
-                    for inp in calc.inputs
-                ])
-
-    def save_user(self, user):
-        with self.conn:
-            self.conn.execute(
-                'INSERT OR REPLACE INTO user(user_id, name) VALUES(?, ?)',
-                (user.user_id, user.name))
-
-    def get_user(self, user_id):
-        q = self.conn.execute(
-            'SELECT name FROM user WHERE (user_id = ?)',
-            (user_id,)
+                    (calc.calc_id, loc, digest)
+                    for loc, digest in calc.inputs.items()
+                ],
             )
-        name, = q.fetchone()
-        return boyle.User(user_id=user_id, name=name)
 
-    def save_run(self, run):
-        logger.debug(f'Saving run {run}')
-        self.save_calc(run.calc)
-        self.save_user(run.user)
+    def save_run(
+        self,
+        calc: Calc,
+        results: Mapping[Loc, Digest],
+        start_time: datetime.datetime,
+        end_time: datetime.datetime,
+    ):
+        run_id = str(uuid.uuid4())
+
+        self.save_calc(calc)
 
         with self.conn:
             self.conn.execute(
                 'INSERT INTO run '
-                '(run_id, calc_id, user_id, start_time, end_time) '
+                '(run_id, calc_id, start_time, end_time) '
                 'VALUES (?, ?, ?, ?, ?)',
-                (
-                    run.run_id,
-                    run.calc.calc_id,
-                    run.user.user_id,
-                    run.start_time,
-                    run.end_time
-                    )
-                )
+                (run_id, calc.calc_id, start_time, end_time),
+            )
 
             self.conn.executemany(
-                'INSERT INTO result (run_id, loc, digest) '
-                'VALUES (?, ?, ?)',
-                [
-                    (run.run_id, resource.loc, resource.digest)
-                    for resource in run.results
-                ])
+                'INSERT INTO result (run_id, loc, digest) ' 'VALUES (?, ?, ?)',
+                [(run_id, loc, digest) for loc, digest in results.items()],
+            )
 
-    def save_response(self, comp, result, user, time):
-        logger.debug(f'Saving response {comp} {result}')
+    def save_comp(self, comp: Comp):
         with self.conn:
             self.conn.execute(
-                'INSERT OR IGNORE INTO comp(comp_id, op_id, loc) '
+                'INSERT OR IGNORE INTO comp(comp_id, op_id, out_loc) '
                 'VALUES (?, ?, ?)',
-                (comp.comp_id, comp.op.op_id, comp.loc))
+                (comp.comp_id, comp.op.op_id, comp.out_loc),
+            )
 
             self.conn.executemany(
-                'INSERT OR IGNORE INTO parent(comp_id, parent_id) '
+                'INSERT OR IGNORE INTO parent(comp_id, loc, input_comp_id) '
                 'VALUES (?, ?)',
-                [(comp.comp_id, p.comp_id) for p in comp.parents])
+                [
+                    (comp.comp_id, loc, input_comp.comp_id)
+                    for loc, input_comp in comp.inputs.items()
+                ],
+            )
 
+    def save_response(
+        self, comp: Comp, digest: Digest, time: datetime.datetime
+    ):
+        self.save_comp(comp)
+
+        with self.conn:
             self.conn.execute(
                 'INSERT OR IGNORE INTO response '
-                '(comp_id, digest, user_id, first_time) '
-                'VALUES (?, ?, ?, ?)',
-                (comp.comp_id, result.digest, user.user_id, time))
+                '(comp_id, digest, first_time) '
+                'VALUES (?, ?, ?)',
+                (comp.comp_id, digest, time),
+            )
 
-
-    def set_trust(self, calc_id, loc, digest, user_id, opinion):
+    def set_trust(self, calc_id: str, loc: Loc, digest: Digest, opinion: bool):
         with self.conn:
             self.conn.execute(
                 'INSERT OR REPLACE INTO trust '
-                '(calc_id, loc, digest, user_id, opinion) '
-                'VALUES (?, ?, ?, ?, ?) ',
-                (calc_id, loc, digest, user_id, opinion)
-                )
+                '(calc_id, loc, digest, opinion) '
+                'VALUES (?, ?, ?, ?) ',
+                (calc_id, loc, digest, opinion),
+            )
 
-
-    def _get_opinions_by_resource(self, calc, loc):
+    def get_opinions(self, calc: Calc, loc: Loc) -> Mapping[Digest, Opinion]:
         query = self.conn.execute(
-            'SELECT DISTINCT digest, trust.user_id, opinion FROM result '
+            'SELECT digest, opinion FROM result '
             'INNER JOIN run USING (run_id) '
             'LEFT OUTER JOIN trust USING (calc_id, loc, digest) '
             'WHERE (loc = ? AND calc_id = ?)',
-            (loc, calc.calc_id))
+            (loc, calc.calc_id),
+        )
 
-        opinions = {}
-        logger.debug('Getting opinions')
-        for digest, user_id, opinion in query:
-            logger.debug(
-                f'digest: {digest}, user_id: {user_id}, opinion: {opinion}')
-            resource = boyle.Resource(loc=loc, digest=digest)
-            if not resource in opinions:
-                opinions[resource] = {}
-            if user_id:
-                opinions[resource][user_id] = opinion
+        return {digest: opinion for digest, opinion in query}
 
-        return opinions
+    def get_result(self, calc: Calc, out_loc: Loc) -> Digest:
+        opinions = self.get_opinions(calc, out_loc)
 
-    def get_result(self, calc, loc, user):
-        opinions_by_resource = self._get_opinions_by_resource(calc, loc)
-
-        def is_candidate(resource):
-            opinions = opinions_by_resource[resource]
-
-            # A result is a candidate if there are no explicit opinions
-            if not opinions:
-                return True
-
-            # If the user has an explicit opinion, that trumps everything else
-            if user.user_id in opinions:
-                return opinions[user.user_id]
-
-            # Otherwise, let's see what others think
-            # (if we come here, there must be at least one other opinion)
-            those_in_favor = {
-                user_id for user_id, opinion in opinions.items() if opinion
-                }
-
-            return True if those_in_favor else False
-
-        candidates = tuple(r for r in opinions_by_resource if is_candidate(r))
+        candidates = [
+            digest
+            for digest, opinion in opinions.items()
+            if not opinion == False
+        ]
 
         # If there is no digest left, nothing is found.
         # If there is exactly one left, it can be used.
@@ -187,17 +163,17 @@ class Log:
         if not candidates:
             raise boyle.NotFoundException()
         elif len(candidates) == 1:
-            match, = candidates
-            return match
+            digest, = candidates
+            return digest
         else:
-            raise boyle.ConflictException(candidates)
+            raise ConflictException(opinions)
 
+    def get_calc(self, comp: Comp) -> Calc:
+        def get_comp_result(input_comp):
+            calc = self.get_calc(input_comp)
+            return self.get_result(calc, input_comp.out_loc)
 
-    def get_calculation(self, comp, user):
-
-        def get_result(parent):
-            calc = self.get_calculation(parent, user)
-            return self.get_result(calc, parent.loc, user)
-
-        inputs = tuple(get_result(p) for p in comp.parents)
-        return boyle.Calc(inputs=inputs, op=comp.op)
+        return Calc(
+            inputs={loc: get_comp_result(c) for loc, c in comp.inputs.items()},
+            op=comp.op,
+        )

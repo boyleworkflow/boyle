@@ -28,6 +28,9 @@ class NotFoundException(Exception):
     pass
 
 
+class ConflictException(Exception):
+    pass
+
 def id_property(func):
 
     @property
