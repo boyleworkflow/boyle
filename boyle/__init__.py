@@ -1,13 +1,10 @@
 import logging
 
 import boyle.config
-from boyle.core import (
-    User, Op, Comp, Calc, Resource, Run, ConflictException, NotFoundException
-    )
+from boyle.core import Op, Comp, Calc, ConflictException, NotFoundException
 from boyle.log import Log
-from boyle.scheduler import Scheduler
 from boyle.storage import Storage
-from boyle.task import Shell
+from boyle.task import shell
+from boyle.make import make
 
 logger = logging.getLogger(__name__)
-

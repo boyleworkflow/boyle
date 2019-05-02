@@ -88,7 +88,7 @@ class Log:
             self.conn.execute(
                 'INSERT INTO run '
                 '(run_id, calc_id, start_time, end_time) '
-                'VALUES (?, ?, ?, ?, ?)',
+                'VALUES (?, ?, ?, ?)',
                 (run_id, calc.calc_id, start_time, end_time),
             )
 
@@ -100,14 +100,15 @@ class Log:
     def save_comp(self, comp: Comp):
         with self.conn:
             self.conn.execute(
-                'INSERT OR IGNORE INTO comp(comp_id, op_id, out_loc) '
+                'INSERT OR IGNORE INTO comp (comp_id, op_id, out_loc) '
                 'VALUES (?, ?, ?)',
                 (comp.comp_id, comp.op.op_id, comp.out_loc),
             )
 
             self.conn.executemany(
-                'INSERT OR IGNORE INTO parent(comp_id, loc, input_comp_id) '
-                'VALUES (?, ?)',
+                'INSERT OR IGNORE INTO comp_input '
+                '(comp_id, loc, input_comp_id) '
+                'VALUES (?, ?, ?)',
                 [
                     (comp.comp_id, loc, input_comp.comp_id)
                     for loc, input_comp in comp.inputs.items()

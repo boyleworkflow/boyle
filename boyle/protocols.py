@@ -5,15 +5,20 @@ from typing_extensions import Protocol
 import datetime
 
 
-DigestMap = Mapping[Loc, Digest]
-
-
 class Loc(Protocol):
     ...
 
 
 class Digest(Protocol):
     ...
+
+
+DigestMap = Mapping[Loc, Digest]
+
+
+class Storage(Protocol):
+    def can_restore(self, digest: Digest) -> bool:
+        ...
 
 
 class Op(Protocol):
@@ -28,7 +33,7 @@ class Calc(Protocol):
 
 class Comp(Protocol):
     op: Op
-    inputs: Mapping[Loc, Comp]
+    inputs: Mapping[Loc, 'Comp']
     out_loc: Loc
 
 
@@ -51,9 +56,4 @@ class Log(Protocol):
         start_time: datetime.datetime,
         end_time: datetime.datetime,
     ):
-        ...
-
-
-class Storage(Protocol):
-    def can_restore(self, digest: Digest) -> bool:
         ...

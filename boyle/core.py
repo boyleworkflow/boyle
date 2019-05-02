@@ -1,4 +1,4 @@
-from typing import Mapping, Sequence, Union, Any
+from typing import Mapping, Union, Any, Iterable
 from pathlib import Path
 import functools
 import json
@@ -6,14 +6,20 @@ import hashlib
 
 import attr
 
-PathLike = Union[Path, str]
+from boyle.storage import Storage
 
-digest_func = hashlib.sha1
+
+Digest = str
+Loc = str
+DigestMap = Mapping[Loc, Digest]
+PathLike = Union[Path, str]
 
 
 def unique_json(obj: Any) -> str:
     return json.dumps(obj, sort_keys=True)
 
+
+digest_func = hashlib.sha1
 
 def digest_str(s: str) -> Digest:
     return digest_func(s.encode('utf-8')).hexdigest()
@@ -50,29 +56,33 @@ def id_property(func):
 
     return id_func
 
-
-Digest = str
-Loc = str
-
-
-DigestMap = Mapping[Loc, Digest]
-
-@attr.s(auto_attribs=True)
+@attr.s(auto_attribs=True, frozen=True, cmp=False)
 class Op:
     cmd: str
+    out_locs: Iterable[Loc]
+
+    def __hash__(self):
+        return hash(self.op_id)
 
     @id_property
     def op_id(self):
-        return {'cmd': self.cmd}
+        return {'cmd': self.cmd, 'out_locs': self.out_locs}
 
-    def run(self, inputs: DigestMap, storage: FileStorage) -> DigestMap:
-        raise NotImplemented
+    def run(self, inputs: DigestMap, storage: Storage) -> DigestMap:
+        # proc = subprocess.Popen(self.cmd, cwd=work_dir, shell=True)
+        # proc.wait()
+        # return
+        # raise NotImplemented
+        return {loc: eval(self.cmd) for loc in self.out_locs}
 
 
-@attr.s(auto_attribs=True)
+@attr.s(auto_attribs=True, frozen=True, cmp=False)
 class Calc:
     op: Op
     inputs: Mapping[Loc, Digest]
+
+    def __hash__(self):
+        return hash(self.calc_id)
 
     @id_property
     def calc_id(self):
@@ -81,15 +91,18 @@ class Calc:
             'inputs': self.inputs,
         }
 
-    def __attrs_post_init__(self):
-        assert set(self.task.inp_locs) == set(self.inputs)
+    # def __attrs_post_init__(self):
+    #     assert set(self.task.inp_locs) == set(self.inputs)
 
 
-@attr.s(auto_attribs=True)
+@attr.s(auto_attribs=True, frozen=True, cmp=False)
 class Comp:
     op: Op
-    inputs: Mapping[Loc, Comp]
+    inputs: Mapping[Loc, 'Comp']
     out_loc: Loc
+
+    def __hash__(self):
+        return hash(self.comp_id)
 
     @id_property
     def comp_id(self):
@@ -100,5 +113,5 @@ class Comp:
         }
 
     def __attrs_post_init__(self):
-        assert set(self.task.inp_locs) == set(self.inputs)
-        assert self.out_loc in task.out_locs
+        # assert set(self.op.inp_locs) == set(self.inputs)
+        assert self.out_loc in self.op.out_locs

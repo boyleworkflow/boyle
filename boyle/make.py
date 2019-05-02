@@ -1,6 +1,7 @@
 from typing import Iterable, Sequence, Mapping, Callable, List, Set
 import datetime
 import itertools
+from collections import defaultdict
 
 from boyle.core import NotFoundException
 from boyle.protocols import Log, Storage, Loc, Digest, Op, Calc, Comp
@@ -91,6 +92,9 @@ def _run_calc(calc: Calc, out_locs: Iterable[Loc], log: Log, storage: Storage):
     results = calc.op.run(calc.inputs, storage)
     end_time = datetime.datetime.utcnow()
 
+    for digest in results.values():
+        assert storage.can_restore(digest), digest
+
     log.save_run(
         calc=calc, results=results, start_time=start_time, end_time=end_time
     )
@@ -123,4 +127,4 @@ def make(requested: Iterable[Comp], log: Log, storage: Storage):
         log.save_response(comp, digest, time)
         results[comp] = digest
 
-    return comp
+    return results
