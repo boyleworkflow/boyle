@@ -99,6 +99,7 @@ def _get_ready_and_needed(requested, log, storage) -> Iterable[Comp]:
 
 def _run_calc(
     calc: Calc,
+    out_locs: Iterable[Loc],
     log: Log,
     storage: Storage,
     create_environment: EnvironmentCreator,
@@ -106,16 +107,15 @@ def _run_calc(
     env = create_environment()
 
     try:
-        for loc in calc.task.inp_locs:
-            digest = calc.inputs[loc]
+        for loc, digest in calc.inputs.items():
             storage.restore(env, loc, digest)
 
         start_time = datetime.datetime.utcnow()
-        calc.task.run(env)
+        calc.op.run(env)
         end_time = datetime.datetime.utcnow()
 
         results = {}
-        for loc in calc.task.out_locs:
+        for loc in out_locs:
             digest = storage.store(env, loc)
             results[loc] = digest
 
@@ -139,7 +139,8 @@ def _ensure_available(requested, log, storage, create_environment):
             comps_by_calc[calc].add(comp)
 
         for calc, comps in comps_by_calc.items():
-            _run_calc(calc, log, storage)
+            out_locs = set(comp.out_loc for comp in comps)
+            _run_calc(calc, out_locs, log, storage)
 
 
 def make(

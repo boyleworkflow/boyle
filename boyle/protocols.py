@@ -18,21 +18,18 @@ class Digest(Protocol):
     ...
 
 
-class Task(Protocol):
-    inp_locs: Iterable[Loc]
-    out_locs: Iterable[Loc]
-
+class Op(Protocol):
     def run(self, env: Environment):
         ...
 
 
 class Calc(Protocol):
-    task: Task
+    op: Op
     inputs: Mapping[Loc, Digest]
 
 
 class Comp(Protocol):
-    task: Task
+    op: Op
     inputs: Mapping[Loc, Comp]
     out_loc: Loc
 
