@@ -3,19 +3,7 @@ import datetime
 import itertools
 
 from boyle.core import NotFoundException
-from boyle.protocols import (
-    Log,
-    Storage,
-    Loc,
-    Digest,
-    Task,
-    Calc,
-    Comp,
-    Environment,
-)
-
-
-EnvironmentCreator = Callable[[], Environment]
+from boyle.protocols import Log, Storage, Loc, Digest, Op, Calc, Comp
 
 
 def _determine_sets(comps: Iterable[Comp], log: Log, storage: Storage):
@@ -97,37 +85,18 @@ def _get_ready_and_needed(requested, log, storage) -> Iterable[Comp]:
     return final
 
 
-def _run_calc(
-    calc: Calc,
-    out_locs: Iterable[Loc],
-    log: Log,
-    storage: Storage,
-    create_environment: EnvironmentCreator,
-):
-    env = create_environment()
+def _run_calc(calc: Calc, out_locs: Iterable[Loc], log: Log, storage: Storage):
 
-    try:
-        for loc, digest in calc.inputs.items():
-            storage.restore(env, loc, digest)
-
-        start_time = datetime.datetime.utcnow()
-        calc.op.run(env)
-        end_time = datetime.datetime.utcnow()
-
-        results = {}
-        for loc in out_locs:
-            digest = storage.store(env, loc)
-            results[loc] = digest
-
-    finally:
-        env.destroy()
+    start_time = datetime.datetime.utcnow()
+    results = calc.op.run(calc.inputs, storage)
+    end_time = datetime.datetime.utcnow()
 
     log.save_run(
         calc=calc, results=results, start_time=start_time, end_time=end_time
     )
 
 
-def _ensure_available(requested, log, storage, create_environment):
+def _ensure_available(requested, log, storage):
     while True:
         comps_to_run = _get_ready_and_needed(requested, log, storage)
         if not comps_to_run:
@@ -143,14 +112,9 @@ def _ensure_available(requested, log, storage, create_environment):
             _run_calc(calc, out_locs, log, storage)
 
 
-def make(
-    requested: Iterable[Comp],
-    log: Log,
-    storage: Storage,
-    create_environment: Callable[[], Environment],
-):
+def make(requested: Iterable[Comp], log: Log, storage: Storage):
     time = datetime.datetime.utcnow()
-    _ensure_available(requested, log, storage, create_environment)
+    _ensure_available(requested, log, storage)
 
     results = {}
     for comp in requested:

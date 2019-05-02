@@ -51,9 +51,11 @@ def id_property(func):
     return id_func
 
 
-Environment = Path
 Digest = str
 Loc = str
+
+
+DigestMap = Mapping[Loc, Digest]
 
 @attr.s(auto_attribs=True)
 class Op:
@@ -63,7 +65,7 @@ class Op:
     def op_id(self):
         return {'cmd': self.cmd}
 
-    def run(self, env: Environment):
+    def run(self, inputs: DigestMap, storage: FileStorage) -> DigestMap:
         raise NotImplemented
 
 

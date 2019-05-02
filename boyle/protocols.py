@@ -5,9 +5,7 @@ from typing_extensions import Protocol
 import datetime
 
 
-class Environment(Protocol):
-    def destroy(self):
-        ...
+DigestMap = Mapping[Loc, Digest]
 
 
 class Loc(Protocol):
@@ -19,13 +17,13 @@ class Digest(Protocol):
 
 
 class Op(Protocol):
-    def run(self, env: Environment):
+    def run(self, inputs: DigestMap, storage: Storage) -> DigestMap:
         ...
 
 
 class Calc(Protocol):
     op: Op
-    inputs: Mapping[Loc, Digest]
+    inputs: DigestMap
 
 
 class Comp(Protocol):
@@ -49,7 +47,7 @@ class Log(Protocol):
     def save_run(
         self,
         calc: Calc,
-        results: Mapping[Loc, Digest],
+        results: DigestMap,
         start_time: datetime.datetime,
         end_time: datetime.datetime,
     ):
@@ -58,10 +56,4 @@ class Log(Protocol):
 
 class Storage(Protocol):
     def can_restore(self, digest: Digest) -> bool:
-        ...
-
-    def restore(self, env: Environment, loc: Loc, digest: Digest):
-        ...
-
-    def store(self, env: Environment, loc: Loc) -> Digest:
         ...
