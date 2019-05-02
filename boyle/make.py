@@ -1,86 +1,21 @@
 from typing import Iterable, Sequence, Mapping, Callable, List, Set
-
-from typing_extensions import Protocol
-
-import itertools
-import uuid
 import datetime
+import itertools
 
-import attr
-
-
-class Environment(Protocol):
-    def destroy(self):
-        pass
-
-EvironmentCreator = Callable[[], Environment]
-
-class Loc(Protocol):
-    pass
-
-
-class Digest(Protocol):
-    pass
+from boyle.core import NotFoundException
+from boyle.protocols import (
+    Log,
+    Storage,
+    Loc,
+    Digest,
+    Task,
+    Calc,
+    Comp,
+    Environment,
+)
 
 
-class Task(Protocol):
-    out_locs: Iterable[Loc]
-
-    def run(self, env: Environment):
-        ...
-
-
-@attr.s(auto_attribs=True)
-class Calc:
-    task: Task
-    inputs: Mapping[Loc, Digest]
-
-
-@attr.s(auto_attribs=True)
-class Comp:
-    task: Task
-    inputs: Mapping[Loc, Comp]
-    out_loc: Loc
-
-
-@attr.s(auto_attribs=True)
-class Run:
-    run_id: str
-    calc: Calc
-    results: Mapping[Loc, Digest]
-    start_time: datetime.datetime
-    end_time: datetime.datetime
-
-
-class NotFoundException(Exception):
-    pass
-
-
-class Log(Protocol):
-    def get_result(self, calc: Calc, out_loc: Loc) -> Digest:
-        ...
-
-    def get_calc(self, comp: Comp) -> Calc:
-        ...
-
-    def save_response(
-        self, comp: Comp, digest: Digest, time: datetime.datetime
-    ):
-        ...
-
-    def save_run(self, run: Run):
-        ...
-
-
-class Storage(Protocol):
-    def can_restore(self, digest: Digest) -> bool:
-        ...
-
-    def restore(self, env: Environment, loc: Loc, digest: Digest):
-        ...
-
-    def store(self, env: Environment, loc: Loc) -> Digest:
-        ...
+EnvironmentCreator = Callable[[], Environment]
 
 
 def _determine_sets(comps: Iterable[Comp], log: Log, storage: Storage):
@@ -162,7 +97,12 @@ def _get_ready_and_needed(requested, log, storage) -> Iterable[Comp]:
     return final
 
 
-def _run_calc(calc: Calc, log: Log, storage: Storage, create_environment: EvironmentCreator):
+def _run_calc(
+    calc: Calc,
+    log: Log,
+    storage: Storage,
+    create_environment: EnvironmentCreator,
+):
     env = create_environment()
 
     try:
@@ -181,15 +121,9 @@ def _run_calc(calc: Calc, log: Log, storage: Storage, create_environment: Eviron
     finally:
         env.destroy()
 
-    run = Run(
-        run_id=str(uuid.uuid4()),
-        calc=calc,
-        results=results,
-        start_time=start_time,
-        end_time=end_time,
+    log.save_run(
+        calc=calc, results=results, start_time=start_time, end_time=end_time
     )
-
-    log.save_run(run)
 
 
 def _ensure_available(requested, log, storage, create_environment):
@@ -207,7 +141,7 @@ def _ensure_available(requested, log, storage, create_environment):
             _run_calc(calc, log, storage)
 
 
-def request(
+def make(
     requested: Iterable[Comp],
     log: Log,
     storage: Storage,
