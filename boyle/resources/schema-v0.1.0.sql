@@ -1,14 +1,14 @@
 PRAGMA foreign_keys = ON;
 
-create table task (
-  task_id text primary key, -- id based on definition
-  definition text
+create table op (
+  op_id text primary key, -- id based on cmd
+  cmd text
 );
 
 create table calc (
-  calc_id text primary key, -- id based on task and inputs
-  task_id text,
-  foreign key(task_id) references task(task_id)
+  calc_id text primary key, -- id based on op and inputs
+  op_id text,
+  foreign key(op_id) references op(op_id)
 );
 
 -- An input to a calculation, i.e., a (Calc, Resource) pair
@@ -23,9 +23,9 @@ create table calc_input (
 -- composition
 create table comp (
   comp_id text primary key,
-  task_id text,
+  op_id text,
   loc text,
-  foreign key(task_id) references task(task_id)
+  foreign key(op_id) references op(op_id)
 );
 
 -- An input to a composition, i.e., a tuple (Comp child, Loc input, Comp parent)
