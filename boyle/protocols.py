@@ -19,6 +19,7 @@ class Digest(Protocol):
 
 
 class Task(Protocol):
+    inp_locs: Iterable[Loc]
     out_locs: Iterable[Loc]
 
     def run(self, env: Environment):

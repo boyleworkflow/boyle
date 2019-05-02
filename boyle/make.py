@@ -106,7 +106,8 @@ def _run_calc(
     env = create_environment()
 
     try:
-        for loc, digest in calc.inputs.items():
+        for loc in calc.task.inp_locs:
+            digest = calc.inputs[loc]
             storage.restore(env, loc, digest)
 
         start_time = datetime.datetime.utcnow()
