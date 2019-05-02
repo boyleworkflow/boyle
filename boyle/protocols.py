@@ -31,13 +31,6 @@ class Calc(Protocol):
     inputs: Mapping[Loc, Digest]
 
 
-class Result(Protocol):
-    calc: Calc
-    loc: Loc
-    digest: Digest
-    opinion: Optional[bool]
-
-
 class Comp(Protocol):
     task: Task
     inputs: Mapping[Loc, Comp]
