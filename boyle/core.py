@@ -1,4 +1,4 @@
-from typing import Mapping, Union, Any, Iterable, NewType, Sequence, Tuple
+from typing import Mapping, Union, Any, Iterable, NewType, Sequence, Tuple, List
 from pathlib import Path
 import functools
 import json
