@@ -8,7 +8,7 @@ import uuid
 import attr
 
 import boyle
-from boyle.core import Op, Calc, Comp, PathLike, Loc, Digest, ConflictException
+from boyle.core import Op, Calc, Comp, PathLike, Loc, Digest, get_upstream_sorted
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +18,14 @@ sqlite3.register_adapter(datetime.datetime, lambda dt: dt.isoformat())
 
 
 Opinion = Optional[bool]
+
+
+class NotFoundException(Exception):
+    pass
+
+
+class ConflictException(Exception):
+    pass
 
 
 class Log:
@@ -97,23 +105,25 @@ class Log:
                 [(run_id, loc, digest) for loc, digest in results.items()],
             )
 
-    def save_comp(self, comp: Comp):
-        with self.conn:
-            self.conn.execute(
-                'INSERT OR IGNORE INTO comp (comp_id, op_id, out_loc) '
-                'VALUES (?, ?, ?)',
-                (comp.comp_id, comp.op.op_id, comp.out_loc),
-            )
 
-            self.conn.executemany(
-                'INSERT OR IGNORE INTO comp_input '
-                '(comp_id, loc, input_comp_id) '
-                'VALUES (?, ?, ?)',
-                [
-                    (comp.comp_id, loc, input_comp.comp_id)
-                    for loc, input_comp in comp.inputs.items()
-                ],
-            )
+    def save_comp(self, leaf_comp: Comp):
+        with self.conn:
+            for comp in get_upstream_sorted([leaf_comp]):
+                self.conn.execute(
+                    'INSERT OR IGNORE INTO comp (comp_id, op_id, out_loc) '
+                    'VALUES (?, ?, ?)',
+                    (comp.comp_id, comp.op.op_id, comp.out_loc),
+                )
+
+                self.conn.executemany(
+                    'INSERT OR IGNORE INTO comp_input '
+                    '(comp_id, loc, input_comp_id) '
+                    'VALUES (?, ?, ?)',
+                    [
+                        (comp.comp_id, loc, inp_comp.comp_id)
+                        for loc, inp_comp in comp.inputs.items()
+                    ],
+                )
 
     def save_response(
         self, comp: Comp, digest: Digest, time: datetime.datetime

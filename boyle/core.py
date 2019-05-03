@@ -121,6 +121,15 @@ class Comp:
             'out_loc': self.out_loc,
         }
 
-    def __attrs_post_init__(self):
-        # assert set(self.op.inp_locs) == set(self.inputs)
-        assert self.out_loc in self.op.out_locs
+
+def get_parents(comps: Iterable[Comp]) -> Iterable[Comp]:
+    return list(itertools.chain(*(comp.inputs.values() for comp in comps)))
+
+
+def get_upstream_sorted(requested: Iterable[Comp]) -> Sequence[Comp]:
+    chunks: List[Iterable[Comp]] = []
+    new: Iterable[Comp] = list(requested)
+    while new:
+        chunks.insert(0, new)
+        new = get_parents(new)
+    return list(itertools.chain(*chunks))
