@@ -1,1 +1,0 @@
-INSERT INTO "task" VALUES('echo hello > a','changeme','changeme');

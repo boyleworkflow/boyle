@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+
+"""Top-level package for Boyle Workflow."""
+
+__version__ = '0.1.0'
+
 import logging
 
 import boyle.config

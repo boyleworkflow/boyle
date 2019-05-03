@@ -1,90 +1,52 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import os
-from os import path
+"""The setup script."""
+
 from setuptools import setup, find_packages
-from pip.req import parse_requirements
-from pip.download import PipSession
-from setuptools.command.install import install
-from setuptools.command.develop import develop
-from subprocess import call, check_call
-import getpass
-from uuid import uuid4
 
-def create_user():
-    import boyle
-    set_user_name = True
-    set_user_id = True
-    settings = boyle.config.load()
-    if 'user' in settings:
-        set_user_name = ('name' not in settings['user'])
-        set_user_id = ('id' not in settings['user'])
-    if set_user_name:
-        boyle.config.set('?global', 'user.name', getpass.getuser())
-    if set_user_id:
-        boyle.config.set('?global', 'user.id', str(uuid4()))
+with open('README.rst') as readme_file:
+    readme = readme_file.read()
 
-class CustomInstall(install):
+with open('HISTORY.rst') as history_file:
+    history = history_file.read()
 
-    def run(self):
-        install.run(self)
-        create_user()
+requirements = ['Click>=7.0', ]
 
-class CustomDevelop(develop):
+setup_requirements = ['pytest-runner', ]
 
-    def run(self):
-        develop.run(self)
-        create_user()
-
-install_reqs = parse_requirements('requirements.txt', session=PipSession())
-reqs = [str(ir.req) for ir in install_reqs]
-
-PACKAGE_NAME = 'boyle'
+test_requirements = ['pytest', ]
 
 setup(
-    cmdclass={
-        'install': CustomInstall,
-        'develop': CustomDevelop
-    },
-    name='boyle',
-    version='0.0.1',
-    url='',
-    license='LGPLv3',
     author='Rasmus Einarsson and Jonatan Kallus',
     author_email=(
         'mr [at] rasmuseinarsson [dot] se, mr [at] jkallus [dot] se'),
-    description=(
-        'A tool for provenance and caching in computational workflows'),
-    install_requires=reqs,
-    packages=['boyle'],
-    package_dir={'boyle': 'boyle', 'tests': 'tests'},
-    package_data={'boyle': ['resources/**/*']},
-    test_suite='tests',
-    entry_points='''
-        [console_scripts]
-        boyle=boyle.cli.main:main_group
-    ''',
-    extras_require = {
-        },
-    # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
-        # How mature is this project? Common values are
-        #   3 - Alpha
-        #   4 - Beta
-        #   5 - Production/Stable
-        'Development Status :: 3 - Alpha',
-
-        # Indicate who your project is intended for
+        'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Developers',
-        'Intended Audience :: Science/Research',
-        'Topic :: Scientific/Engineering',
-
-        # Pick your license as you wish (should match "license" above)
         'License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)',
-
-        # Specify the Python versions you support here. In particular, ensure
-        # that you indicate whether you support Python 2, Python 3 or both.
+        'Natural Language :: English',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4'
-    ]
-    )
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+    ],
+    description="A tool for provenance and caching in computational workflows.",
+    entry_points={
+        'console_scripts': [
+            'boyle=boyle.cli:main',
+        ],
+    },
+    install_requires=requirements,
+    license="LGPLv3",
+    long_description=readme + '\n\n' + history,
+    include_package_data=True,
+    keywords='boyle',
+    name='boyle',
+    packages=find_packages(include=['boyle']),
+    setup_requires=setup_requirements,
+    test_suite='tests',
+    tests_require=test_requirements,
+    url='https://github.com/boyleworkflow/boyle',
+    version='0.1.0',
+    zip_safe=False,
+)
