@@ -19,8 +19,7 @@ test_requirements = ['pytest', ]
 
 setup(
     author='Rasmus Einarsson and Jonatan Kallus',
-    author_email=(
-        'mr [at] rasmuseinarsson [dot] se, mr [at] jkallus [dot] se'),
+    author_email='mr@rasmuseinarsson.se, mr@jkallus.se',
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Developers',
