@@ -2,17 +2,30 @@ from typing import Optional, Mapping, Iterable
 import os
 import sqlite3
 import logging
-import pkg_resources
 import datetime
 import uuid
 import attr
 
+try:
+    import importlib.resources as importlib_resources
+except ModuleNotFoundError:
+    import importlib_resources
+
 import boyleworkflow
-from boyleworkflow.core import Op, Calc, Comp, PathLike, Loc, Digest, get_upstream_sorted
+from boyleworkflow.core import (
+    Op,
+    Calc,
+    Comp,
+    PathLike,
+    Loc,
+    Digest,
+    get_upstream_sorted,
+)
 
 logger = logging.getLogger(__name__)
 
 SCHEMA_VERSION = 'v0.1.0'
+SCHEMA_PATH = f'schema-{SCHEMA_VERSION}.sql'
 
 sqlite3.register_adapter(datetime.datetime, lambda dt: dt.isoformat())
 
@@ -37,14 +50,13 @@ class Log:
         Args:
             path (str): Where to create the database.
         """
-        schema_path = pkg_resources.resource_filename(
-            __name__, "resources/schema-{}.sql".format(SCHEMA_VERSION)
-        )
+        with importlib_resources.path(
+            'boyleworkflow.resources', SCHEMA_PATH
+        ) as schema_path:
+            with open(schema_path, 'r') as f:
+                schema_script = f.read()
 
-        with open(schema_path, 'r') as f:
-            schema_script = f.read()
-
-        conn = sqlite3.connect(path)
+        conn = sqlite3.connect(str(path))
 
         with conn:
             conn.executescript(schema_script)
@@ -54,7 +66,7 @@ class Log:
     def __init__(self, path: PathLike):
         if not os.path.exists(path):
             Log.create(path)
-        self.conn = sqlite3.connect(path, isolation_level='IMMEDIATE')
+        self.conn = sqlite3.connect(str(path), isolation_level='IMMEDIATE')
         self.conn.execute('PRAGMA foreign_keys = ON;')
 
     def close(self):

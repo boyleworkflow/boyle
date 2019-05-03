@@ -13,6 +13,7 @@ with open('HISTORY.rst') as history_file:
 
 requirements = [
     'Click>=7.0',
+    'importlib_resources>=1.0.2;python_version<"3.7"',
     'attrs>=19.1.0',
     'immutables==0.9',
     ]
