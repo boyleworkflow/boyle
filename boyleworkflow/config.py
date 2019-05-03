@@ -4,19 +4,22 @@ import logging
 import pkg_resources
 
 DEFAULT_PATH = os.path.abspath(
-    pkg_resources.resource_filename(__name__, 'resources/boyleconfig.json'))
-GLOBAL_PATH = os.path.expanduser('~/.config/boyle/boyleconfig.json')
+    pkg_resources.resource_filename(__name__, "resources/boyleconfig.json")
+)
+GLOBAL_PATH = os.path.expanduser("~/.config/boyle/boyleconfig.json")
 
 # This should be relative! To follow along if one changes the working directory.
-LOCAL_PATH = 'boyleconfig.json'
+LOCAL_PATH = "boyleconfig.json"
+
 
 def _read_config_if_exists(path):
     if not os.path.exists(path):
         return {}
 
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
         config = json.load(f)
         return config
+
 
 def load():
     """
@@ -40,18 +43,21 @@ def load():
         config.update(_read_config_if_exists(path))
     return config
 
+
 def _get_config_path(path):
-    if path == '?local':
+    if path == "?local":
         path = LOCAL_PATH
-    elif path == '?global':
+    elif path == "?global":
         path = GLOBAL_PATH
 
     return path
+
 
 def _load_config_file(path):
     path = _get_config_path(path)
     config = _read_config_if_exists(path)
     return config
+
 
 def _overwrite_config_file(path, config):
     path = _get_config_path(path)
@@ -60,7 +66,7 @@ def _overwrite_config_file(path, config):
     if not os.path.isdir(dirname):
         os.makedirs(dirname)
 
-    with open(path, 'w') as configfile:
+    with open(path, "w") as configfile:
         json.dump(config, configfile, indent=4)
         configfile.write(os.linesep)
 
@@ -99,7 +105,7 @@ def unset(path, key):
     """
     path = _get_config_path(path)
     if not os.path.exists(path):
-        raise IOError('The file {} does not exist.'.format(path))
+        raise IOError("The file {} does not exist.".format(path))
 
     config = _load_config_file(path)
     del config[key]

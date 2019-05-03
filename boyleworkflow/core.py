@@ -22,10 +22,10 @@ def check_valid_loc(s: str):
     if p.is_reserved():
         raise ValueError(f"loc '{p}' is reserved.")
 
-    if '..' in p.parts:
+    if ".." in p.parts:
         raise ValueError(f"loc '{p}' contains disallowed '..'")
 
-    if '.' in p.parts:
+    if "." in p.parts:
         raise ValueError(f"loc '{p}' contains disallowed '.'")
 
 
@@ -110,7 +110,7 @@ class Op:
     shell: bool = False
     stderr: bool = True
     stdout: bool = True
-    work_dir: str = '.'
+    work_dir: str = "."
 
     @property
     def definition(self):
@@ -155,7 +155,6 @@ class Comp:
             },
             "loc": self.loc,
         }
-
 
 
 def get_parents(comps: Iterable[Comp]) -> Iterable[Comp]:

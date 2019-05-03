@@ -13,9 +13,10 @@ class RunError(Exception):
     pass
 
 
-WORK_BASE_DIR = 'work_dir'
-STDERR_PATH = 'stderr'
-STDOUT_PATH = 'stdout'
+WORK_BASE_DIR = "work_dir"
+STDERR_PATH = "stderr"
+STDOUT_PATH = "stdout"
+
 
 def is_inside(path, parent):
     try:
@@ -32,11 +33,13 @@ def fill_run_dir(calc: Calc, the_dir: PathLike, storage: Storage):
 
     for loc, digest in calc.inputs.items():
         dst_path = (the_dir / loc).resolve()
-        assert is_valid_loc(loc), f'invalid loc {loc}'
+        assert is_valid_loc(loc), f"invalid loc {loc}"
         storage.restore(digest, dst_path)
 
 
-def run(calc: Calc, out_locs: Iterable[Loc], storage: Storage) -> Mapping[Loc, Digest]:
+def run(
+    calc: Calc, out_locs: Iterable[Loc], storage: Storage
+) -> Mapping[Loc, Digest]:
     op = calc.op
 
     with tempfile.TemporaryDirectory() as td:
@@ -55,26 +58,23 @@ def run(calc: Calc, out_locs: Iterable[Loc], storage: Storage) -> Mapping[Loc, D
         stdout_path = container_dir / STDOUT_PATH if op.stdout else devnull
         stderr_path = container_dir / STDERR_PATH if op.stderr else devnull
 
-        with open(stdout_path, 'wb') as stdout, open(stderr_path, 'wb') as stderr:
+        with open(stdout_path, "wb") as stdout, open(
+            stderr_path, "wb"
+        ) as stderr:
             proc = subprocess.run(
                 op.cmd,
                 cwd=work_dir,
                 shell=op.shell,
                 stdout=stdout,
                 stderr=stderr,
-                )
+            )
 
         try:
             proc.check_returncode()
         except subprocess.CalledProcessError as e:
-            info = {
-                'calc': calc,
-                'message': str(e),
-            }
+            info = {"calc": calc, "message": str(e)}
             raise RunError(info) from e
 
-
         return {
-            loc: storage.store(os.path.join(work_dir, loc))
-            for loc in out_locs
-            }
+            loc: storage.store(os.path.join(work_dir, loc)) for loc in out_locs
+        }

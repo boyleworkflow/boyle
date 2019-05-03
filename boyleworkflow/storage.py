@@ -8,6 +8,7 @@ from boyleworkflow.core import PathLike, Digest, digest_file
 
 logger = logging.getLogger(__name__)
 
+
 @attr.s(auto_attribs=True)
 class Storage:
     storage_dir: PathLike
@@ -23,11 +24,11 @@ class Storage:
 
     def restore(self, digest: Digest, dst_path: PathLike):
         src_path = self._get_store_path(digest)
-        logger.debug(f'Restoring {digest} to {dst_path}')
+        logger.debug(f"Restoring {digest} to {dst_path}")
         shutil.copy2(src_path, dst_path)
 
     def store(self, src_path: PathLike) -> Digest:
-        logger.debug(f'Storing {src_path}')
+        logger.debug(f"Storing {src_path}")
         digest = digest_file(src_path)
         dst_path = self._get_store_path(digest)
         shutil.copy2(src_path, dst_path)
