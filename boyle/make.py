@@ -35,7 +35,7 @@ def _determine_sets(comps: Iterable[Comp], log: Log, storage: Storage):
 
         calc = log.get_calc(comp)
         try:
-            digest = log.get_result(calc, comp.out_loc)
+            digest = log.get_result(calc, comp.loc)
             sets["Known"].add(comp)
             if storage.can_restore(digest):
                 sets["Restorable"].add(comp)
@@ -101,7 +101,7 @@ def _ensure_available(requested: Iterable[Comp], log: Log, storage: Storage):
             comps_by_calc[calc].add(comp)
 
         for calc, comps in comps_by_calc.items():
-            out_locs = set(comp.out_loc for comp in comps)
+            out_locs = set(comp.loc for comp in comps)
             _run_calc(calc, out_locs, log, storage)
 
 
@@ -112,7 +112,7 @@ def make(requested: Sequence[Comp], log: Log, storage: Storage):
     results = {}
     for comp in requested:
         calc = log.get_calc(comp)
-        digest = log.get_result(calc, comp.out_loc)
+        digest = log.get_result(calc, comp.loc)
         log.save_response(comp, digest, time)
         results[comp] = digest
 

@@ -19,7 +19,7 @@ def shell(cmd: str, inputs: Mapping[str, Comp], out: Union[Iterable[str], str]):
         out_loc: boyle.core.Comp(
             op=op,
             inputs={Loc(loc): comp for loc, comp in inputs.items()},
-            out_loc=out_loc,
+            loc=out_loc,
         )
         for out_loc in out_locs
     }

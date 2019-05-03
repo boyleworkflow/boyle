@@ -140,7 +140,7 @@ class Calc:
 class Comp:
     op: Op
     inputs: Mapping[Loc, "Comp"] = attr.ib(validator=_attrs_loc_keys_validator)
-    out_loc: Loc = attr.ib(validator=_attrs_loc_validator)
+    loc: Loc = attr.ib(validator=_attrs_loc_validator)
 
     def __attrs_post_init__(self):
         _transform_obj_attr(self, "inputs", immutables.Map)
@@ -153,7 +153,7 @@ class Comp:
                 loc: input_comp.comp_id
                 for loc, input_comp in self.inputs.items()
             },
-            "out_loc": self.out_loc,
+            "loc": self.loc,
         }
 
 

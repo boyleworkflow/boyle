@@ -24,7 +24,7 @@ create table calc_input (
 create table comp (
   comp_id text primary key,
   op_id text,
-  out_loc text,
+  loc text,
   foreign key(op_id) references op(op_id)
 );
 

@@ -107,9 +107,9 @@ class Log:
         with self.conn:
             for comp in get_upstream_sorted([leaf_comp]):
                 self.conn.execute(
-                    'INSERT OR IGNORE INTO comp (comp_id, op_id, out_loc) '
+                    'INSERT OR IGNORE INTO comp (comp_id, op_id, loc) '
                     'VALUES (?, ?, ?)',
-                    (comp.comp_id, comp.op.op_id, comp.out_loc),
+                    (comp.comp_id, comp.op.op_id, comp.loc),
                 )
 
                 self.conn.executemany(
@@ -155,8 +155,8 @@ class Log:
 
         return {digest: opinion for digest, opinion in query}
 
-    def get_result(self, calc: Calc, out_loc: Loc) -> Digest:
-        opinions = self.get_opinions(calc, out_loc)
+    def get_result(self, calc: Calc, loc: Loc) -> Digest:
+        opinions = self.get_opinions(calc, loc)
 
         candidates = [
             digest
@@ -169,7 +169,7 @@ class Log:
         # If there is more than one left, there is a conflict.
 
         if not candidates:
-            raise NotFoundException((calc, out_loc))
+            raise NotFoundException((calc, loc))
         elif len(candidates) == 1:
             digest, = candidates
             return digest
@@ -179,7 +179,7 @@ class Log:
     def get_calc(self, comp: Comp) -> Calc:
         def get_comp_result(input_comp: Comp) -> Digest:
             calc = self.get_calc(input_comp)
-            return self.get_result(calc, input_comp.out_loc)
+            return self.get_result(calc, input_comp.loc)
 
         return Calc(
             inputs={
