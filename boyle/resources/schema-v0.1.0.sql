@@ -1,8 +1,8 @@
 PRAGMA foreign_keys = ON;
 
 create table op (
-  op_id text primary key, -- id based on cmd
-  cmd text
+  op_id text primary key, -- id based on definition
+  definition text
 );
 
 create table calc (

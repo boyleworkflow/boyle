@@ -63,8 +63,8 @@ class Log:
     def save_calc(self, calc: Calc):
         with self.conn:
             self.conn.execute(
-                'INSERT OR IGNORE INTO op(op_id, cmd) VALUES (?, ?)',
-                (calc.op.op_id, calc.op.cmd),
+                'INSERT OR IGNORE INTO op(op_id, definition) VALUES (?, ?)',
+                (calc.op.op_id, calc.op.definition),
             )
 
             self.conn.execute(

@@ -13,7 +13,7 @@ def shell(cmd: str, inputs: Mapping[str, Comp], out: Union[Iterable[str], str]):
 
     out_locs = list(map(Loc, out))
 
-    op = boyle.core.Op(cmd=cmd)
+    op = boyle.core.Op(cmd=cmd, shell=True)
 
     comps = {
         out_loc: boyle.core.Comp(

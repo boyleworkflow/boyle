@@ -107,6 +107,14 @@ def _transform_obj_attr(obj, attr_name, func):
 @attr.s(auto_attribs=True, frozen=True)
 class Op:
     cmd: str
+    shell: bool = False
+    stderr: bool = True
+    stdout: bool = True
+    work_dir: str = '.'
+
+    @property
+    def definition(self):
+        return unique_json(attr.asdict(self))
 
     @id_property
     def op_id(self):

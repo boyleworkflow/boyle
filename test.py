@@ -12,7 +12,7 @@ a = boyle.shell('echo hello > a', inputs={}, out='a')
 #
 b = boyle.shell('echo world > b', inputs={}, out='b')
 
-c = boyle.shell('cat x y > c', inputs={'../x': a, 'y': b}, out='c')
+c = boyle.shell('cat x y > c && echo test', inputs={'x': a, 'y': b}, out='c')
 
 c_fail = boyle.shell('cat x y > c', inputs={'x': a, 'z': b}, out='c')
 
