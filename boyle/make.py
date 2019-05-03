@@ -1,13 +1,12 @@
 from typing import Iterable, Sequence, Mapping, Callable, List, Set
 import datetime
 from collections import defaultdict
-import tempfile
-import os
-import subprocess
+
 
 from boyle.core import Loc, Digest, Op, Calc, Comp, get_upstream_sorted, get_parents
 from boyle.log import Log, NotFoundException
 from boyle.storage import Storage
+from boyle.runcalc import run
 
 
 def _determine_sets(comps: Iterable[Comp], log: Log, storage: Storage):
@@ -118,19 +117,3 @@ def make(requested: Sequence[Comp], log: Log, storage: Storage):
         results[comp] = digest
 
     return results
-
-
-def run(calc: Calc, out_locs: Iterable[Loc], storage: Storage) -> Mapping[Loc, Digest]:
-    op = calc.op
-
-    with tempfile.TemporaryDirectory() as work_dir:
-        for loc, digest in calc.inputs.items():
-            storage.restore(digest, os.path.join(work_dir, loc))
-
-        proc = subprocess.Popen(op.cmd, cwd=work_dir, shell=True)
-        proc.wait()
-
-        return {
-            loc: storage.store(os.path.join(work_dir, loc))
-            for loc in out_locs
-            }
