@@ -7,8 +7,8 @@ import datetime
 import uuid
 import attr
 
-import boyle
-from boyle.core import Op, Calc, Comp, PathLike, Loc, Digest, get_upstream_sorted
+import boyleworkflow
+from boyleworkflow.core import Op, Calc, Comp, PathLike, Loc, Digest, get_upstream_sorted
 
 logger = logging.getLogger(__name__)
 

@@ -4,7 +4,7 @@ import logging
 
 import attr
 
-from boyle.core import PathLike, Digest, digest_file
+from boyleworkflow.core import PathLike, Digest, digest_file
 
 logger = logging.getLogger(__name__)
 

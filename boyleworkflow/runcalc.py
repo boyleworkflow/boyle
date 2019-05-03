@@ -4,9 +4,9 @@ import tempfile
 import subprocess
 from pathlib import Path
 
-from boyle.core import Calc, Op, Loc, Digest, PathLike, is_valid_loc
-from boyle.log import Log
-from boyle.storage import Storage
+from boyleworkflow.core import Calc, Op, Loc, Digest, PathLike, is_valid_loc
+from boyleworkflow.log import Log
+from boyleworkflow.storage import Storage
 
 
 class RunError(Exception):

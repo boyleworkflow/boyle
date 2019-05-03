@@ -3,10 +3,10 @@ import datetime
 from collections import defaultdict
 
 
-from boyle.core import Loc, Digest, Op, Calc, Comp, get_upstream_sorted, get_parents
-from boyle.log import Log, NotFoundException
-from boyle.storage import Storage
-from boyle.runcalc import run
+from boyleworkflow.core import Loc, Digest, Op, Calc, Comp, get_upstream_sorted, get_parents
+from boyleworkflow.log import Log, NotFoundException
+from boyleworkflow.storage import Storage
+from boyleworkflow.runcalc import run
 
 
 def _determine_sets(comps: Iterable[Comp], log: Log, storage: Storage):
