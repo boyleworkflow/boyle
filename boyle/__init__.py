@@ -1,8 +1,8 @@
 import logging
 
 import boyle.config
-from boyle.core import Op, Comp, Calc, ConflictException, NotFoundException
-from boyle.log import Log
+from boyle.core import Op, Comp, Calc
+from boyle.log import Log, ConflictException, NotFoundException
 from boyle.storage import Storage
 from boyle.task import shell
 from boyle.make import make

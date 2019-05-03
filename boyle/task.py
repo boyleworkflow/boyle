@@ -1,17 +1,32 @@
+from typing import Mapping, Iterable, Union
 import subprocess
 import attr
-import boyle
 import boyle.core
+from boyle.core import Loc, Comp
 
-@attr.s
-class Shell:
 
-    cmd = attr.ib()
+def shell(cmd: str, inputs: Mapping[str, Comp], out: Union[Iterable[str], str]):
+    if isinstance(out, str):
+        out_list = [out]
+    else:
+        out_list = list(out)
 
-    @boyle.core.id_property
-    def task_id(self):
-        return {'cmd': self.cmd}
+    out_locs = list(map(Loc, out))
 
-    def run(self, work_dir):
-        proc = subprocess.Popen(self.cmd, cwd=work_dir, shell=True)
-        proc.wait()
+    op = boyle.core.Op(cmd=cmd, out_locs=out_locs)
+
+    comps = {
+        out_loc: boyle.core.Comp(
+            op=op,
+            inputs={Loc(loc): comp for loc, comp in inputs.items()},
+            out_loc=out_loc,
+        )
+        for out_loc in out_locs
+    }
+
+    if isinstance(out, str):
+        assert len(comps) == 1, len(comps)
+        comp, = comps.values()
+        return comp
+    else:
+        return comps

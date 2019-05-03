@@ -1,10 +1,13 @@
 from typing import Iterable, Sequence, Mapping, Callable, List, Set
 import datetime
-import itertools
 from collections import defaultdict
+import tempfile
+import os
+import subprocess
 
-from boyle.core import NotFoundException
-from boyle.protocols import Log, Storage, Loc, Digest, Op, Calc, Comp
+from boyle.core import Loc, Digest, Op, Calc, Comp, get_upstream_sorted, get_parents
+from boyle.log import Log, NotFoundException
+from boyle.storage import Storage
 
 
 def _determine_sets(comps: Iterable[Comp], log: Log, storage: Storage):
@@ -43,24 +46,11 @@ def _determine_sets(comps: Iterable[Comp], log: Log, storage: Storage):
     return sets
 
 
-def _get_parents(comps: Iterable[Comp]) -> Iterable[Comp]:
-    return list(itertools.chain(*(comp.inputs.values() for comp in comps)))
-
-
-def _get_upstream_sorted(requested: Iterable[Comp]) -> Sequence[Comp]:
-    chunks: List[Iterable[Comp]] = []
-    new: Iterable[Comp] = list(requested)
-    while new:
-        chunks.insert(0, new)
-        new = _get_parents(new)
-    return list(itertools.chain(*chunks))
-
-
 def _get_ready_and_needed(requested, log, storage) -> Iterable[Comp]:
     requested = set(requested)
     assert len(requested) > 0
 
-    comps = _get_upstream_sorted(requested)
+    comps = get_upstream_sorted(requested)
     sets = _determine_sets(comps, log, storage)
 
     if requested <= sets["Restorable"]:
@@ -78,7 +68,7 @@ def _get_ready_and_needed(requested, log, storage) -> Iterable[Comp]:
 
         # Furthermore we need to run parents to the previous candidates,
         # if those parents are not restorable.
-        additional = set(_get_parents(additional)) - sets["Restorable"]
+        additional = set(get_parents(additional)) - sets["Restorable"]
 
     final = candidates.intersection(sets["Runnable"])
     assert len(final) > 0, len(sets["Runnable"])
@@ -89,11 +79,11 @@ def _get_ready_and_needed(requested, log, storage) -> Iterable[Comp]:
 def _run_calc(calc: Calc, out_locs: Iterable[Loc], log: Log, storage: Storage):
 
     start_time = datetime.datetime.utcnow()
-    results = calc.op.run(calc.inputs, storage)
+    results = run(calc, storage)
     end_time = datetime.datetime.utcnow()
 
-    for digest in results.values():
-        assert storage.can_restore(digest), digest
+    for loc, digest in results.items():
+        assert storage.can_restore(digest), (loc, digest)
 
     log.save_run(
         calc=calc, results=results, start_time=start_time, end_time=end_time
@@ -116,7 +106,7 @@ def _ensure_available(requested, log, storage):
             _run_calc(calc, out_locs, log, storage)
 
 
-def make(requested: Iterable[Comp], log: Log, storage: Storage):
+def make(requested: Sequence[Comp], log: Log, storage: Storage):
     time = datetime.datetime.utcnow()
     _ensure_available(requested, log, storage)
 
@@ -128,3 +118,23 @@ def make(requested: Iterable[Comp], log: Log, storage: Storage):
         results[comp] = digest
 
     return results
+
+
+def run(calc: Calc, storage: Storage) -> Mapping[Loc, Digest]:
+    op = calc.op
+
+    print('running', op.cmd)
+    with tempfile.TemporaryDirectory() as work_dir:
+        for loc, digest in calc.inputs.items():
+            print('placing', loc, digest)
+            storage.restore(digest, os.path.join(work_dir, loc))
+
+        print('contents', os.listdir(work_dir))
+
+        proc = subprocess.Popen(op.cmd, cwd=work_dir, shell=True)
+        proc.wait()
+
+        return {
+            loc: storage.store(os.path.join(work_dir, loc))
+            for loc in op.out_locs
+            }

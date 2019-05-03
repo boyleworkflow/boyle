@@ -2,47 +2,23 @@ import attr
 
 import boyle
 
-@attr.s(auto_attribs=True, frozen=True, cmp=False)
-class Op:
-    cmd: int
-    out_locs = ['cmd']
-
-    def __hash__(self):
-        return hash(self.op_id)
-
-    @property
-    def op_id(self):
-        return f'op_{self.cmd}'
-
-    def run(self, inputs, storage):
-        digest = f'{self.cmd}*2'
-        digests = {'cmd': digest}
-        storage.contents[digest] = self.cmd * 2
-        return digests
-
-
-@attr.s(auto_attribs=True)
-class Storage:
-    contents: dict
-
-    def can_restore(self, digest: str) -> bool:
-        return digest in self.contents
-
-
-storage = Storage({})
-
+storage = boyle.Storage('storage_dir')
 log = boyle.Log('log.sqlite')
 
-op2 = Op(2)
+a = boyle.shell('echo hello > a', inputs={}, out='a')
+# b = boyle.shell('echo hello > a')
 
-def make_comp(n):
-    return boyle.Comp(op=Op(n), inputs={}, out_loc='cmd')
+# print(a)
+#
+b = boyle.shell('echo world > b', inputs={}, out='b')
 
-c2 = make_comp(2)
-print(c2)
+c = boyle.shell('cat x y > c', inputs={'x': a, 'y': b}, out='c')
 
-results = boyle.make([c2], log, storage)
+print(c)
 
-print(results)
+# results = boyle.make([a], log, storage)
+# results = boyle.make([b], log, storage)
+results = boyle.make([c], log, storage)
 
-print(storage.contents[results[c2]])
+for comp, digest in results.items():
+    print(comp.comp_id, digest)

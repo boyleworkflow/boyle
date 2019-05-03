@@ -1,4 +1,4 @@
-from typing import Optional, Mapping
+from typing import Optional, Mapping, Iterable
 import os
 import sqlite3
 import logging
@@ -63,22 +63,19 @@ class Log:
     def save_calc(self, calc: Calc):
         with self.conn:
             self.conn.execute(
-                'INSERT OR IGNORE INTO op(op_id, cmd) ' 'VALUES (?, ?)',
+                'INSERT OR IGNORE INTO op(op_id, cmd) VALUES (?, ?)',
                 (calc.op.op_id, calc.op.cmd),
             )
 
             self.conn.execute(
-                'INSERT OR IGNORE INTO calc(calc_id, op_id) ' 'VALUES (?, ?)',
+                'INSERT OR IGNORE INTO calc(calc_id, op_id) VALUES (?, ?)',
                 (calc.calc_id, calc.op.op_id),
             )
 
             self.conn.executemany(
                 'INSERT OR IGNORE INTO calc_input (calc_id, loc, digest) '
                 'VALUES (?, ?, ?)',
-                [
-                    (calc.calc_id, loc, digest)
-                    for loc, digest in calc.inputs.items()
-                ],
+                [(calc.calc_id, loc, digest) for loc, digest in calc.inputs.items()],
             )
 
     def save_run(
@@ -101,7 +98,7 @@ class Log:
             )
 
             self.conn.executemany(
-                'INSERT INTO result (run_id, loc, digest) ' 'VALUES (?, ?, ?)',
+                'INSERT INTO result (run_id, loc, digest) VALUES (?, ?, ?)',
                 [(run_id, loc, digest) for loc, digest in results.items()],
             )
 
@@ -172,7 +169,7 @@ class Log:
         # If there is more than one left, there is a conflict.
 
         if not candidates:
-            raise boyle.NotFoundException()
+            raise NotFoundException((calc, out_loc))
         elif len(candidates) == 1:
             digest, = candidates
             return digest
@@ -180,11 +177,14 @@ class Log:
             raise ConflictException(opinions)
 
     def get_calc(self, comp: Comp) -> Calc:
-        def get_comp_result(input_comp):
+        def get_comp_result(input_comp: Comp) -> Digest:
             calc = self.get_calc(input_comp)
             return self.get_result(calc, input_comp.out_loc)
 
         return Calc(
-            inputs={loc: get_comp_result(c) for loc, c in comp.inputs.items()},
+            inputs={
+                loc: get_comp_result(inp_comp)
+                for loc, inp_comp in comp.inputs.items()
+            },
             op=comp.op,
         )

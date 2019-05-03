@@ -1,28 +1,23 @@
-from typing import Mapping, Union, Any, Iterable
+from typing import Mapping, Union, Any, Iterable, NewType, Sequence, Tuple
 from pathlib import Path
 import functools
 import json
 import hashlib
+import itertools
 
 import attr
+import immutables  # type: ignore
 
-from boyle.storage import Storage
-
-
-Digest = str
-Loc = str
-DigestMap = Mapping[Loc, Digest]
+Digest = NewType("Digest", str)
+Loc = NewType("Loc", str)
 PathLike = Union[Path, str]
-
-
-def unique_json(obj: Any) -> str:
-    return json.dumps(obj, sort_keys=True)
 
 
 digest_func = hashlib.sha1
 
+
 def digest_str(s: str) -> Digest:
-    return digest_func(s.encode('utf-8')).hexdigest()
+    return Digest(digest_func(s.encode("utf-8")).hexdigest())
 
 
 _CHUNK_SIZE = 1024
@@ -39,11 +34,11 @@ def digest_file(path: PathLike) -> Digest:
         return Digest(digest.hexdigest())
 
 
-class ConflictException(Exception):
-    pass
+def unique_json(obj: Any) -> str:
+    return json.dumps(obj, sort_keys=True)
+
 
 def id_property(func):
-
     @property
     @functools.wraps(func)
     def id_func(self):
@@ -56,7 +51,7 @@ def id_property(func):
         try:
             json = unique_json(id_obj)
         except TypeError as e:
-            msg = f'The id_obj of {self} is not JSON serializable: {id_obj}'
+            msg = f"The id_obj of {self} is not JSON serializable: {id_obj}"
             raise TypeError(msg) from e
         id_obj = {"type": type(self).__qualname__, "id_obj": id_obj}
         id_str = digest_str(json)
@@ -65,60 +60,61 @@ def id_property(func):
 
     return id_func
 
-@attr.s(auto_attribs=True, frozen=True, cmp=False)
+
+def make_sorted_tuple(value: Sequence) -> Tuple:
+    return tuple(sorted(value))
+
+
+def _transform_obj_attr(obj, attr_name, func):
+    old_value = getattr(obj, attr_name)
+    new_value = func(old_value)
+    object.__setattr__(obj, attr_name, new_value)
+
+
+@attr.s(auto_attribs=True, frozen=True)
 class Op:
     cmd: str
-    out_locs: Iterable[Loc]
-
-    def __hash__(self):
-        return hash(self.op_id)
+    out_locs: Sequence[Loc] = attr.ib(converter=make_sorted_tuple)
 
     @id_property
     def op_id(self):
-        return {'cmd': self.cmd, 'out_locs': self.out_locs}
-
-    def run(self, inputs: DigestMap, storage: Storage) -> DigestMap:
-        # proc = subprocess.Popen(self.cmd, cwd=work_dir, shell=True)
-        # proc.wait()
-        # return
-        # raise NotImplemented
-        return {loc: eval(self.cmd) for loc in self.out_locs}
+        return attr.asdict(self)
 
 
-@attr.s(auto_attribs=True, frozen=True, cmp=False)
+@attr.s(auto_attribs=True, frozen=True)
 class Calc:
     op: Op
     inputs: Mapping[Loc, Digest]
 
-    def __hash__(self):
-        return hash(self.calc_id)
+    def __attrs_post_init__(self):
+        _transform_obj_attr(self, "inputs", immutables.Map)
 
     @id_property
     def calc_id(self):
-        return {
-            'op': self.op.op_id,
-            'inputs': self.inputs,
-        }
-
-    # def __attrs_post_init__(self):
-    #     assert set(self.task.inp_locs) == set(self.inputs)
+        value = attr.asdict(self)
+        value["inputs"] = dict(value["inputs"])
+        return value
 
 
-@attr.s(auto_attribs=True, frozen=True, cmp=False)
+@attr.s(auto_attribs=True, frozen=True)
 class Comp:
     op: Op
-    inputs: Mapping[Loc, 'Comp']
+    inputs: Mapping[Loc, "Comp"]
     out_loc: Loc
 
-    def __hash__(self):
-        return hash(self.comp_id)
+    def __attrs_post_init__(self):
+        _transform_obj_attr(self, "inputs", immutables.Map)
+        assert self.out_loc in self.op.out_locs
 
     @id_property
     def comp_id(self):
         return {
-            'op': self.op.op_id,
-            'inputs': {loc: comp.comp_id for loc, comp in self.inputs.items()},
-            'out_loc': self.out_loc,
+            "op_id": self.op.op_id,
+            "input_ids": {
+                loc: input_comp.comp_id
+                for loc, input_comp in self.inputs.items()
+            },
+            "out_loc": self.out_loc,
         }
 
 
