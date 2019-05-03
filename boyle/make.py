@@ -89,13 +89,13 @@ def _run_calc(calc: Calc, out_locs: Iterable[Loc], log: Log, storage: Storage):
     )
 
 
-def _ensure_available(requested, log, storage):
+def _ensure_available(requested: Iterable[Comp], log: Log, storage: Storage):
     while True:
         comps_to_run = _get_ready_and_needed(requested, log, storage)
         if not comps_to_run:
             break
 
-        comps_by_calc = defaultdict(set)
+        comps_by_calc: Mapping[Calc, Set[Comp]] = defaultdict(set)
         for comp in comps_to_run:
             calc = log.get_calc(comp)
             comps_by_calc[calc].add(comp)

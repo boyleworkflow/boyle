@@ -1,4 +1,4 @@
-from typing import Iterable, Mapping
+from typing import Iterable, Mapping, cast
 import os
 import tempfile
 import subprocess
@@ -51,8 +51,9 @@ def run(calc: Calc, out_locs: Iterable[Loc], storage: Storage) -> Mapping[Loc, D
 
         fill_run_dir(calc, file_dir, storage)
 
-        stdout_path = container_dir / STDOUT_PATH if op.stdout else os.devnull
-        stderr_path = container_dir / STDERR_PATH if op.stderr else os.devnull
+        devnull = cast(PathLike, os.devnull)
+        stdout_path = container_dir / STDOUT_PATH if op.stdout else devnull
+        stderr_path = container_dir / STDERR_PATH if op.stderr else devnull
 
         with open(stdout_path, 'wb') as stdout, open(stderr_path, 'wb') as stderr:
             proc = subprocess.run(
