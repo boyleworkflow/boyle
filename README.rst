@@ -3,8 +3,8 @@ Boyle Workflow
 ==============
 
 
-.. image:: https://img.shields.io/pypi/v/boyle.svg
-        :target: https://pypi.python.org/pypi/boyle
+.. image:: https://img.shields.io/pypi/v/boyleworkflow.svg
+        :target: https://pypi.python.org/pypi/boyleworkflow
 
 .. image:: https://img.shields.io/travis/boyleworkflow/boyle.svg
         :target: https://travis-ci.org/boyleworkflow/boyle
