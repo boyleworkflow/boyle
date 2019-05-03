@@ -2,7 +2,7 @@
 
 """Top-level package for Boyle Workflow."""
 
-__version__ = '0.1.0'
+__version__ = '0.1.1'
 
 import logging
 
