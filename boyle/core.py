@@ -1,5 +1,5 @@
 from typing import Mapping, Union, Any, Iterable, NewType, Sequence, Tuple, List
-from pathlib import Path
+from pathlib import Path, PurePath
 import functools
 import json
 import hashlib
@@ -11,6 +11,39 @@ import immutables  # type: ignore
 Digest = NewType("Digest", str)
 Loc = NewType("Loc", str)
 PathLike = Union[Path, str]
+
+
+def check_valid_loc(s: str):
+    p = PurePath(s)
+
+    if p.is_absolute():
+        raise ValueError(f"loc '{p}' is absolute")
+
+    if p.is_reserved():
+        raise ValueError(f"loc '{p}' is reserved.")
+
+    if '..' in p.parts:
+        raise ValueError(f"loc '{p}' contains disallowed '..'")
+
+    if '.' in p.parts:
+        raise ValueError(f"loc '{p}' contains disallowed '.'")
+
+
+def is_valid_loc(s: str) -> bool:
+    try:
+        check_valid_loc(s)
+        return True
+    except ValueError:
+        return False
+
+
+def _attrs_loc_keys_validator(instance, attribute, value):
+    for loc in value.keys():
+        check_valid_loc(loc)
+
+
+def _attrs_loc_validator(instance, attribute, value):
+    check_valid_loc(value)
 
 
 digest_func = hashlib.sha1
@@ -83,7 +116,7 @@ class Op:
 @attr.s(auto_attribs=True, frozen=True)
 class Calc:
     op: Op
-    inputs: Mapping[Loc, Digest]
+    inputs: Mapping[Loc, Digest] = attr.ib(validator=_attrs_loc_keys_validator)
 
     def __attrs_post_init__(self):
         _transform_obj_attr(self, "inputs", immutables.Map)
@@ -98,8 +131,8 @@ class Calc:
 @attr.s(auto_attribs=True, frozen=True)
 class Comp:
     op: Op
-    inputs: Mapping[Loc, "Comp"]
-    out_loc: Loc
+    inputs: Mapping[Loc, "Comp"] = attr.ib(validator=_attrs_loc_keys_validator)
+    out_loc: Loc = attr.ib(validator=_attrs_loc_validator)
 
     def __attrs_post_init__(self):
         _transform_obj_attr(self, "inputs", immutables.Map)
