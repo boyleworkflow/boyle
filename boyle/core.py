@@ -74,7 +74,6 @@ def _transform_obj_attr(obj, attr_name, func):
 @attr.s(auto_attribs=True, frozen=True)
 class Op:
     cmd: str
-    out_locs: Sequence[Loc] = attr.ib(converter=make_sorted_tuple)
 
     @id_property
     def op_id(self):
@@ -104,7 +103,6 @@ class Comp:
 
     def __attrs_post_init__(self):
         _transform_obj_attr(self, "inputs", immutables.Map)
-        assert self.out_loc in self.op.out_locs
 
     @id_property
     def comp_id(self):
@@ -116,6 +114,7 @@ class Comp:
             },
             "out_loc": self.out_loc,
         }
+
 
 
 def get_parents(comps: Iterable[Comp]) -> Iterable[Comp]:

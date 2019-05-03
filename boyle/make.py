@@ -79,7 +79,7 @@ def _get_ready_and_needed(requested, log, storage) -> Iterable[Comp]:
 def _run_calc(calc: Calc, out_locs: Iterable[Loc], log: Log, storage: Storage):
 
     start_time = datetime.datetime.utcnow()
-    results = run(calc, storage)
+    results = run(calc, out_locs, storage)
     end_time = datetime.datetime.utcnow()
 
     for loc, digest in results.items():
@@ -120,21 +120,17 @@ def make(requested: Sequence[Comp], log: Log, storage: Storage):
     return results
 
 
-def run(calc: Calc, storage: Storage) -> Mapping[Loc, Digest]:
+def run(calc: Calc, out_locs: Iterable[Loc], storage: Storage) -> Mapping[Loc, Digest]:
     op = calc.op
 
-    print('running', op.cmd)
     with tempfile.TemporaryDirectory() as work_dir:
         for loc, digest in calc.inputs.items():
-            print('placing', loc, digest)
             storage.restore(digest, os.path.join(work_dir, loc))
-
-        print('contents', os.listdir(work_dir))
 
         proc = subprocess.Popen(op.cmd, cwd=work_dir, shell=True)
         proc.wait()
 
         return {
             loc: storage.store(os.path.join(work_dir, loc))
-            for loc in op.out_locs
+            for loc in out_locs
             }
