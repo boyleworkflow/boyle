@@ -32,7 +32,7 @@ setup(
     description="A tool for provenance and caching in computational workflows.",
     entry_points={
         'console_scripts': [
-            'boyle=boyle.cli:main',
+            'boyle=boyleworkflow.cli:main',
         ],
     },
     install_requires=requirements,
@@ -40,8 +40,8 @@ setup(
     long_description=readme + '\n\n' + history,
     include_package_data=True,
     keywords='boyle',
-    name='boyle',
-    packages=find_packages(include=['boyle']),
+    name='boyleworkflow',
+    packages=find_packages(include=['boyleworkflow']),
     setup_requires=setup_requirements,
     test_suite='tests',
     tests_require=test_requirements,
