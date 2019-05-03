@@ -25,13 +25,18 @@ def digest_str(s: str) -> Digest:
     return digest_func(s.encode('utf-8')).hexdigest()
 
 
+_CHUNK_SIZE = 1024
+
+
 def digest_file(path: PathLike) -> Digest:
-    with open(path, 'rb') as f:
-        return digest_func(f.read()).hexdigest()
-
-
-class NotFoundException(Exception):
-    pass
+    digest = digest_func()
+    with open(path, "rb") as f:
+        while True:
+            data = f.read(_CHUNK_SIZE)
+            if not data:
+                break
+            digest.update(data)
+        return Digest(digest.hexdigest())
 
 
 class ConflictException(Exception):
