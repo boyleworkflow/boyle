@@ -13,7 +13,7 @@ from click.testing import CliRunner
 
 import boyleworkflow
 from boyleworkflow import cli
-
+from boyleworkflow.util import set_file_permissions
 from boyleworkflow.storage import Storage
 
 
@@ -68,3 +68,75 @@ def test_store_and_restore(storage):
                 restored_content = f.read()
 
             assert restored_content == original_contents[k]
+
+
+def test_file_permissions(storage):
+
+    # Restored files should be readable and write protected.
+    # No other guarantees on file permissions.
+    # In Unix this means file mode 444 or 555 or anything in between,
+    # but the Windows write protection is found in the user bit
+    # so in practice just check that the user write bit is false.
+
+    original_content = 'abc'
+
+    with tempfile.TemporaryDirectory() as td:
+        orig_path = os.path.join(td, 'my_file')
+
+        with open(orig_path, 'w') as f:
+            f.write(original_content)
+
+        digest = storage.store(orig_path)
+
+    with tempfile.TemporaryDirectory() as td:
+        restored_path = os.path.join(td, 'restored')
+        storage.restore(digest, restored_path)
+
+        with pytest.raises(PermissionError):
+            open(restored_path, 'a')
+
+
+def test_modify(storage):
+
+    # Modifications to contents of restored files should not persist.
+    # This could happen if we handle hardlinks in a stupid way.
+    # However, it is fine if the storage notices changed files and
+    # discards them.
+    #
+    # Therefore there are two acceptable behaviors after changing
+    # a restored file:
+    #
+    # 1. It cannot be restored again.
+    # 2. It can be restored again (with the original content).
+
+    original_content = 'abc'
+
+    with tempfile.TemporaryDirectory() as td:
+        orig_path = os.path.join(td, 'my_file')
+
+        with open(orig_path, 'w') as f:
+            f.write(original_content)
+
+        digest = storage.store(orig_path)
+
+
+    with tempfile.TemporaryDirectory() as td:
+        restored_path = os.path.join(td, 'restored')
+        storage.restore(digest, restored_path)
+        set_file_permissions(restored_path, write=True)
+        with open(restored_path, 'a') as f:
+            f.write('d')
+
+
+    with tempfile.TemporaryDirectory() as td:
+        restored_path = os.path.join(td, 'restored')
+
+        if not storage.can_restore(digest):
+            return
+
+        storage.restore(digest, restored_path)
+
+        with open(restored_path, 'r') as f:
+            restored_content = f.read()
+
+        assert restored_content == original_content

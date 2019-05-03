@@ -4,6 +4,7 @@ import logging
 
 import attr
 
+from boyleworkflow.util import set_file_permissions
 from boyleworkflow.core import PathLike, Digest, digest_file
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,7 @@ class Storage:
         src_path = self._get_store_path(digest)
         logger.debug(f"Restoring {digest} to {dst_path}")
         shutil.copy2(src_path, dst_path)
+        set_file_permissions(dst_path, write=False, read=True)
 
     def store(self, src_path: PathLike) -> Digest:
         logger.debug(f"Storing {src_path}")
