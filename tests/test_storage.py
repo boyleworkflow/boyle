@@ -6,6 +6,7 @@
 import tempfile
 import shutil
 import os
+import time
 
 import pytest
 
@@ -120,6 +121,12 @@ def test_modify(storage):
         digest = storage.store(orig_path)
 
 
+    # Wait a tiny bit before modifying the file;
+    # if this is left out it seems the mtime is not updated later,
+    # indicating that the file handle has been recycled or something?
+    time.sleep(.01)
+
+
     with tempfile.TemporaryDirectory() as td:
         restored_path = os.path.join(td, 'restored')
         storage.restore(digest, restored_path)
@@ -128,15 +135,31 @@ def test_modify(storage):
             f.write('d')
 
 
-    with tempfile.TemporaryDirectory() as td:
-        restored_path = os.path.join(td, 'restored')
+    if storage.can_restore(digest):
+        # If the storage can restore,
+        # it must have had its own copy of the file
 
-        if not storage.can_restore(digest):
-            return
+        with tempfile.TemporaryDirectory() as td:
+            restored_path = os.path.join(td, 'restored')
 
-        storage.restore(digest, restored_path)
+            storage.restore(digest, restored_path)
 
-        with open(restored_path, 'r') as f:
-            restored_content = f.read()
+            with open(restored_path, 'r') as f:
+                restored_content = f.read()
 
-        assert restored_content == original_content
+            assert restored_content == original_content
+
+    else:
+        # If the storage can not restore, it probably provided a
+        # hardlink that modified the stored file.
+        # In this case, we would like the storage to recover
+        # if we first call "store" with the same file again.
+        with tempfile.TemporaryDirectory() as td:
+            orig_path = os.path.join(td, 'my_file')
+
+            with open(orig_path, 'w') as f:
+                f.write(original_content)
+
+            storage.store(orig_path)
+
+        assert storage.can_restore(digest)
