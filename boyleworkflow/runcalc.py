@@ -4,7 +4,7 @@ import tempfile
 import subprocess
 from pathlib import Path
 
-from boyleworkflow.core import Calc, Op, Loc, Digest, PathLike, is_valid_loc
+from boyleworkflow.core import Calc, Op, Loc, Digest, PathLike, is_valid_loc, Result
 from boyleworkflow.log import Log
 from boyleworkflow.storage import Storage
 
@@ -31,15 +31,15 @@ def fill_run_dir(calc: Calc, the_dir: PathLike, storage: Storage):
     contents = list(the_dir.iterdir())
     assert not contents, contents
 
-    for loc, digest in calc.inputs.items():
-        dst_path = (the_dir / loc).resolve()
-        assert is_valid_loc(loc), f"invalid loc {loc}"
-        storage.restore(digest, dst_path)
+    for inp in calc.inputs:
+        dst_path = (the_dir / inp.loc).resolve()
+        assert is_valid_loc(inp.loc), f"invalid loc {inp.loc}"
+        storage.restore(inp.digest, dst_path)
 
 
 def run(
     calc: Calc, out_locs: Iterable[Loc], storage: Storage
-) -> Mapping[Loc, Digest]:
+) -> Iterable[Result]:
     op = calc.op
 
     with tempfile.TemporaryDirectory() as td:
@@ -75,6 +75,7 @@ def run(
             info = {"calc": calc, "message": str(e)}
             raise RunError(info) from e
 
-        return {
-            loc: storage.store(os.path.join(work_dir, loc)) for loc in out_locs
-        }
+        return [
+            Result(loc, storage.store(os.path.join(work_dir, loc)))
+            for loc in out_locs
+        ]

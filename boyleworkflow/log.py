@@ -19,6 +19,7 @@ from boyleworkflow.core import (
     PathLike,
     Loc,
     Digest,
+    Result,
     get_upstream_sorted,
 )
 
@@ -85,18 +86,18 @@ class Log:
             )
 
             self.conn.executemany(
-                "INSERT OR IGNORE INTO calc_input (calc_id, loc, digest) "
+                "INSERT OR IGNORE INTO input (calc_id, loc, digest) "
                 "VALUES (?, ?, ?)",
                 [
-                    (calc.calc_id, loc, digest)
-                    for loc, digest in calc.inputs.items()
+                    (calc.calc_id, inp.loc, inp.digest)
+                    for inp in calc.inputs
                 ],
             )
 
     def save_run(
         self,
         calc: Calc,
-        results: Mapping[Loc, Digest],
+        results: Iterable[Result],
         start_time: datetime.datetime,
         end_time: datetime.datetime,
     ):
@@ -114,7 +115,7 @@ class Log:
 
             self.conn.executemany(
                 "INSERT INTO result (run_id, loc, digest) VALUES (?, ?, ?)",
-                [(run_id, loc, digest) for loc, digest in results.items()],
+                [(run_id, result.loc, result.digest) for result in results],
             )
 
     def save_comp(self, leaf_comp: Comp):
@@ -127,12 +128,12 @@ class Log:
                 )
 
                 self.conn.executemany(
-                    "INSERT OR IGNORE INTO comp_input "
-                    "(comp_id, loc, input_comp_id) "
-                    "VALUES (?, ?, ?)",
+                    "INSERT OR IGNORE INTO parent "
+                    "(comp_id, parent_comp_id) "
+                    "VALUES (?, ?)",
                     [
-                        (comp.comp_id, loc, inp_comp.comp_id)
-                        for loc, inp_comp in comp.inputs.items()
+                        (comp.comp_id, parent.comp_id)
+                        for parent in comp.parents
                     ],
                 )
 
@@ -169,7 +170,7 @@ class Log:
 
         return {digest: opinion for digest, opinion in query}
 
-    def get_result(self, calc: Calc, loc: Loc) -> Digest:
+    def get_result(self, calc: Calc, loc: Loc) -> Result:
         opinions = self.get_opinions(calc, loc)
 
         candidates = [
@@ -186,19 +187,16 @@ class Log:
             raise NotFoundException((calc, loc))
         elif len(candidates) == 1:
             digest, = candidates
-            return digest
+            return Result(loc, digest)
         else:
             raise ConflictException(opinions)
 
     def get_calc(self, comp: Comp) -> Calc:
-        def get_comp_result(input_comp: Comp) -> Digest:
+        def get_comp_result(input_comp: Comp) -> Result:
             calc = self.get_calc(input_comp)
             return self.get_result(calc, input_comp.loc)
 
         return Calc(
-            inputs={
-                loc: get_comp_result(inp_comp)
-                for loc, inp_comp in comp.inputs.items()
-            },
+            inputs=tuple(get_comp_result(parent) for parent in comp.parents),
             op=comp.op,
         )

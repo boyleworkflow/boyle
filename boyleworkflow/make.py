@@ -31,19 +31,19 @@ def _determine_sets(comps: Iterable[Comp], log: Log, storage: Storage):
     }
 
     for comp in comps:
-        input_comps = set(comp.inputs.values())
-        if input_comps <= sets["Known"]:
+        parents = set(comp.parents)
+        if parents <= sets["Known"]:
             sets["Concrete"].add(comp)
         else:
             sets["Abstract"].add(comp)
             continue
 
-        if input_comps <= sets["Restorable"]:
+        if parents <= sets["Restorable"]:
             sets["Runnable"].add(comp)
 
         calc = log.get_calc(comp)
         try:
-            digest = log.get_result(calc, comp.loc)
+            digest = log.get_result(calc, comp.loc).digest
             sets["Known"].add(comp)
             if storage.can_restore(digest):
                 sets["Restorable"].add(comp)
@@ -89,8 +89,8 @@ def _run_calc(calc: Calc, out_locs: Iterable[Loc], log: Log, storage: Storage):
     results = run(calc, out_locs, storage)
     end_time = datetime.datetime.utcnow()
 
-    for loc, digest in results.items():
-        assert storage.can_restore(digest), (loc, digest)
+    for result in results:
+        assert storage.can_restore(result.digest), result
 
     log.save_run(
         calc=calc, results=results, start_time=start_time, end_time=end_time
@@ -120,7 +120,7 @@ def make(requested: Sequence[Comp], log: Log, storage: Storage):
     results = {}
     for comp in requested:
         calc = log.get_calc(comp)
-        digest = log.get_result(calc, comp.loc)
+        digest = log.get_result(calc, comp.loc).digest
         log.save_response(comp, digest, time)
         results[comp] = digest
 

@@ -11,8 +11,8 @@ create table calc (
   foreign key(op_id) references op(op_id)
 );
 
--- An input to a calculation, i.e., a (Calc, Resource) pair
-create table calc_input (
+-- An input to a calculation, i.e., a (Calc, Result) pair
+create table input (
   calc_id text,
   loc text,
   digest text,
@@ -28,14 +28,13 @@ create table comp (
   foreign key(op_id) references op(op_id)
 );
 
--- An input to a composition, i.e., a tuple (Comp child, Loc input, Comp parent)
-create table comp_input (
+-- An input to a composition, i.e., a tuple (Comp child, Comp parent)
+create table parent (
   comp_id text,
-  loc text,
-  input_comp_id text,
+  parent_comp_id text,
   foreign key(comp_id) references comp(comp_id),
-  foreign key(input_comp_id) references comp(comp_id),
-  primary key (comp_id, loc)
+  foreign key(parent_comp_id) references comp(comp_id),
+  primary key (comp_id, parent_comp_id)
 );
 
 create table trust (
@@ -57,7 +56,7 @@ create table run (
 );
 create index run_calc on run (calc_id);
 
--- A result created by a run, i.e., a (Resource, Run) pair
+-- A result created by a run, i.e., a (Run, Resource) pair
 create table result (
   run_id text,
   loc text,

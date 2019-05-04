@@ -1,11 +1,11 @@
-from typing import Mapping, Iterable, Union
+from typing import Iterable, Union
 import subprocess
 import attr
 import boyleworkflow.core
 from boyleworkflow.core import Loc, Comp
 
 
-def shell(cmd: str, inputs: Mapping[str, Comp], out: Union[Iterable[str], str]):
+def shell(cmd: str, inputs: Iterable[Comp], out: Union[Iterable[str], str]):
     if isinstance(out, str):
         out_list = [out]
     else:
@@ -18,7 +18,7 @@ def shell(cmd: str, inputs: Mapping[str, Comp], out: Union[Iterable[str], str]):
     comps = {
         out_loc: boyleworkflow.core.Comp(
             op=op,
-            inputs={Loc(loc): comp for loc, comp in inputs.items()},
+            parents=tuple(inputs),
             loc=out_loc,
         )
         for out_loc in out_locs

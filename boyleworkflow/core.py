@@ -6,7 +6,6 @@ import hashlib
 import itertools
 
 import attr
-import immutables  # type: ignore
 
 Digest = NewType("Digest", str)
 Loc = NewType("Loc", str)
@@ -37,13 +36,16 @@ def is_valid_loc(s: str) -> bool:
         return False
 
 
-def _attrs_loc_keys_validator(instance, attribute, value):
-    for loc in value.keys():
-        check_valid_loc(loc)
-
-
 def _attrs_loc_validator(instance, attribute, value):
     check_valid_loc(value)
+
+
+def _unique_locs_validator(instance, attribute, items):
+    seen_locs = set()
+    for item in items:
+        if item.loc in seen_locs:
+            raise ValueError(f"multiple definitions of loc '{loc}'")
+        check_valid_loc(item.loc)
 
 
 digest_func = hashlib.sha1
@@ -122,12 +124,23 @@ class Op:
 
 
 @attr.s(auto_attribs=True, frozen=True)
+class Result:
+    loc: Loc
+    digest: Digest
+
+
+def _make_tuple_sorted_by_loc(items):
+    items = sorted(items, key=lambda x: x.loc)
+    return tuple(items)
+
+
+@attr.s(auto_attribs=True, frozen=True)
 class Calc:
     op: Op
-    inputs: Mapping[Loc, Digest] = attr.ib(validator=_attrs_loc_keys_validator)
-
-    def __attrs_post_init__(self):
-        _transform_obj_attr(self, "inputs", immutables.Map)
+    inputs: Tuple[Result, ...] = attr.ib(
+        validator=_unique_locs_validator,
+        converter=_make_tuple_sorted_by_loc,
+        )
 
     @id_property
     def calc_id(self):
@@ -139,26 +152,23 @@ class Calc:
 @attr.s(auto_attribs=True, frozen=True)
 class Comp:
     op: Op
-    inputs: Mapping[Loc, "Comp"] = attr.ib(validator=_attrs_loc_keys_validator)
+    parents: Tuple["Comp", ...] = attr.ib(
+        validator=_unique_locs_validator,
+        converter=_make_tuple_sorted_by_loc,
+        )
     loc: Loc = attr.ib(validator=_attrs_loc_validator)
-
-    def __attrs_post_init__(self):
-        _transform_obj_attr(self, "inputs", immutables.Map)
 
     @id_property
     def comp_id(self):
         return {
             "op_id": self.op.op_id,
-            "input_ids": {
-                loc: input_comp.comp_id
-                for loc, input_comp in self.inputs.items()
-            },
+            "input_ids": [parent.comp_id for parent in self.parents],
             "loc": self.loc,
         }
 
 
 def get_parents(comps: Iterable[Comp]) -> Iterable[Comp]:
-    return list(itertools.chain(*(comp.inputs.values() for comp in comps)))
+    return list(itertools.chain(*(comp.parents for comp in comps)))
 
 
 def get_upstream_sorted(requested: Iterable[Comp]) -> Sequence[Comp]:
