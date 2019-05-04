@@ -110,6 +110,7 @@ def _transform_obj_attr(obj, attr_name, func):
 class Op:
     cmd: str
     shell: bool = False
+    stdin: bool = False
     stderr: bool = True
     stdout: bool = True
     work_dir: str = "."
