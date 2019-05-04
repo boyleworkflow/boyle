@@ -44,6 +44,27 @@ def log(request):
     return log
 
 
+def restore_and_read(digest, storage, mode="r"):
+    with tempfile.TemporaryDirectory() as td:
+        path = f"{td}/tempfile"
+        storage.restore(digest, path)
+        with open(path, mode) as f:
+            return f.read()
+
+
+def make_and_check_expected_contents(expected_file_contents, log, storage):
+
+    assert len(expected_file_contents) > 0
+
+    results = boyleworkflow.make(list(expected_file_contents), log, storage)
+
+    assert set(results) == set(expected_file_contents)
+
+    for comp, digest in results.items():
+        result = restore_and_read(digest, storage)
+        assert result == expected_file_contents[comp]
+
+
 def test_simple_shell(log, storage):
     a = shell("echo hello > a").out("a")
     b = shell("echo world > b").out("b")
@@ -51,17 +72,48 @@ def test_simple_shell(log, storage):
 
     expected_file_contents = {a: "hello\n", b: "world\n", c: "hello\nworld\n"}
 
-    results = boyleworkflow.make([a, b, c], log, storage)
+    make_and_check_expected_contents(expected_file_contents, log, storage)
 
-    assert set(results) == set(expected_file_contents)
 
-    with tempfile.TemporaryDirectory() as td:
+def test_stdin(log, storage):
+    a = shell("echo 'testing stdin' > a").out("a")
+    b = shell("cat > b", stdin=a).out("b")
 
-        for comp, digest in results.items():
-            path = f"{td}/tempfile"
-            storage.restore(digest, path)
-            with open(path, "r") as f:
-                result = f.read()
-            os.remove(path)
+    make_and_check_expected_contents({b: "testing stdin\n"}, log, storage)
 
-            assert result == expected_file_contents[comp]
+
+def test_stdout_output(log, storage):
+    task = shell("echo something > a && echo 'testing stdout'")
+
+    make_and_check_expected_contents(
+        {task.out("a"): "something\n", task.stdout: "testing stdout\n"},
+        log,
+        storage,
+    )
+
+
+def test_stdout_input(log, storage):
+    a = shell("echo 'like piping'").stdout
+
+    b = shell("cat > b", stdin=a).out("b")
+
+    make_and_check_expected_contents({b: "like piping\n"}, log, storage)
+
+
+def test_stdout_chain(log, storage):
+    a = shell("echo 'like pipin a chain'").stdout
+
+    b = shell("cat", stdin=a).stdout
+
+    c = shell("cat", stdin=b).stdout
+
+    make_and_check_expected_contents({c: "like piping a chain\n"}, log, storage)
+
+
+def test_stderr(log, storage):
+    # redirect stdout to stderr
+    # not sure if this is the way to do it...
+    task = shell("echo 'testing stderr' 1>&2")
+    make_and_check_expected_contents(
+        {task.stderr: "testing stderr\n", task.stdout: ""}, log, storage
+    )
