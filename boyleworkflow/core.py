@@ -11,6 +11,7 @@ import attr
 
 BASE_DIR = "files"
 
+
 class SpecialFilePath(Enum):
     STDIN = "../stdin"
     STDOUT = "../stdout"
@@ -24,9 +25,13 @@ PathLike = Union[Path, str]
 
 _SPECIAL_ALLOWED_LOCS = {f.value for f in SpecialFilePath}
 
+
 def check_valid_loc(s: str):
     if s in _SPECIAL_ALLOWED_LOCS:
         return
+
+    if s == "":
+        raise ValueError(f"empty loc '{s}' is not allowed (try '.' instead)")
 
     p = PurePath(s)
 
@@ -39,8 +44,27 @@ def check_valid_loc(s: str):
     if ".." in p.parts:
         raise ValueError(f"loc '{p}' contains disallowed '..'")
 
-    if "." in p.parts:
-        raise ValueError(f"loc '{p}' contains disallowed '.'")
+
+def check_valid_input_loc(s: str):
+    check_valid_loc(s)
+
+    if s in [SpecialFilePath.STDOUT.value, SpecialFilePath.STDERR.value]:
+        raise ValueError(f"loc '{s}' cannot be used as input (try renaming it)")
+
+
+def check_valid_output_loc(s: str):
+    check_valid_loc(s)
+
+    if s in [SpecialFilePath.STDIN.value]:
+        raise ValueError(
+            f"loc '{s}' cannot be used as output (try renaming it)"
+        )
+
+
+def normalize_loc(s: str) -> Loc:
+    check_valid_loc(s)
+    path = Path(s)
+    return Loc(str(Path(*path.parts)))
 
 
 def is_valid_loc(s: str) -> bool:
@@ -55,12 +79,12 @@ def _attrs_loc_validator(instance, attribute, value):
     check_valid_loc(value)
 
 
-def _unique_locs_validator(instance, attribute, items):
-    seen_locs = set()
-    for item in items:
-        if item.loc in seen_locs:
-            raise ValueError(f"multiple definitions of loc '{loc}'")
-        check_valid_loc(item.loc)
+def _attrs_loc_input_validator(instance, attribute, value):
+    check_valid_input_loc(value)
+
+
+def _attrs_loc_output_validator(instance, attribute, value):
+    check_valid_output_loc(value)
 
 
 digest_func = hashlib.sha1
@@ -141,7 +165,7 @@ class Op:
 
 @attr.s(auto_attribs=True, frozen=True)
 class Result:
-    loc: Loc
+    loc: Loc = attr.ib(validator=_attrs_loc_validator)
     digest: Digest
 
 
@@ -150,13 +174,26 @@ def _make_tuple_sorted_by_loc(items):
     return tuple(items)
 
 
+def _check_unique_locs(items):
+    seen_locs = set()
+    for item in items:
+        if item.loc in seen_locs:
+            raise ValueError(f"multiple definitions of loc '{loc}'")
+
+
+def _input_locs_validator(instance, attribute, value):
+    for item in value:
+        check_valid_input_loc(item.loc)
+
+    _check_unique_locs(value)
+
+
 @attr.s(auto_attribs=True, frozen=True)
 class Calc:
     op: Op
     inputs: Tuple[Result, ...] = attr.ib(
-        validator=_unique_locs_validator,
-        converter=_make_tuple_sorted_by_loc,
-        )
+        validator=_input_locs_validator, converter=_make_tuple_sorted_by_loc
+    )
 
     @id_property
     def calc_id(self):
@@ -169,10 +206,11 @@ class Calc:
 class Comp:
     op: Op
     parents: Tuple["Comp", ...] = attr.ib(
-        validator=_unique_locs_validator,
-        converter=_make_tuple_sorted_by_loc,
-        )
-    loc: Loc = attr.ib(validator=_attrs_loc_validator)
+        validator=_input_locs_validator, converter=_make_tuple_sorted_by_loc
+    )
+    loc: Loc = attr.ib(
+        validator=_attrs_loc_output_validator, converter=normalize_loc
+    )
 
     @id_property
     def comp_id(self):
