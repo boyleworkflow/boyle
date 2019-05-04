@@ -1,24 +1,28 @@
+import tempfile
+
 import attr
 
-import boyle
+import boyleworkflow as boyle
 
-storage = boyle.Storage("storage_dir")
-log = boyle.Log("log.sqlite")
+with tempfile.TemporaryDirectory() as td:
 
-a = boyle.shell("echo hello > a", inputs={}, out="a")
-# b = boyle.shell('echo hello > a')
+    storage = boyle.Storage(td)
+    log = boyle.Log("log.sqlite")
 
-# print(a)
-#
-b = boyle.shell("echo world > b", inputs={}, out="b")
+    a = boyle.shell("echo hello > a", inputs=(), out="a")
+    # b = boyle.shell('echo hello > a')
 
-c = boyle.shell("cat x y > c && echo test", inputs={"x": a, "y": b}, out="c")
+    # print(a)
+    #
+    b = boyle.shell("echo world > b", inputs=(), out="b")
 
-c_fail = boyle.shell("cat x y > c", inputs={"x": a, "z": b}, out="c")
+    c = boyle.shell("cat a b > c && echo test", inputs=(a, b), out="c")
 
-results = boyle.make([c], log, storage)
+    c_fail = boyle.shell("cat x y > c", inputs=(a, b), out="c")
 
-for comp, digest in results.items():
-    print(comp.comp_id, digest)
+    results = boyle.make([c], log, storage)
 
-boyle.make([c_fail], log, storage)
+    for comp, digest in results.items():
+        print(comp.comp_id, digest)
+
+    boyle.make([c_fail], log, storage)

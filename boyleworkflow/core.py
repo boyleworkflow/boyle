@@ -4,15 +4,30 @@ import functools
 import json
 import hashlib
 import itertools
+from enum import Enum
 
 import attr
+
+
+BASE_DIR = "files"
+
+class SpecialFilePath(Enum):
+    STDIN = "../stdin"
+    STDOUT = "../stdout"
+    STDERR = "../stderr"
+
 
 Digest = NewType("Digest", str)
 Loc = NewType("Loc", str)
 PathLike = Union[Path, str]
 
 
+_SPECIAL_ALLOWED_LOCS = {f.value for f in SpecialFilePath}
+
 def check_valid_loc(s: str):
+    if s in _SPECIAL_ALLOWED_LOCS:
+        return
+
     p = PurePath(s)
 
     if p.is_absolute():
