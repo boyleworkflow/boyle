@@ -10,7 +10,8 @@ import os
 import pytest
 
 import boyleworkflow
-from boyleworkflow.api import shell, rename
+from boyleworkflow.loc import SpecialFilePath
+from boyleworkflow.api import shell, rename, Task
 
 
 @pytest.fixture
@@ -117,6 +118,36 @@ def test_stderr(log, storage):
     make_and_check_expected_contents(
         {task.stderr: "testing stderr\n", task.stdout: ""}, log, storage
     )
+
+
+def test_special_files_access():
+    stdout_1 = shell('command').out(SpecialFilePath.STDOUT.value)
+    stdout_2 = shell('command').stdout
+    assert stdout_1 == stdout_2
+
+    stderr_1 = shell('command').out(SpecialFilePath.STDERR.value)
+    stderr_2 = shell('command').stderr
+    assert stderr_1 == stderr_2
+
+
+def test_specal_files_disallowed():
+    op = boyleworkflow.core.Op()
+
+    # stdin cannot be an output
+    with pytest.raises(ValueError):
+        Task(op).out(SpecialFilePath.STDIN.value)
+
+    # stdout can be output but not input
+    stdout = shell('command').stdout
+    with pytest.raises(ValueError):
+        Task(op, [stdout])
+
+
+    # stderr can be output but not input
+    stderr = shell('command').stderr
+    with pytest.raises(ValueError):
+        Task(op, [stderr])
+
 
 
 def test_rename(log, storage):

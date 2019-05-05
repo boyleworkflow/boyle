@@ -34,8 +34,24 @@ class Task:
     op: Op
     inputs: Iterable[Comp] = attr.ib(converter=_make_tuple, default=())
 
+    @inputs.validator
+    def validate(instance, attribute, inputs):
+        forbidden = [SpecialFilePath.STDOUT.value, SpecialFilePath.STDERR.value]
+        for inp in inputs:
+            if inp.loc in forbidden:
+                raise ValueError(
+                    f"loc '{inp.loc}' not allowed as input (try renaming it)"
+                )
+
     def out(self, resource: Resource):
-        return Comp(self.op, self.inputs, _get_loc(resource))
+        forbidden = [SpecialFilePath.STDIN.value]
+        loc = _get_loc(resource)
+        if loc in forbidden:
+            raise ValueError(
+                f"loc '{loc}' not allowed as output (try renaming it)"
+            )
+
+        return Comp(self.op, self.inputs, loc)
 
     @property
     def stdout(self):

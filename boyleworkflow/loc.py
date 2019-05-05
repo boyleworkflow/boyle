@@ -36,22 +36,6 @@ def check_valid_loc(s: str):
         raise ValueError(f"loc '{p}' contains disallowed '..'")
 
 
-def check_valid_input_loc(s: str):
-    check_valid_loc(s)
-
-    if s in [SpecialFilePath.STDOUT.value, SpecialFilePath.STDERR.value]:
-        raise ValueError(f"loc '{s}' cannot be used as input (try renaming it)")
-
-
-def check_valid_output_loc(s: str):
-    check_valid_loc(s)
-
-    if s in [SpecialFilePath.STDIN.value]:
-        raise ValueError(
-            f"loc '{s}' cannot be used as output (try renaming it)"
-        )
-
-
 def normalize_loc(s: str) -> Loc:
     check_valid_loc(s)
     path = PurePath(s)

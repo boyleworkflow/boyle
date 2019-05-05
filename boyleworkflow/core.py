@@ -5,13 +5,7 @@ import attr
 
 from boyleworkflow.util import id_property
 from boyleworkflow.storage import Storage, Digest
-from boyleworkflow.loc import (
-    Loc,
-    check_valid_loc,
-    check_valid_input_loc,
-    check_valid_output_loc,
-    normalize_loc,
-)
+from boyleworkflow.loc import Loc, check_valid_loc, normalize_loc
 
 
 @attr.s(auto_attribs=True, frozen=True)
@@ -44,7 +38,7 @@ def _make_tuple_sorted_by_loc(items) -> Tuple:
 
 def _validate_input_locs(items):
     for item in items:
-        check_valid_input_loc(item.loc)
+        check_valid_loc(item.loc)
 
     seen_locs = set()
     for item in items:
@@ -69,7 +63,7 @@ class Calc:
 
 
 def validate_out_loc(instance, attribute, value):
-    check_valid_output_loc(value)
+    check_valid_loc(value)
 
 
 @attr.s(auto_attribs=True, frozen=True)
@@ -84,7 +78,7 @@ class Comp:
 
     @loc.validator
     def validate(instance, attribute, value):
-        check_valid_output_loc(value)
+        check_valid_loc(value)
 
     @id_property
     def comp_id(self):

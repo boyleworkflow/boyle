@@ -35,22 +35,3 @@ def test_allowed_loc():
         comp = Comp(op, (), inp)
         assert comp.loc == expected_out
 
-
-def test_special_files_loc():
-    op = Op()
-
-    # stdin cannot be an output
-    with pytest.raises(ValueError):
-        Comp(op, (), SpecialFilePath.STDIN.value)
-
-
-    # stdout can be output but not input
-    stdout = Comp(op, (), SpecialFilePath.STDOUT.value)
-    with pytest.raises(ValueError):
-        Comp(op, (stdout,), 'x')
-
-
-    # stderr can be output but not input
-    stderr = Comp(op, (), SpecialFilePath.STDERR.value)
-    with pytest.raises(ValueError):
-        Comp(op, (stderr,), 'x')
