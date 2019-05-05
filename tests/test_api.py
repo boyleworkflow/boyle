@@ -102,7 +102,7 @@ def test_stdout_input(log, storage):
 
 
 def test_stdout_chain(log, storage):
-    a = shell("echo 'like pipin a chain'").stdout
+    a = shell("echo 'like piping a chain'").stdout
 
     b = shell("cat", stdin=a).stdout
 
