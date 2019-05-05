@@ -10,7 +10,7 @@ import os
 import pytest
 
 import boyleworkflow
-from boyleworkflow.api import shell
+from boyleworkflow.api import shell, rename
 
 
 @pytest.fixture
@@ -117,3 +117,13 @@ def test_stderr(log, storage):
     make_and_check_expected_contents(
         {task.stderr: "testing stderr\n", task.stdout: ""}, log, storage
     )
+
+
+def test_rename(log, storage):
+    # redirect stdout to stderr
+    # not sure if this is the way to do it...
+    a = shell("echo 'hello world' > a").out('a')
+    b = rename(a, 'b')
+    c = shell("cp b c", [b]).out('c')
+
+    make_and_check_expected_contents({c: "hello world\n"}, log, storage)

@@ -116,3 +116,29 @@ class ShellOp(Op):
                 Result(loc, storage.store(os.path.join(work_dir, loc)))
                 for loc in out_locs
             ]
+
+
+@attr.s(auto_attribs=True, frozen=True)
+class RenameOp:
+    inp_loc: Loc
+    out_loc: Loc
+
+    @property
+    def definition(self):
+        return unique_json(attr.asdict(self))
+
+    @id_property
+    def op_id(self):
+        return attr.asdict(self)
+
+    def run(
+        self,
+        inputs: Iterable[Result],
+        out_locs: Iterable[Loc],
+        storage: Storage,
+    ) -> Iterable[Result]:
+
+        digests = {inp.loc: inp.digest for inp in inputs}
+        inp_digest = digests[self.inp_loc]
+
+        return [Result(self.out_loc, inp_digest)]

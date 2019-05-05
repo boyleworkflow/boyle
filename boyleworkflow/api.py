@@ -4,7 +4,7 @@ from enum import Enum
 import attr
 
 from boyleworkflow.core import Op, Comp, Loc
-from boyleworkflow.ops import SpecialFilePath, ShellOp
+from boyleworkflow.ops import SpecialFilePath, ShellOp, RenameOp
 
 
 @attr.s(auto_attribs=True)
@@ -51,7 +51,7 @@ class Task:
 
 
 def rename(comp: Comp, new_loc: Loc) -> Comp:
-    op = ShellOp(f"mv {comp.loc} {new_loc}", shell=True)
+    op = RenameOp(comp.loc, new_loc)
     return Comp(op, [comp], new_loc)
 
 
