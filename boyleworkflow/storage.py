@@ -1,11 +1,11 @@
+from typing import NewType
 import os
 import shutil
 import logging
 
 import attr
 
-from boyleworkflow.util import set_file_permissions
-from boyleworkflow.core import PathLike, Digest, digest_file
+from boyleworkflow.util import set_file_permissions, PathLike, digest_file
 
 logger = logging.getLogger(__name__)
 
@@ -14,19 +14,22 @@ class RestoreError(Exception):
     pass
 
 
+Digest = NewType("Digest", str)
+
+
 @attr.s(auto_attribs=True)
 class Storage:
     storage_dir: PathLike
 
     def __attrs_post_init__(self):
         os.makedirs(self.storage_dir, exist_ok=True)
-        os.makedirs(os.path.join(self.storage_dir, 'meta'), exist_ok=True)
+        os.makedirs(os.path.join(self.storage_dir, "meta"), exist_ok=True)
 
     def _get_store_path(self, digest: Digest) -> PathLike:
         return os.path.join(self.storage_dir, digest)
 
     def _get_meta_path(self, digest: Digest) -> PathLike:
-        return os.path.join(self.storage_dir, 'meta', digest)
+        return os.path.join(self.storage_dir, "meta", digest)
 
     def _appears_unchanged(self, digest: Digest):
         src_path = self._get_store_path(digest)
@@ -49,11 +52,10 @@ class Storage:
         except FileNotFoundError:
             pass
 
-        with open(meta_path, 'w'):
+        with open(meta_path, "w"):
             pass
 
         shutil.copystat(src_path, meta_path)
-
 
     def can_restore(self, digest: Digest) -> bool:
         if not os.path.exists(self._get_store_path(digest)):
@@ -73,11 +75,12 @@ class Storage:
         src_path = self._get_store_path(digest)
         set_file_permissions(src_path, write=False, read=True)
 
-        os.link(src_path, dst_path)
+        # os.link(src_path, dst_path)
+        shutil.copy2(src_path, dst_path)
 
     def store(self, src_path: PathLike) -> Digest:
         logger.debug(f"Storing {src_path}")
-        digest = digest_file(src_path)
+        digest = Digest(digest_file(src_path))
         if self.can_restore(digest):
             return digest
 
@@ -92,6 +95,7 @@ class Storage:
             pass
 
         set_file_permissions(src_path, write=False, read=True)
-        os.link(src_path, dst_path)
+        # os.link(src_path, dst_path)
+        shutil.copy2(src_path, dst_path)
         self._set_meta(digest)
         return digest

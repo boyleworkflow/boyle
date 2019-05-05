@@ -9,7 +9,8 @@ import os
 
 import pytest
 
-from boyleworkflow.core import Calc, Loc, Comp, Op, SpecialFilePath
+from boyleworkflow.core import Comp, Op
+from boyleworkflow.loc import Loc, SpecialFilePath
 
 
 disallowed_locs = ["", "..", "a/../b", "/", "/home/user", '../x']
@@ -24,7 +25,7 @@ allowed_locs = {
 
 
 def test_allowed_loc():
-    op = Op('command')
+    op = Op()
 
     for loc in disallowed_locs:
         with pytest.raises(ValueError):
@@ -36,7 +37,7 @@ def test_allowed_loc():
 
 
 def test_special_files_loc():
-    op = Op('command')
+    op = Op()
 
     # stdin cannot be an output
     with pytest.raises(ValueError):

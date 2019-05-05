@@ -12,16 +12,9 @@ except ModuleNotFoundError:
     import importlib_resources
 
 import boyleworkflow
-from boyleworkflow.core import (
-    Op,
-    Calc,
-    Comp,
-    PathLike,
-    Loc,
-    Digest,
-    Result,
-    get_upstream_sorted,
-)
+from boyleworkflow.core import Op, Calc, Comp, Loc, Result, get_upstream_sorted
+from boyleworkflow.util import PathLike
+from boyleworkflow.storage import Digest
 
 logger = logging.getLogger(__name__)
 
@@ -88,10 +81,7 @@ class Log:
             self.conn.executemany(
                 "INSERT OR IGNORE INTO input (calc_id, loc, digest) "
                 "VALUES (?, ?, ?)",
-                [
-                    (calc.calc_id, inp.loc, inp.digest)
-                    for inp in calc.inputs
-                ],
+                [(calc.calc_id, inp.loc, inp.digest) for inp in calc.inputs],
             )
 
     def save_run(
@@ -131,10 +121,7 @@ class Log:
                     "INSERT OR IGNORE INTO parent "
                     "(comp_id, parent_comp_id) "
                     "VALUES (?, ?)",
-                    [
-                        (comp.comp_id, parent.comp_id)
-                        for parent in comp.parents
-                    ],
+                    [(comp.comp_id, parent.comp_id) for parent in comp.parents],
                 )
 
     def save_response(

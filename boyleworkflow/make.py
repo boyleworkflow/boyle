@@ -14,7 +14,6 @@ from boyleworkflow.core import (
 )
 from boyleworkflow.log import Log, NotFoundException
 from boyleworkflow.storage import Storage
-from boyleworkflow.runcalc import run
 
 
 def _determine_sets(comps: Iterable[Comp], log: Log, storage: Storage):
@@ -86,7 +85,7 @@ def _get_ready_and_needed(requested, log, storage) -> Iterable[Comp]:
 def _run_calc(calc: Calc, out_locs: Iterable[Loc], log: Log, storage: Storage):
 
     start_time = datetime.datetime.utcnow()
-    results = run(calc, out_locs, storage)
+    results = calc.op.run(calc.inputs, out_locs, storage)
     end_time = datetime.datetime.utcnow()
 
     for result in results:

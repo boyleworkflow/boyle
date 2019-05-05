@@ -15,7 +15,8 @@ from click.testing import CliRunner
 import boyleworkflow
 from boyleworkflow import cli
 
-from boyleworkflow.core import Comp, Calc, Op, Result
+from boyleworkflow.core import Comp, Calc, Result
+from boyleworkflow.ops import ShellOp
 
 
 @pytest.fixture
@@ -67,7 +68,7 @@ def generate_test_data():
     all_results = []
 
     for out_keys in sorted(dependencies):
-        op = Op(f"command for {out_keys}")
+        op = ShellOp(f"command for {out_keys}")
 
         inputs = [
             Result(locs[inp_key], digests[inp_key])
