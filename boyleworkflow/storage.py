@@ -75,8 +75,7 @@ class Storage:
         src_path = self._get_store_path(digest)
         set_file_permissions(src_path, write=False, read=True)
 
-        # os.link(src_path, dst_path)
-        shutil.copy2(src_path, dst_path)
+        os.link(src_path, dst_path)
 
     def store(self, src_path: PathLike) -> Digest:
         logger.debug(f"Storing {src_path}")
@@ -95,7 +94,6 @@ class Storage:
             pass
 
         set_file_permissions(src_path, write=False, read=True)
-        # os.link(src_path, dst_path)
-        shutil.copy2(src_path, dst_path)
+        os.link(src_path, dst_path)
         self._set_meta(digest)
         return digest
