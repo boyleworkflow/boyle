@@ -1,10 +1,11 @@
-from typing import Iterable, Union, Optional, Tuple, cast
+from typing import Iterable, Union, Optional, Tuple, cast, Any
 from enum import Enum
 
 import attr
 
 from boyleworkflow.core import Op, Comp, Loc
 from boyleworkflow.ops import SpecialFilePath, ShellOp, RenameOp
+from boyleworkflow.storage import Storage, Digest
 
 
 @attr.s(auto_attribs=True)
@@ -90,3 +91,11 @@ def shell(
         inputs = inputs + (rename(stdin, SpecialFilePath.STDIN.value),)
     op = ShellOp(cmd, stdin=(stdin is not None), shell=True, **kwargs)
     return Task(op, inputs)
+
+
+def load_value(digest: Digest, storage: Storage) -> Any:
+    raise NotImplementedError
+
+
+def python(func: Callable, *args, **kwargs):
+    raise NotImplementedError
