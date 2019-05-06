@@ -1,4 +1,4 @@
-from typing import Iterable, Union, Optional, Tuple
+from typing import Iterable, Union, Optional, Tuple, cast
 from enum import Enum
 
 import attr
@@ -25,14 +25,21 @@ def _get_loc(resource: Resource) -> Loc:
     return Loc(resource.loc)
 
 
-def _make_tuple(it: Iterable) -> Tuple:
-    return tuple(it)
+TaskInputs = Union[Comp, Iterable[Comp]]
+def ensure_comp_tuple(value: TaskInputs) -> Tuple[Comp, ...]:
+    print(value)
+    try:
+        values = cast(Iterable[Comp], value)
+        return tuple(values)
+    except TypeError:
+        the_value = cast(Comp, value)
+        return (the_value,)
 
 
-@attr.s(auto_attribs=True)
+@attr.s(auto_attribs=True, frozen=True)
 class Task:
     op: Op
-    inputs: Iterable[Comp] = attr.ib(converter=_make_tuple, default=())
+    inputs: Iterable[Comp] = attr.ib(converter=ensure_comp_tuple, default=())
 
     @inputs.validator
     def validate(instance, attribute, inputs):
@@ -72,9 +79,14 @@ def rename(comp: Comp, new_loc: Loc) -> Comp:
 
 
 def shell(
-    cmd, inputs: Iterable[Comp] = (), stdin: Optional[Comp] = None, **kwargs
+    cmd, inputs: TaskInputs = (), stdin: Optional[Comp] = None, **kwargs
 ):
+    inputs = ensure_comp_tuple(inputs)
+    for inp in inputs:
+        if isinstance(inp, Task):
+            raise ValueError("Cannot use task as input. Forgot task.out()?")
+
     if stdin is not None:
-        inputs = tuple(inputs) + (rename(stdin, SpecialFilePath.STDIN.value),)
+        inputs = inputs + (rename(stdin, SpecialFilePath.STDIN.value),)
     op = ShellOp(cmd, stdin=(stdin is not None), shell=True, **kwargs)
     return Task(op, inputs)
