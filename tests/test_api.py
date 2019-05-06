@@ -11,7 +11,9 @@ import pytest
 
 import boyleworkflow
 from boyleworkflow.loc import SpecialFilePath
-from boyleworkflow.api import shell, rename, Task
+from boyleworkflow.api import shell, rename, Task, python, load_value
+
+import simple_module
 
 
 @pytest.fixture
@@ -71,9 +73,9 @@ def test_simple_shell(log, storage):
     b = shell("echo world > b").out("b")
     c = shell("cat a b > c && echo test", inputs=(a, b)).out("c")
 
-    expected_file_contents = {a: "hello\n", b: "world\n", c: "hello\nworld\n"}
-
-    make_and_check_expected_contents(expected_file_contents, log, storage)
+    make_and_check_expected_contents(
+        {a: "hello\n", b: "world\n", c: "hello\nworld\n"}, log, storage
+    )
 
 
 def test_stdin(log, storage):
@@ -95,7 +97,6 @@ def test_stdout_output(log, storage):
 
 def test_stdout_input(log, storage):
     a = shell("echo 'like piping'").stdout
-
     b = shell("cat > b", stdin=a).out("b")
 
     make_and_check_expected_contents({b: "like piping\n"}, log, storage)
@@ -103,9 +104,7 @@ def test_stdout_input(log, storage):
 
 def test_stdout_chain(log, storage):
     a = shell("echo 'like piping a chain'").stdout
-
     b = shell("cat", stdin=a).stdout
-
     c = shell("cat", stdin=b).stdout
 
     make_and_check_expected_contents({c: "like piping a chain\n"}, log, storage)
@@ -121,12 +120,12 @@ def test_stderr(log, storage):
 
 
 def test_special_files_access():
-    stdout_1 = shell('command').out(SpecialFilePath.STDOUT.value)
-    stdout_2 = shell('command').stdout
+    stdout_1 = shell("command").out(SpecialFilePath.STDOUT.value)
+    stdout_2 = shell("command").stdout
     assert stdout_1 == stdout_2
 
-    stderr_1 = shell('command').out(SpecialFilePath.STDERR.value)
-    stderr_2 = shell('command').stderr
+    stderr_1 = shell("command").out(SpecialFilePath.STDERR.value)
+    stderr_2 = shell("command").stderr
     assert stderr_1 == stderr_2
 
 
@@ -138,23 +137,77 @@ def test_specal_files_disallowed():
         Task(op).out(SpecialFilePath.STDIN.value)
 
     # stdout can be output but not input
-    stdout = shell('command').stdout
+    stdout = shell("command").stdout
     with pytest.raises(ValueError):
         Task(op, [stdout])
 
-
     # stderr can be output but not input
-    stderr = shell('command').stderr
+    stderr = shell("command").stderr
     with pytest.raises(ValueError):
         Task(op, [stderr])
-
 
 
 def test_rename(log, storage):
     # redirect stdout to stderr
     # not sure if this is the way to do it...
-    a = shell("echo 'hello world' > a").out('a')
-    b = rename(a, 'b')
-    c = shell("cp b c", [b]).out('c')
+    a = shell("echo 'hello world' > a").out("a")
+    b = rename(a, "b")
+    c = shell("cp b c", [b]).out("c")
 
     make_and_check_expected_contents({c: "hello world\n"}, log, storage)
+
+
+def test_single_or_multiple_inputs():
+    op = boyleworkflow.core.Op()
+
+    a = shell("command").out("a")
+
+    t1 = shell("command", [a])
+    t2 = shell("command", a)
+
+    assert t1 == t2
+
+
+def test_inputs_context_manager():
+    op = boyleworkflow.core.Op()
+
+    CMD = "command"
+
+    a = shell("command a").out("a")
+    b = shell("command b").out("a")
+
+    ta1 = shell(CMD, [a])
+
+    with a:
+        ta2 = shell(CMD)
+
+    assert ta1 == ta2
+
+    t1 = shell(CMD)
+
+    assert t1 != ta1
+    assert t1 != ta2
+
+    with b:
+        tb1 = shell(CMD)
+        with a:
+            tab1 = shell(CMD)
+
+    t2 = shell(CMD)
+    assert t1 == t2
+
+    tb2 = shell(CMD, b)
+    assert tb1 == tb2
+
+    tab2 = shell(CMD, [a, b])
+    assert tab1 == tab2
+
+
+def test_simplest_python_task(log, storage):
+    four = python(simple_module.plus_1, 3).value
+
+    digest = boyleworkflow.make([four], log, storage)
+
+    restored_value = load_value(digest, storage)
+
+    assert restored_value == 4
