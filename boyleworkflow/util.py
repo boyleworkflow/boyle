@@ -1,12 +1,16 @@
-from typing import Union, Any
+from typing import Any
 import os
 import stat
+import uuid
 import hashlib
 import json
-from pathlib import Path
-import functools
 
-PathLike = Union[Path, str]
+
+### UUID
+
+def get_uuid_string() -> str:
+    return str(uuid.uuid4())
+
 
 ### FILE PERMISSIONS
 
@@ -54,18 +58,17 @@ def get_file_permissions(path):
 
 ### DIGESTS ETC
 
-digest_func = hashlib.sha1
+digest_class = hashlib.sha256
 
 
 def digest_str(s: str) -> str:
-    return digest_func(s.encode("utf-8")).hexdigest()
+    return digest_class(s.encode("utf-8")).hexdigest()
 
 
 _CHUNK_SIZE = 1024
 
-
-def digest_file(path: PathLike) -> str:
-    digest = digest_func()
+def digest_file(path: os.PathLike) -> str:
+    digest = digest_class()
     with open(path, "rb") as f:
         while True:
             data = f.read(_CHUNK_SIZE)
@@ -79,24 +82,11 @@ def unique_json(obj: Any) -> str:
     return json.dumps(obj, sort_keys=True)
 
 
-def id_property(func):
-    @property
-    @functools.wraps(func)
-    def id_func(self):
-        try:
-            return self._id_str
-        except AttributeError:
-            pass
-
-        id_obj = func(self)
-        try:
-            json = unique_json(id_obj)
-        except TypeError as e:
-            msg = f"The id_obj of {self} is not JSON serializable: {id_obj}"
-            raise TypeError(msg) from e
-        id_obj = {"type": type(self).__qualname__, "id_obj": id_obj}
-        id_str = digest_str(json)
-        object.__setattr__(self, "_id_str", id_str)
-        return id_str
-
-    return id_func
+def unique_json_digest(obj: Any) -> str:
+    try:
+        json_string = unique_json(obj)
+    except TypeError as e:
+        msg = f"The object is not JSON serializable: {obj}"
+        raise TypeError(msg) from e
+    id_str = digest_str(json_string)
+    return id_str

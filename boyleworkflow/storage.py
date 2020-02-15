@@ -2,10 +2,11 @@ from typing import NewType
 import os
 import shutil
 import logging
-
+from pathlib import Path
 import attr
 
-from boyleworkflow.util import set_file_permissions, PathLike, digest_file
+from boyleworkflow.util import set_file_permissions, digest_file
+from boyleworkflow.core import Digest
 
 logger = logging.getLogger(__name__)
 
@@ -14,22 +15,19 @@ class RestoreError(Exception):
     pass
 
 
-Digest = NewType("Digest", str)
-
-
 @attr.s(auto_attribs=True)
 class Storage:
-    storage_dir: PathLike
+    storage_dir: Path = attr.ib(converter=Path)
 
     def __attrs_post_init__(self):
         os.makedirs(self.storage_dir, exist_ok=True)
         os.makedirs(os.path.join(self.storage_dir, "meta"), exist_ok=True)
 
-    def _get_store_path(self, digest: Digest) -> PathLike:
-        return os.path.join(self.storage_dir, digest)
+    def _get_store_path(self, digest: Digest) -> Path:
+        return self.storage_dir / digest
 
-    def _get_meta_path(self, digest: Digest) -> PathLike:
-        return os.path.join(self.storage_dir, "meta", digest)
+    def _get_meta_path(self, digest: Digest) -> Path:
+        return self.storage_dir / "meta" / digest
 
     def _appears_unchanged(self, digest: Digest):
         src_path = self._get_store_path(digest)
@@ -66,7 +64,7 @@ class Storage:
 
         return True
 
-    def restore(self, digest: Digest, dst_path: PathLike):
+    def restore(self, digest: Digest, dst_path: Path):
         logger.debug(f"Restoring {digest} to {dst_path}")
 
         if not self.can_restore(digest):
@@ -77,7 +75,7 @@ class Storage:
 
         os.link(src_path, dst_path)
 
-    def store(self, src_path: PathLike) -> Digest:
+    def store(self, src_path: Path) -> Digest:
         logger.debug(f"Storing {src_path}")
         digest = Digest(digest_file(src_path))
         if self.can_restore(digest):

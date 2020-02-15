@@ -1,126 +1,117 @@
-from typing import Iterable, Sequence, Mapping, Callable, List, Set
+from typing import Set, Sequence, Mapping, Iterable
+import contextlib
+import os
+from pathlib import Path
 import datetime
-from collections import defaultdict
 
+import attr
 
 from boyleworkflow.core import (
-    Loc,
-    Digest,
     Op,
     Calc,
-    Comp,
-    get_upstream_sorted,
-    get_parents,
+    Node,
+    Defn,
+    Digest,
+    Index,
+    IndexKey,
+    Run,
+    Log,
+    Loc,
+    Storage,
+    Resources,
+    NotFoundException,
+    DefnResult,
+    SINGLE_KEY,
 )
-from boyleworkflow.log import Log, NotFoundException
-from boyleworkflow.storage import Storage
+from boyleworkflow.ops import run_op
 
 
-def _determine_sets(comps: Iterable[Comp], log: Log, storage: Storage):
-    sets: Mapping[str, set] = {
-        name: set()
-        for name in (
-            "Abstract",  # input digests unknown
-            "Concrete",  # input digests known
-            "Known",  # output digest known
-            "Unknown",  # output digest unknown
-            "Restorable",  # output data can be restored
-            "Runnable",  # input data can be restored
-        )
-    }
 
-    for comp in comps:
-        parents = set(comp.parents)
-        if parents <= sets["Known"]:
-            sets["Concrete"].add(comp)
-        else:
-            sets["Abstract"].add(comp)
-            continue
-
-        if parents <= sets["Restorable"]:
-            sets["Runnable"].add(comp)
-
-        calc = log.get_calc(comp)
-        try:
-            digest = log.get_result(calc, comp.loc).digest
-            sets["Known"].add(comp)
-            if storage.can_restore(digest):
-                sets["Restorable"].add(comp)
-        except NotFoundException as e:
-            sets["Unknown"].add(comp)
-
-    return sets
+@attr.s(auto_attribs=True)
+class Context:
+    log: Log
+    storage: Storage
+    project_dir: Loc
+    temp_dir: Loc
+    outdata_dir: Loc
 
 
-def _get_ready_and_needed(requested, log, storage) -> Iterable[Comp]:
-    requested = set(requested)
-    assert len(requested) > 0
-
-    comps = get_upstream_sorted(requested)
-    sets = _determine_sets(comps, log, storage)
-
-    if requested <= sets["Restorable"]:
-        return set()
-
-    candidates: Set[Comp] = set()
-
-    # First set of candidates is the union of
-    #  (1) requested outputs that are not restorable, and
-    #  (2) all unknown outputs upstream of the requested outputs
-    additional = (requested - sets["Restorable"]) | sets["Unknown"]
-
-    while additional:
-        candidates.update(additional)
-
-        # Furthermore we need to run parents to the previous candidates,
-        # if those parents are not restorable.
-        additional = set(get_parents(additional)) - sets["Restorable"]
-
-    final = candidates.intersection(sets["Runnable"])
-    assert len(final) > 0, len(sets["Runnable"])
-
-    return final
-
-
-def _run_calc(calc: Calc, out_locs: Iterable[Loc], log: Log, storage: Storage):
-
+def _run_calc(calc: Calc, ctx: Context):
     start_time = datetime.datetime.utcnow()
-    results = calc.op.run(calc.inputs, out_locs, storage)
+    results = run_op(calc.op, calc.inputs, ctx.storage)
     end_time = datetime.datetime.utcnow()
-
-    for result in results:
-        assert storage.can_restore(result.digest), result
-
-    log.save_run(
-        calc=calc, results=results, start_time=start_time, end_time=end_time
-    )
+    run = Run(calc, start_time, end_time, results)
+    ctx.log.save_run(run)
 
 
-def _ensure_available(requested: Iterable[Comp], log: Log, storage: Storage):
-    while True:
-        comps_to_run = _get_ready_and_needed(requested, log, storage)
-        if not comps_to_run:
-            break
-
-        comps_by_calc: Mapping[Calc, Set[Comp]] = defaultdict(set)
-        for comp in comps_to_run:
-            calc = log.get_calc(comp)
-            comps_by_calc[calc].add(comp)
-
-        for calc, comps in comps_by_calc.items():
-            out_locs = set(comp.loc for comp in comps)
-            _run_calc(calc, out_locs, log, storage)
+def _get_upstream_sorted(defns: Iterable[Defn]) -> Sequence[Defn]:
+    raise NotImplementedError()
 
 
-def make(requested: Sequence[Comp], log: Log, storage: Storage):
-    time = datetime.datetime.utcnow()
-    _ensure_available(requested, log, storage)
+def _read_index(digest: Digest, storage: Storage) -> Index:
+    return Index(storage.read_bytes(digest).decode())
 
-    results = {}
-    for comp in requested:
-        calc = log.get_calc(comp)
-        digest = log.get_result(calc, comp.loc).digest
-        log.save_response(comp, digest, time)
-        results[comp] = digest
 
-    return results
+def _ensure_defn_restorable(defn: Defn, ctx: Context):
+    # The requested Defns are also marked as explicit requests,
+    # later when they are placed in the out directory.
+    explicit_request = False
+
+    index_digest = ctx.log.get_defn_result(defn.node.index_defn, SINGLE_KEY)
+    index = _read_index(index_digest, ctx.storage)
+    ctx.log.save_index(index)
+
+    for key in index:
+        calc = ctx.log.get_calc(defn.node, key)
+
+        needs_run = True  # assume until proven otherwise
+
+        with contextlib.suppress(NotFoundException):
+            digest = ctx.log.get_calc_result(calc, defn.loc)
+
+            if ctx.storage.can_restore(digest):
+                needs_run = False
+
+        if needs_run:
+            _run_calc(calc, ctx)
+            digest = ctx.log.get_calc_result(calc, defn.loc)
+
+        ctx.log.save_defn_result(
+            DefnResult(defn, index, key, digest, explicit_request)
+        )
+
+
+def _ensure_all_restorable(requested: Iterable[Defn], ctx: Context):
+    upstream_sorted = _get_upstream_sorted(requested)
+
+    for defn in upstream_sorted:
+        _ensure_defn_restorable(defn, ctx)
+
+
+def _key_to_str(key: IndexKey) -> str:
+    return str(key)
+
+
+def _get_out_loc(ctx: Context, name: str, defn: Defn, key: IndexKey) -> Loc:
+    return ctx.outdata_dir / name / _key_to_str(key) / defn.loc
+
+
+def _place_results(request: Mapping[str, Defn], ctx: Context):
+    explicit_request = True
+    for name, defn in request.items():
+        index = ctx.log.get_index(defn.node)
+        for key in index:
+            digest = ctx.log.get_defn_result(defn, key)
+
+            ctx.log.save_defn_result(
+                DefnResult(defn, index, key, digest, explicit_request)
+            )
+
+            out_loc = _get_out_loc(ctx, name, defn, key)
+            ctx.storage.restore(digest, out_loc)
+
+
+def make(request: Mapping[str, Defn], ctx: Context):
+    requested_defns = set(request.values())
+    _ensure_all_restorable(requested_defns, ctx)
+    _place_results(request, ctx)
