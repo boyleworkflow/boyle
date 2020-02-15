@@ -23,11 +23,12 @@ create table defn (
 
 create table node_input (
   node_id text not null,
+  loc text not null,
   parent_node_id text not null,
   parent_loc text not null,
-  foreign key (node_id) references node(node_id),
+  foreign key (node_id) references defn(node_id),
   foreign key (parent_node_id, parent_loc) references defn(node_id, loc),
-  primary key (node_id, parent_node_id, parent_loc)
+  primary key (node_id, loc)
 ) without rowid;
 
 create table index_result (
