@@ -67,12 +67,10 @@ create table calc_input (
 
 create table run (
   run_id text primary key not null,
-  node_id text not null,
   calc_id text not null,
   start_time timestamp not null,
   end_time timestamp not null,
   foreign key (calc_id) references calc(calc_id)
-  foreign key (node_id) references node(node_id)
 ) without rowid;
 create index run_calc on run (calc_id);
 
