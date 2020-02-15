@@ -9,7 +9,8 @@ create table node (
   node_id text primary key not null,
   op_id text not null,
   index_node_id text not null,
-  foreign key (index_node_id) references node(node_id),
+  index_loc text not null,
+  foreign key (index_node_id, index_loc) references defn(node_id, loc),
   foreign key (op_id) references op(op_id)
 ) without rowid;
 
