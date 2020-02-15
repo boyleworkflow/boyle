@@ -2,7 +2,7 @@ PRAGMA foreign_keys = ON;
 
 create table op (
   op_id text primary key not null,
-  definition json not null,
+  definition json not null
 ) without rowid;
 
 create table node (
