@@ -1,4 +1,4 @@
-from typing import Set, Sequence, Mapping, Iterable
+from typing import Set, Sequence, Mapping, Iterable, Tuple
 import contextlib
 import os
 from pathlib import Path
@@ -10,21 +10,15 @@ from boyleworkflow.core import (
     Op,
     Calc,
     Node,
-    Defn,
-    Digest,
-    Index,
-    IndexKey,
+    Tree,
     Run,
+    NodeResult,
     Log,
     Loc,
     Storage,
-    Resources,
     NotFoundException,
-    DefnResult,
-    SINGLE_KEY,
 )
 from boyleworkflow.ops import run_op
-
 
 
 @attr.s(auto_attribs=True)
@@ -38,80 +32,73 @@ class Context:
 
 def _run_calc(calc: Calc, ctx: Context):
     start_time = datetime.datetime.utcnow()
-    results = run_op(calc.op, calc.inputs, ctx.storage)
+    output_tree = run_op(calc.op, calc.input_tree, ctx.storage)
     end_time = datetime.datetime.utcnow()
-    run = Run(calc, start_time, end_time, results)
+    run = Run(calc, output_tree, start_time, end_time)
     ctx.log.save_run(run)
 
 
-def _get_upstream_sorted(defns: Iterable[Defn]) -> Sequence[Defn]:
+def _get_upstream_sorted(defns: Iterable[Node]) -> Sequence[Node]:
+    raise NotImplementedError()
+
+def _build_tree_from_subtrees(subtrees: Mapping[Loc, Tree]) -> Tree:
+    raise NotImplementedError()
+
+def _generate_calcs(node: Node, ctx: Context) -> Iterable[Tuple[Loc, Calc]]:
     raise NotImplementedError()
 
 
-def _read_index(digest: Digest, storage: Storage) -> Index:
-    return Index(storage.read_bytes(digest).decode())
-
-
-def _ensure_defn_restorable(defn: Defn, ctx: Context):
-    # The requested Defns are also marked as explicit requests,
-    # later when they are placed in the out directory.
+def _ensure_node_restorable(node: Node, ctx: Context):
+    # The requested Nodes are also later marked as explicit requests,
+    # when they are placed in the out directory.
+    # Here, just mark the implicit requests.
     explicit_request = False
 
-    index_digest = ctx.log.get_defn_result(defn.node.index_defn, SINGLE_KEY)
-    index = _read_index(index_digest, ctx.storage)
-    ctx.log.save_index(index)
-
-    for key in index:
-        calc = ctx.log.get_calc(defn.node, key)
+    subtrees = {}
+    for loc, calc in _generate_calcs(node, ctx):
 
         needs_run = True  # assume until proven otherwise
 
         with contextlib.suppress(NotFoundException):
-            digest = ctx.log.get_calc_result(calc, defn.loc)
+            tree = ctx.log.get_calc_result(calc, node.outputs)
 
-            if ctx.storage.can_restore(digest):
+            if ctx.storage.can_restore(tree):
                 needs_run = False
 
         if needs_run:
             _run_calc(calc, ctx)
-            digest = ctx.log.get_calc_result(calc, defn.loc)
+            tree = ctx.log.get_calc_result(calc, node.outputs)
 
-        ctx.log.save_defn_result(
-            DefnResult(defn, index, key, digest, explicit_request)
-        )
+        subtrees[loc] = tree
+
+    tree = _build_tree_from_subtrees(subtrees)
+
+    ctx.log.save_node_result(NodeResult(node, tree, explicit_request))
 
 
-def _ensure_all_restorable(requested: Iterable[Defn], ctx: Context):
+def _ensure_all_restorable(requested: Iterable[Node], ctx: Context):
     upstream_sorted = _get_upstream_sorted(requested)
 
-    for defn in upstream_sorted:
-        _ensure_defn_restorable(defn, ctx)
+    for node in upstream_sorted:
+        _ensure_node_restorable(node, ctx)
 
 
-def _key_to_str(key: IndexKey) -> str:
-    return str(key)
+def _get_out_loc(ctx: Context, name: str) -> Loc:
+    return ctx.outdata_dir / name
 
 
-def _get_out_loc(ctx: Context, name: str, defn: Defn, key: IndexKey) -> Loc:
-    return ctx.outdata_dir / name / _key_to_str(key) / defn.loc
-
-
-def _place_results(request: Mapping[str, Defn], ctx: Context):
+def _place_results(request: Mapping[str, Node], ctx: Context):
     explicit_request = True
-    for name, defn in request.items():
-        index = ctx.log.get_index(defn.node)
-        for key in index:
-            digest = ctx.log.get_defn_result(defn, key)
+    for name, node in request.items():
+        tree = ctx.log.get_node_result(node)
 
-            ctx.log.save_defn_result(
-                DefnResult(defn, index, key, digest, explicit_request)
-            )
+        ctx.log.save_node_result(NodeResult(node, tree, explicit_request))
 
-            out_loc = _get_out_loc(ctx, name, defn, key)
-            ctx.storage.restore(digest, out_loc)
+        out_loc = _get_out_loc(ctx, name)
+        ctx.storage.restore(tree, out_loc)
 
 
-def make(request: Mapping[str, Defn], ctx: Context):
-    requested_defns = set(request.values())
-    _ensure_all_restorable(requested_defns, ctx)
+def make(request: Mapping[str, Node], ctx: Context):
+    requested_nodes = set(request.values())
+    _ensure_all_restorable(requested_nodes, ctx)
     _place_results(request, ctx)

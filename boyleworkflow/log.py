@@ -1,4 +1,4 @@
-from typing import Optional, Mapping, Iterable
+from typing import Optional, Mapping, Iterable, Generator
 import os
 import sqlite3
 import logging
@@ -20,15 +20,14 @@ from boyleworkflow.core import (
     Calc,
     Node,
     Defn,
-    DefnResult,
+    NodeResult,
     Loc,
+    Tree,
     Run,
-    NodeId,
+    TreeConflictException,
     NotFoundException,
     ConflictException,
-    Index,
-    IndexKey,
-    SINGLE_KEY,
+    merge_trees,
 )
 from boyleworkflow.storage import Digest
 
@@ -80,26 +79,8 @@ class Log(boyleworkflow.core.Log):
             (op.op_id, op.definition),
         )
 
-    def _save_calc_and_inputs(self, calc: Calc):
-        self.conn.execute(
-            "INSERT OR IGNORE INTO calc(calc_id, op_id) VALUES (?, ?)",
-            (calc.calc_id, calc.op.op_id),
-        )
-
-        self.conn.executemany(
-            "INSERT OR IGNORE INTO input (calc_id, loc, digest) "
-            "VALUES (?, ?, ?)",
-            [
-                (calc.calc_id, loc, digest)
-                for loc, digest in calc.inputs.items()
-            ],
-        )
-
-    def _save_calc_results(self, run: Run):
-        self.conn.executemany(
-            "INSERT INTO calc_result (run_id, loc, digest) VALUES (?, ?, ?)",
-            [(run.run_id, loc, digest) for loc, digest in run.results.items()],
-        )
+    def _save_tree(self, tree: Tree):
+        raise NotImplementedError()
 
     def save_run(self, run: Run):
         """
@@ -107,29 +88,33 @@ class Log(boyleworkflow.core.Log):
 
         Save:
             * The Op
-            * The Calc (including its inputs)
-            * The Run (including the results)
+            * The Run itself (including the result Tree)
         """
 
         with self.conn:
             self._save_op(run.calc.op)
-            self._save_calc_and_inputs(run.calc)
+            self._save_tree(run.output_tree)
 
             self.conn.execute(
                 "INSERT INTO run "
-                "(run_id, calc_id, start_time, end_time) "
-                "VALUES (?, ?, ?, ?)",
-                (run.run_id, run.calc.calc_id, run.start_time, run.end_time),
+                "(run_id, op_id, inp_digest, out_digest, start_time, end_time) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (
+                    run.run_id,
+                    run.calc.op.op_id,
+                    run.calc.input_tree.tree_id,
+                    run.output_tree.tree_id,
+                    run.start_time,
+                    run.end_time,
+                ),
             )
-
-            self._save_calc_results(run)
 
     def _save_node_and_inputs_and_outputs(self, node: Node):
         self.conn.execute(
             "INSERT OR IGNORE INTO node "
-            "(node_id, op_id, index_node_id) "
+            "(node_id, op_id, depth) "
             "VALUES (?, ?, ?)",
-            (node.node_id, node.op.op_id, node.index_defn.node.node_id),
+            (node.node_id, node.op.op_id, node.depth),
         )
 
         self.conn.executemany(
@@ -147,99 +132,80 @@ class Log(boyleworkflow.core.Log):
             [(node.node_id, loc) for loc in node.outputs],
         )
 
-    def save_node(self, node: Node):
+    def save_node_result(self, node_result: NodeResult):
         """
-        Save a Node.
+        Save a NodeResult with dependencies.
+
+        This notes the Node as (one possible) provenance of a Tree.
 
         Save:
-            * The Node itself
-            * The Op
-            * Connections to upstream nodes
-            * Defns
+            * The Node and connections to parent Nodes (but not upstream nodes)
+            * The NodeResult itself
         """
-        with self.conn:
-            self._save_op(node.op)
-            self._save_node_and_inputs_and_outputs(node)
-
-    @staticmethod
-    def _get_iloc(index: Index, key: IndexKey):
-        for i, potential_match in enumerate(index):
-            if key == potential_match:
-                return i
-
-        raise ValueError(f"could not find key {key}")
-
-
-    def save_defn_result(self, defn_result: DefnResult):
-        iloc = self._get_iloc(defn_result.index, defn_result.key)
 
         with self.conn:
+            self._save_node_and_inputs_and_outputs(node_result.node)
+
             self.conn.execute(
-                "INSERT OR IGNORE INTO defn_result "
-                "(node_id, loc, index_digest, iloc, explicit, result_digest, "
-                "first_time) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO node_result "
+                "(node_id, output_tree_id, explicit, first_time) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
                 (
-                    defn_result.defn.node.node_id,
-                    defn_result.defn.loc,
-                    defn_result.index.digest,
-                    iloc,
-                    defn_result.explicit,
-                    defn_result.digest,
-                    defn_result.time,
+                    node_result.node.node_id,
+                    node_result.output_tree.tree_id,
+                    node_result.explicit,
+                    node_result.time,  # First time, if inserting
                 ),
             )
 
-    def save_index(self, index: Index):
-        with self.conn:
-            self.conn.execute(
-                "INSERT OR IGNORE INTO index_result (digest, data) "
-                "VALUES (?, ?)",
-                (index.digest, index.data),
-            )
+    def get_calc(self, node: Node) -> Calc:
+        input_resources = {
+            loc: self.get_node_result(parent_defn.node)[parent_defn.loc]
+            for loc, parent_defn in node.inputs.items()
+        }
 
-    def get_index(self, node: Node) -> Index:
-        index_digest = self.get_defn_result(node.index_defn, SINGLE_KEY)
-        query = self.conn.execute(
-            "SELECT data FROM index_result WHERE (digest = ?)", (index_digest,)
-        )
-        data, = query.fetchone()
-        return Index(data)
+        input_tree = Tree.from_resources(input_resources)
 
-    def get_calc_result(self, calc: Calc, loc: Loc) -> Digest:
-        opinions = self._get_opinions(calc, loc)
+        return Calc(node.op, input_tree)
 
-        candidates = [
-            digest
-            for digest, opinion in opinions.items()
-            if not opinion == False
-        ]
+    def get_calc_result(self, calc: Calc, outputs: Iterable[Loc]) -> Tree:
+        trees = self._generate_trusted_trees(calc, outputs)
 
-        # If there is no digest left, nothing is found.
-        # If there is exactly one left, it can be used.
-        # If there is more than one left, there is a conflict.
+        # If there is no tree, nothing is found.
+        # If there is exactly one tree, it can be used.
+        # If there are more than one, check that they agree.
 
-        if not candidates:
-            raise NotFoundException((calc, loc))
-        elif len(candidates) > 1:
-            raise ConflictException(opinions)
+        try:
+            # If the first raises StopIteration there is no (trusted) result.
+            tree = next(trees)
+        except StopIteration:
+            raise NotFoundException(calc)
 
-        digest, = candidates
+        try:
+            for other in trees:
+                tree = tree.merge(other)
+        except TreeConflictException as e:
+            raise ConflictException(calc) from e
 
-        return digest
+        return tree
 
-    def get_calc(self, node: Node, key: IndexKey) -> Calc:
-        return Calc(
-            node.op,
-            {
-                loc: self.get_defn_result(defn, key)
-                for loc, defn in node.inputs.items()
-            },
-        )
+    def get_node_result(self, node: Node) -> Digest:
+        calc = self.get_calc(node)
+        return self.get_calc_result(calc, node.outputs)
 
-    def get_defn_result(self, defn: Defn, key: IndexKey) -> Digest:
-        calc = self.get_calc(defn.node, key)
-        return self.get_calc_result(calc, defn.loc)
+    def _generate_trusted_trees(
+        self, calc: Calc, outputs: Iterable[Loc]
+    ) -> Generator[Tree, None, None]:
+        # query = self.conn.execute(
+        #     "SELECT digest, opinion FROM result "
+        #     "INNER JOIN run USING (run_id) "
+        #     "LEFT OUTER JOIN trust USING (calc_id, loc, digest) "
+        #     "WHERE (loc = ? AND calc_id = ?)",
+        #     (loc, calc.calc_id),
+        # )
+
+        # return {digest: opinion for digest, opinion in query}
+        raise NotImplementedError()
 
     # def set_trust(self, calc_id: str, loc: Loc, digest: Digest, opinion: bool):
     #     with self.conn:
@@ -249,14 +215,3 @@ class Log(boyleworkflow.core.Log):
     #             "VALUES (?, ?, ?, ?) ",
     #             (calc_id, loc, digest, opinion),
     #         )
-
-    def _get_opinions(self, calc: Calc, loc: Loc) -> Mapping[Digest, Opinion]:
-        query = self.conn.execute(
-            "SELECT digest, opinion FROM result "
-            "INNER JOIN run USING (run_id) "
-            "LEFT OUTER JOIN trust USING (calc_id, loc, digest) "
-            "WHERE (loc = ? AND calc_id = ?)",
-            (loc, calc.calc_id),
-        )
-
-        return {digest: opinion for digest, opinion in query}
