@@ -8,30 +8,30 @@ create table tree_item (
   primary key (tree_id, path_segment)
 ) without rowid;
 
-create table op (
-  op_id text primary key not null,
-  definition json not null
+create table calc (
+  calc_id text primary key not null,
+  input_tree_id not null,
+  op json not null
+  foreign key input_tree_id references tree_item(tree_id),
 ) without rowid;
 
 create table run (
   run_id text primary key not null,
-  input_tree_id not null,
-  op_id text not null,
+  calc_id text not null,
   start_time timestamp not null,
   end_time timestamp not null,
-  foreign key input_tree_id references tree_item(tree_id),
-  foreign key op_id references op(op_id)
+  foreign key calc_id references calc(calc_id)
 ) without rowid;
 
 -- Each result of a calculation is a file or dir placed at a given path.
 create table result (
   run_id text not null,
-  loc text not null,
+  result_path text not null,
   tree_item_type text not null,
   tree_item_id text not null,
   trusted boolean,
   foreign key run_id references run(run_id),
-  primary key (run_id, loc)
+  primary key (run_id, result_path)
 ) without rowid;
 
 -- A target is "rendered" somewhere as a tree,
