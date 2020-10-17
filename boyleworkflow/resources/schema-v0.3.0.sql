@@ -34,16 +34,16 @@ create table result (
   primary key (run_id, result_path)
 ) without rowid;
 
--- A target is "rendered" somewhere as a tree,
--- concretely meaning as one or more files and directories.
--- Thus, point to the whole tree.
 create table provenance (
   workflow_blob_id text not null,
-  input_tree_id text not null,
+  workflow_input_tree_id text not null,
   target_key text not null,
   request_time timestamp not null,
-  output_tree_id text not null,
-  foreign key output_tree_id references tree_item(tree_id),
-  foreign key input_tree_id references tree_item(tree_id),
-  primary key (workflow_blob_id, input_tree_id, target_key, request_time)
+  calc_id text not null,
+  result_path text not null,
+  tree_item_type text not null,
+  tree_item_id text not null,
+  foreign key workflow_input_tree_id references tree_item(tree_id),
+  foreign key calc_id references calc_item(calc_id),
+  primary key (workflow_blob_id, workflow_input_tree_id, target_key, request_time)
 ) without rowid;
