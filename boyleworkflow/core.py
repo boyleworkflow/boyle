@@ -1,39 +1,9 @@
 from __future__ import annotations
 from typing import Protocol
-from boyleworkflow.trees import Tree, Indexed
-from boyleworkflow.calcs import Calc, Run, Glob
+from boyleworkflow.trees import Tree
+from boyleworkflow.calcs import Glob
 from pathlib import Path
 
-
-class NotFoundException(Exception):
-    pass
-
-
-class ConflictException(Exception):
-    pass
-
-
-class Log(Protocol):
-    def search_result(self, calc: Calc, glob: Glob) -> Indexed[Tree]:
-        """
-        Get the Indexed[Tree] resulting from a Calc restricted to a Glob.
-
-        Raises:
-            NotFoundException if log has no result.
-            ConflictException if log has multiple conflicting results.
-        """
-        ...
-
-    def save_run(self, run: Run):
-        """
-        Save a Run with dependencies.
-
-        Save:
-            * The Op
-            * The input Tree
-            * The Run itself (including the result Trees))
-        """
-        ...
 
 
 class Storage(Protocol):

@@ -1,34 +1,17 @@
-from typing import Optional, Mapping, Iterable, Generator
-import os
+from typing import NewType, Optional, Iterable, Generator
 import sqlite3
 import logging
 import datetime
-import uuid
-import attr
 import sys
+from pathlib import Path
 
 assert sys.version_info.major == 3
 
-if sys.version_info.minor >= 7:
-    import importlib.resources as importlib_resources
-else:
-    import importlib_resources
+import importlib.resources as importlib_resources
 
-import boyleworkflow
-from boyleworkflow.core import (
-    Op,
-    Calc,
-    Node,
-    Defn,
-    NodeResult,
-    Loc,
-    Tree,
-    Run,
-    TreeConflictException,
-    NotFoundException,
-    ConflictException,
-)
-from boyleworkflow.storage import Digest
+from boyleworkflow.trees import Tree, Indexed, TreeId
+from boyleworkflow.calcs import Calc, Glob, Run, Op
+from boyleworkflow.util import digest_str, unique_json, unique_json_digest
 
 logger = logging.getLogger(__name__)
 
@@ -37,18 +20,25 @@ SCHEMA_PATH = f"schema-{SCHEMA_VERSION}.sql"
 
 sqlite3.register_adapter(datetime.datetime, lambda dt: dt.isoformat())
 
-
 Opinion = Optional[bool]
 
 
-class Log(boyleworkflow.core.Log):
+class NotFoundException(Exception):
+    pass
+
+
+class ConflictException(Exception):
+    pass
+
+
+class Log:
     @staticmethod
-    def create(path: os.PathLike):
+    def create(path: Path):
         """
         Create a new Log database.
 
         Args:
-            path (str): Where to create the database.
+            path: Where to create the database.
         """
         with importlib_resources.path(
             "boyleworkflow.resources", SCHEMA_PATH
@@ -63,8 +53,8 @@ class Log(boyleworkflow.core.Log):
 
         conn.close()
 
-    def __init__(self, path: os.PathLike):
-        if not os.path.exists(path):
+    def __init__(self, path: Path):
+        if not path.exists():
             Log.create(path)
         self.conn = sqlite3.connect(str(path), isolation_level="IMMEDIATE")
         self.conn.execute("PRAGMA foreign_keys = ON;")
@@ -72,14 +62,57 @@ class Log(boyleworkflow.core.Log):
     def close(self):
         self.conn.close()
 
+    def search_result(self, calc: Calc, glob: Glob) -> Indexed[Tree]:
+        """
+        Get the Indexed[Tree] resulting from a Calc restricted to a Glob.
+
+        Raises:
+            NotFoundException if log has no result.
+            ConflictException if log has multiple conflicting results.
+        """
+        tree_ids = self._get_not_distrusted_tree_ids(calc, glob)
+
+        unique_tree_ids = set(tree_ids)
+
+        # If there is no tree, nothing is found.
+        if len(unique_tree_ids) == 0:
+            raise NotFoundException(calc, glob)
+        if len(unique_tree_ids) > 1:
+            raise ConflictException(calc, glob)
+
+        (tree_id,) = unique_tree_ids
+
+        return self._get_tree(tree_id)
+
+    def _get_not_distrusted_tree_ids(
+        self, calc: Calc, glob: Glob
+    ) -> Iterable[TreeId]:
+        ...
+
+    def _get_tree(self, tree_id: TreeId) -> Indexed[Tree]:
+        ...
+
+    def save_run(self, run: Run):
+        """
+        Save a Run with dependencies.
+
+        Save:
+            * The Op
+            * The input Tree
+            * The Run itself (including the result Trees))
+        """
+        ...
+
     def _save_op(self, op: Op):
+        op_unique_json = unique_json(op)
+        op_id = digest_str(op_unique_json)
         self.conn.execute(
             "INSERT OR IGNORE INTO op(op_id, definition) VALUES (?, ?)",
-            (op.op_id, op.definition),
+            (op_id, op_unique_json),
         )
 
     def _save_tree(self, tree: Tree):
-        raise NotImplementedError()
+        ...
 
     def save_run(self, run: Run):
         """
@@ -167,44 +200,9 @@ class Log(boyleworkflow.core.Log):
 
         return Calc(node.op, input_tree)
 
-    def get_calc_result(self, calc: Calc, outputs: Iterable[Loc]) -> Tree:
-        trees = self._generate_trusted_trees(calc, outputs)
-
-        # If there is no tree, nothing is found.
-        # If there is exactly one tree, it can be used.
-        # If there are more than one, check that they agree.
-
-        try:
-            # If the first raises StopIteration there is no (trusted) result.
-            tree = next(trees)
-        except StopIteration:
-            raise NotFoundException(calc)
-
-        try:
-            for other in trees:
-                tree = tree.merge(other)
-        except TreeConflictException as e:
-            raise ConflictException(calc) from e
-
-        return tree
-
     def get_node_result(self, node: Node) -> Digest:
         calc = self.get_calc(node)
         return self.get_calc_result(calc, node.outputs)
-
-    def _generate_trusted_trees(
-        self, calc: Calc, outputs: Iterable[Loc]
-    ) -> Generator[Tree, None, None]:
-        # query = self.conn.execute(
-        #     "SELECT digest, opinion FROM result "
-        #     "INNER JOIN run USING (run_id) "
-        #     "LEFT OUTER JOIN trust USING (calc_id, loc, digest) "
-        #     "WHERE (loc = ? AND calc_id = ?)",
-        #     (loc, calc.calc_id),
-        # )
-
-        # return {digest: opinion for digest, opinion in query}
-        raise NotImplementedError()
 
     # def set_trust(self, calc_id: str, loc: Loc, digest: Digest, opinion: bool):
     #     with self.conn:

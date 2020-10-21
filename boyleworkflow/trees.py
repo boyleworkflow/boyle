@@ -1,3 +1,4 @@
+from boyleworkflow.util import unique_json_digest
 from typing import (
     Iterable,
     Mapping,
@@ -16,6 +17,13 @@ Key = Tuple[Name]
 Tree = NewType("Tree", Mapping[Name, "TreeItem"])
 Leaf = NewType("Leaf", str)
 TreeItem = Union[Tree, Leaf]
+
+TreeId = NewType("TreeId", str)
+
+
+def calc_tree_id(tree: Tree) -> TreeId:
+    return TreeId(unique_json_digest(tree))
+
 
 T = TypeVar("T")
 Indexed = Iterable[Tuple[Key, T]]

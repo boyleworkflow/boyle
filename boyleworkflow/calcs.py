@@ -1,4 +1,4 @@
-from typing import Mapping, NewType, Protocol
+from typing import Any, Mapping, NewType
 from dataclasses import dataclass
 import datetime
 from boyleworkflow.trees import Tree
@@ -6,8 +6,7 @@ from boyleworkflow.trees import Tree
 Glob = NewType("Glob", str)
 
 
-class Op(Protocol):
-    pass
+Op = Mapping[str, Any]
 
 
 @dataclass

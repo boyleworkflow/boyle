@@ -8,11 +8,16 @@ create table tree_item (
   primary key (tree_id, path_segment)
 ) without rowid;
 
-create table calc (
-  calc_id text primary key not null,
-  input_tree_id not null,
+create table op (
+  op_id text not null primary key,
   op json not null
+) without rowid;
+
+create table calc (
+  input_tree_id text not null,
+  op_id text not null,
   foreign key input_tree_id references tree_item(tree_id),
+  primary key (input_tree_id, op_id)
 ) without rowid;
 
 create table run (
