@@ -28,7 +28,7 @@ def storage(request):
 
     request.addfinalizer(fin)
 
-    storage = boyleworkflow.Storage(temp_dir)
+    storage = Storage(temp_dir)
 
     return storage
 

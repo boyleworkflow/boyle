@@ -14,8 +14,6 @@ from click.testing import CliRunner
 import boyleworkflow
 from boyleworkflow import cli
 
-from boyleworkflow.core import Comp, Calc, Op
-
 
 def test_command_line_interface():
     """Test the CLI."""

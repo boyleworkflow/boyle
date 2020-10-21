@@ -27,13 +27,12 @@ from boyleworkflow.core import (
     TreeConflictException,
     NotFoundException,
     ConflictException,
-    merge_trees,
 )
 from boyleworkflow.storage import Digest
 
 logger = logging.getLogger(__name__)
 
-SCHEMA_VERSION = "v0.2.0"
+SCHEMA_VERSION = "v0.3.0"
 SCHEMA_PATH = f"schema-{SCHEMA_VERSION}.sql"
 
 sqlite3.register_adapter(datetime.datetime, lambda dt: dt.isoformat())
