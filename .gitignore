@@ -103,3 +103,5 @@ ENV/
 
 # sublime files
 *.sublime-*
+*.code-workspace
+.vscode
