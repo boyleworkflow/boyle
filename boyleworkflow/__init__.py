@@ -1,54 +1,49 @@
 __version__ = "0.2.0"
 
 from dataclasses import dataclass
-from typing import Any, Generic, Iterable, Mapping, NewType, Protocol, TypeVar
+from typing import Collection, Mapping, NewType, Protocol
 
 
 class Op(Protocol):
     ...
 
 
-Sandbox = TypeVar("Sandbox")
-
-CalcInput = Any
-
 Loc = NewType("Loc", str)
-Digest = NewType("Digest", str)
-
-CalcResults = Mapping[Loc, Digest]
+Result = NewType("Result", str)
+SandboxKey = NewType("SandboxKey", str)
 
 
 @dataclass
 class Calc:
-    inp: Iterable[CalcInput]
+    inp: Mapping[Loc, Result]
     op: Op
-    out: Iterable[Loc]
+    out: Collection[Loc]
 
 
-class Env(Generic[Sandbox], Protocol):
-    def run_op(self, op: Op, sandbox: Sandbox):
+class Env(Protocol):
+    def run_op(self, op: Op, sandbox: SandboxKey):
         ...
 
-    def create_sandbox(self) -> Sandbox:
+    def create_sandbox(self) -> SandboxKey:
         ...
 
-    def destroy_sandbox(self, sandbox: Sandbox):
+    def destroy_sandbox(self, sandbox: SandboxKey):
         ...
 
-    def place(self, item: CalcInput, sandbox: Sandbox):
+    def place(self, sandbox: SandboxKey, loc: Loc, digest: Result):
         ...
 
-    def stow(self, loc: Loc, sandbox: Sandbox) -> Digest:
+    def stow(self, sandbox: SandboxKey, loc: Loc) -> Result:
         ...
 
 
-def run(calc: Calc, env: Env) -> CalcResults:
+def run(calc: Calc, env: Env) -> Mapping[Loc, Result]:
     sandbox = env.create_sandbox()
     try:
-        for item in calc.inp:
-            env.place(item, sandbox)
+        for loc, digest in calc.inp.items():
+            env.place(sandbox, loc, digest)
         env.run_op(calc.op, sandbox)
-        results = {loc: env.stow(loc, sandbox) for loc in calc.out}
+        results = {loc: env.stow(sandbox, loc) for loc in calc.out}
         return results
     finally:
         env.destroy_sandbox(sandbox)

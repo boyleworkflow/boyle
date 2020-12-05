@@ -1,12 +1,19 @@
 import pytest
 from pytest import fixture
 from unittest.mock import Mock, call
-from boyleworkflow import run, Calc, Loc
+from boyleworkflow import run, Calc, Loc, Result
 
 
 @fixture
 def calc():
-    return Calc(["i1", "i2", "i3"], Mock(), [Loc("o1"), Loc("o2")])
+    return Calc(
+        {Loc(name): Result(f"result:{name}") for name in ["i1", "i2", "i3"]},
+        Mock(),
+        [
+            Loc("o1"),
+            Loc("o2"),
+        ],
+    )
 
 
 def test_creates_exactly_one_sandbox(calc):
@@ -26,7 +33,9 @@ def test_places_inputs_in_sandbox(calc):
     env = Mock()
     sandbox = env.create_sandbox()
     run(calc, env)
-    expected_calls = [call(item, sandbox) for item in calc.inp]
+    expected_calls = [
+        call(sandbox, loc, digest) for loc, digest in calc.inp.items()
+    ]
     assert expected_calls == env.place.call_args_list
 
 
@@ -51,12 +60,12 @@ def test_stows_results(calc):
     env = Mock()
     sandbox = env.create_sandbox()
     run(calc, env)
-    expected_calls = [call(loc, sandbox) for loc in calc.out]
+    expected_calls = [call(sandbox, loc) for loc in calc.out]
     assert expected_calls == env.stow.call_args_list
 
 
 def test_returns_digests(calc):
     expected_results = {loc: f"digest:{loc}" for loc in calc.out}
-    env = Mock(stow=lambda loc, sandbox: expected_results[loc])
+    env = Mock(stow=lambda sandbox, loc: expected_results[loc])
     results = run(calc, env)
     assert results == expected_results
