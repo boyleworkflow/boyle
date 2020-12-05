@@ -6,7 +6,7 @@ from boyleworkflow import run, Calc
 
 @fixture
 def calc():
-    return Calc(["a", "b", "c"], Mock())
+    return Calc(["i1", "i2", "i3"], Mock(), ["o1", "o2"])
 
 
 def test_creates_exactly_one_sandbox(calc):
@@ -45,3 +45,11 @@ def test_destroys_sandbox_after_failed_run(calc):
     with pytest.raises(Exception):
         run(calc, env)
     env.destroy_sandbox.assert_called_once_with(sandbox)
+
+
+def test_stows_results(calc):
+    env = Mock()
+    sandbox = env.create_sandbox()
+    run(calc, env)
+    expected_calls = [call(loc, sandbox) for loc in calc.out]
+    assert expected_calls == env.stow.call_args_list

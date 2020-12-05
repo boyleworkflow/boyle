@@ -12,11 +12,13 @@ Sandbox = TypeVar("Sandbox")
 
 CalcInput = Any
 
+Loc = Any
 
 @dataclass
 class Calc:
     inp: Iterable[CalcInput]
     op: Op
+    out: Iterable[Loc]
 
 
 class Env(Generic[Sandbox], Protocol):
@@ -32,6 +34,9 @@ class Env(Generic[Sandbox], Protocol):
     def place(self, item: CalcInput, sandbox: Sandbox):
         ...
 
+    def stow(self, loc: Loc, sandbox: Sandbox):
+        ...
+
 
 def run(calc: Calc, env: Env):
     sandbox = env.create_sandbox()
@@ -39,5 +44,7 @@ def run(calc: Calc, env: Env):
         for item in calc.inp:
             env.place(item, sandbox)
         env.run_op(calc.op, sandbox)
+        for loc in calc.out:
+            env.stow(loc, sandbox)
     finally:
         env.destroy_sandbox(sandbox)
