@@ -1,12 +1,12 @@
 import pytest
 from pytest import fixture
 from unittest.mock import Mock, call
-from boyleworkflow import run, Calc
+from boyleworkflow import run, Calc, Loc
 
 
 @fixture
 def calc():
-    return Calc(["i1", "i2", "i3"], Mock(), ["o1", "o2"])
+    return Calc(["i1", "i2", "i3"], Mock(), [Loc("o1"), Loc("o2")])
 
 
 def test_creates_exactly_one_sandbox(calc):
@@ -53,3 +53,10 @@ def test_stows_results(calc):
     run(calc, env)
     expected_calls = [call(loc, sandbox) for loc in calc.out]
     assert expected_calls == env.stow.call_args_list
+
+
+def test_returns_digests(calc):
+    expected_results = {loc: f"digest:{loc}" for loc in calc.out}
+    env = Mock(stow=lambda loc, sandbox: expected_results[loc])
+    results = run(calc, env)
+    assert results == expected_results
