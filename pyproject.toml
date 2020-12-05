@@ -5,7 +5,7 @@ description = "A tool for provenance and caching in computational workflows."
 authors = ["Rasmus Einarsson <mr@rasmuseinarsson.se>", "Jonatan Kallus <mr@jkallus.se>"]
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = "~3.8"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.1.2"
