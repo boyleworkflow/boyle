@@ -8,7 +8,7 @@ authors = ["Rasmus Einarsson <mr@rasmuseinarsson.se>", "Jonatan Kallus <mr@jkall
 python = "^3.6"
 
 [tool.poetry.dev-dependencies]
-pytest = "^5.2"
+pytest = "^6.1.2"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
