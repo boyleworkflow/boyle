@@ -39,6 +39,38 @@ Digest = NewType("Digest", str)
 
 @dataclass
 class GraphState:
+    """
+    Invariants:
+
+    # all_nodes is the minimal graph below requested
+    all_nodes == frozenset(_iter_nodes_and_ancestors(requested))
+
+    # nodes are marked known if and only if they have results
+    known == frozenset(results.keys())
+
+    #  A node may not be known without its parents being known
+    # (technically it is conceivable, but it does not make sense
+    # and likely would be a mistake if it happened)
+    parents_known <= known
+
+    # the Node.parents property is in sync with known and parents_known
+    parents_known == frozenset(n for n in all_nodes if n.parents <= known)
+
+    # runnable is nonempty (at the very least root nodes can be run)
+    len(runnable) > 0
+    
+    # The Node.parents property is in sync with runnable and restorable
+    runnable == frozenset(n for n in all_nodes if n.parents <= restorable)
+
+    # priority_work is first to make all known; then make requested restorable.
+    if known < all_nodes:
+        priority_work == runnable & (all_nodes - known)
+    else:
+        priority_work == runnable & (all_nodes - restorable)
+
+    # priority_work is empty if and only if requested <= restorable
+    (not priority_work) == (requested <= restorable)
+    """
     all_nodes: FrozenSet[Node]
     requested: FrozenSet[Node]
     parents_known: FrozenSet[Node]
@@ -62,6 +94,7 @@ class GraphState:
             priority_work=frozenset(root_nodes),
             results={},
         )
+
 
     def _update(self, **changes):
         return dataclasses.replace(self, **changes)
