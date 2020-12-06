@@ -4,7 +4,7 @@ import pytest
 from pytest import fixture
 from unittest.mock import Mock, call
 from boyleworkflow.calc import Loc
-from boyleworkflow.graph import Node, NodeInp, get_root_nodes
+from boyleworkflow.graph import Node
 
 
 @dataclass(frozen=True)
@@ -18,12 +18,7 @@ def build_node_network(
     nodes = {}
     for name, parents in parents_by_name.items():
         nodes[name] = Node(
-            NodeInp.from_dict(
-                {
-                    Loc(parent_name): nodes[parent_name]
-                    for parent_name in parents
-                }
-            ),
+            {Loc(parent_name): nodes[parent_name] for parent_name in parents},
             MockOp(f"{name}_op"),
             Loc(f"{name}_out"),
         )
@@ -46,17 +41,6 @@ def test_nodes_correctly_hashable():
     ids_b = set(map(id, nodes_b))
 
     assert ids_a.isdisjoint(ids_b)
-
-
-def test_node_inp_from_empty_dict():
-    assert NodeInp(()) == NodeInp.from_dict({})
-
-
-def test_node_may_not_have_duplicate_input_locs():
-    root1 = Node(NodeInp(()), MockOp(), Loc("out1"))
-    root2 = Node(NodeInp(()), MockOp(), Loc("out2"))
-    with pytest.raises(ValueError):
-        inp = NodeInp(((Loc("a"), root1), (Loc("a"), root2)))
 
 
 def test_parents():

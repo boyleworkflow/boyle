@@ -4,25 +4,14 @@ from dataclasses import dataclass
 from typing import Collection, Iterable, Mapping, Set, Tuple
 
 @dataclass(frozen=True)
-class NodeInp:
-    pairs: Tuple[Tuple[Loc, "Node"], ...]
-
-    @classmethod
-    def from_dict(cls, d: Mapping[Loc, "Node"]):
-        return cls(tuple(d.items()))
-
-    def __post_init__(self):
-        inp_locs = [pair[0] for pair in self.pairs]
-        if len(set(inp_locs)) < len(inp_locs):
-            raise ValueError(f"duplicate locs: {inp_locs}")
-
-    
-@dataclass(frozen=True)
 class Node:
-    inp: NodeInp
+    inp: Mapping[Loc, "Node"]
     op: Op
     out: Loc
 
     @property
     def parents(self) -> Set["Node"]:
-        return set(pair[1] for pair in self.inp.pairs)
+        return set(self.inp.values())
+    
+    def __hash__(self):
+        return hash((tuple(self.inp.items()), self.op, self.out))
