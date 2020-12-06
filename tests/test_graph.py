@@ -4,7 +4,7 @@ import pytest
 from pytest import fixture
 from unittest.mock import Mock, call
 from boyleworkflow.calc import Loc
-from boyleworkflow.graph import Node
+from boyleworkflow.graph import Node, get_root_nodes
 
 
 @dataclass(frozen=True)
@@ -54,3 +54,20 @@ def test_parents():
     assert nodes["root"].parents == set()
     assert nodes["mid"].parents == {nodes["root"]}
     assert nodes["end"].parents == {nodes["mid"]}
+
+
+def test_root():
+    nodes = build_node_network(
+        {
+            "root1": [],
+            "root2": [],
+            "mid1": ["root1"],
+            "mid2": ["root1", "root2"],
+            "bottom1": ["mid1"],
+            "bottom2": ["mid2"],
+        }
+    )
+
+    assert get_root_nodes(nodes["root1"]) == {nodes["root1"]}
+    assert get_root_nodes(nodes["bottom1"]) == {nodes["root1"]}
+    assert get_root_nodes(nodes["bottom2"]) == {nodes["root1"], nodes["root2"]}
