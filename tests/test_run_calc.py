@@ -1,7 +1,7 @@
 import pytest
 from pytest import fixture
 from unittest.mock import Mock, call
-from boyleworkflow import run, Calc, Loc, Result
+from boyleworkflow.calc import run, Calc, Loc, Result
 
 
 @fixture
