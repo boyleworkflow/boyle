@@ -1,8 +1,8 @@
 from dataclasses import dataclass
-from typing import Collection, Mapping, NewType, Protocol
+from typing import Collection, Hashable, Mapping, NewType, Protocol
 
 
-class Op(Protocol):
+class Op(Hashable, Protocol):
     ...
 
 
