@@ -128,10 +128,11 @@ class GraphState:
 
     @classmethod
     def from_requested(cls, requested: Iterable[Node]) -> "GraphState":
+        all_nodes = frozenset(_iter_nodes_and_ancestors(requested))
         requested = frozenset(requested)
         root_nodes = get_root_nodes(*requested)
         return GraphState(
-            all_nodes=frozenset(_iter_nodes_and_ancestors(requested)),
+            all_nodes=all_nodes,
             requested=requested,
             parents_known=frozenset(root_nodes),
             known=frozenset(),
@@ -144,17 +145,25 @@ class GraphState:
     def _update(self, **changes):
         return dataclasses.replace(self, **changes)
 
+    def _set_priority_work(self):
+        not_known = self.all_nodes - self.known
+        priority_work = self.runnable & not_known
+        if not priority_work:
+            not_restorable = self.all_nodes - self.restorable
+            priority_work = self.runnable & not_restorable
+        return self._update(priority_work=priority_work)
+
     def add_results(self, results: Mapping[Node, Digest]):
-        new_results = {**self.results, **results}
-        new_known = self.known.union(new_results)
-        new_parents_known = frozenset(
-            node for node in self.all_nodes if node.parents <= new_known
+        updated_results = {**self.results, **results}
+        updated_known = self.known.union(results)
+        updated_parents_known = frozenset(
+            node for node in self.all_nodes if node.parents <= updated_known
         )
         return self._update(
-            results=new_results,
-            known=new_known,
-            parents_known=new_parents_known,
-        )
+            results=updated_results,
+            known=updated_known,
+            parents_known=updated_parents_known,
+        )._set_priority_work()
 
     def add_restorable(self, nodes: Iterable[Node]):
         addition = set(nodes)
@@ -171,4 +180,4 @@ class GraphState:
         return self._update(
             restorable=new_restorable,
             runnable=new_runnable,
-        )
+        )._set_priority_work()
