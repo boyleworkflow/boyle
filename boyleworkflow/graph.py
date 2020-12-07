@@ -64,6 +64,17 @@ class GraphState:
     results: Mapping[Node, Digest]
 
     def failed_invariants(self):
+        priority_work = self.runnable & (self.all_nodes - self.known)
+
+        # TODO: think carefully about this. In first place we want to run
+        # nodes that are unknown. But if that is not possible, we need to run
+        # some known but not restorable node. This strategy is simple and
+        # should probably guarantee that it will finish. But are there
+        # more efficient ways to backtrace than to run everything runnable
+        # that is not restorable?
+        if not priority_work:
+            priority_work = self.runnable & (self.all_nodes - self.restorable)
+
         invariant_checks = [
             InvariantCheck(
                 "all_nodes == requested and its ancestors",
@@ -105,12 +116,7 @@ class GraphState:
             InvariantCheck(
                 "priority_work is first to make all known; "
                 "then make requested restorable.",
-                self.priority_work
-                == (
-                    (self.runnable & (self.all_nodes - self.known))
-                    if (self.known < self.all_nodes)
-                    else (self.runnable & (self.all_nodes - self.restorable))
-                ),
+                self.priority_work == priority_work,
             ),
             InvariantCheck(
                 "priority_work is empty if and only if requested <= restorable",
