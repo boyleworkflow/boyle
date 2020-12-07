@@ -2,7 +2,16 @@ import itertools
 from boyleworkflow.calc import Loc, Op
 import dataclasses
 from dataclasses import dataclass
-from typing import Collection, FrozenSet, Iterable, Mapping, NewType, Set, Tuple
+from typing import (
+    Any,
+    Collection,
+    FrozenSet,
+    Iterable,
+    Mapping,
+    NewType,
+    Set,
+    Tuple,
+)
 
 
 @dataclass(frozen=True)
@@ -38,39 +47,13 @@ Digest = NewType("Digest", str)
 
 
 @dataclass
+class InvariantCheck:
+    description: str
+    result: bool
+
+
+@dataclass
 class GraphState:
-    """
-    Invariants:
-
-    # all_nodes is the minimal graph below requested
-    all_nodes == frozenset(_iter_nodes_and_ancestors(requested))
-
-    # nodes are marked known if and only if they have results
-    known == frozenset(results.keys())
-
-    #  A node may not be known without its parents being known
-    # (technically it is conceivable, but it does not make sense
-    # and likely would be a mistake if it happened)
-    parents_known <= known
-
-    # the Node.parents property is in sync with known and parents_known
-    parents_known == frozenset(n for n in all_nodes if n.parents <= known)
-
-    # runnable is nonempty (at the very least root nodes can be run)
-    len(runnable) > 0
-    
-    # The Node.parents property is in sync with runnable and restorable
-    runnable == frozenset(n for n in all_nodes if n.parents <= restorable)
-
-    # priority_work is first to make all known; then make requested restorable.
-    if known < all_nodes:
-        priority_work == runnable & (all_nodes - known)
-    else:
-        priority_work == runnable & (all_nodes - restorable)
-
-    # priority_work is empty if and only if requested <= restorable
-    (not priority_work) == (requested <= restorable)
-    """
     all_nodes: FrozenSet[Node]
     requested: FrozenSet[Node]
     parents_known: FrozenSet[Node]
@@ -79,6 +62,63 @@ class GraphState:
     restorable: FrozenSet[Node]
     priority_work: FrozenSet[Node]
     results: Mapping[Node, Digest]
+
+    def failed_invariants(self):
+        invariant_checks = [
+            InvariantCheck(
+                "all_nodes == requested and its ancestors",
+                self.all_nodes
+                == frozenset(_iter_nodes_and_ancestors(self.requested)),
+            ),
+            InvariantCheck(
+                "nodes are marked known if and only if they have results",
+                self.known == frozenset(self.results.keys()),
+            ),
+            InvariantCheck(
+                "a node cannot be restorable without being known",
+                self.restorable <= self.known,
+            ),
+            InvariantCheck(
+                "A node may not be known without its parents being known",
+                # (technically it is conceivable, but it does not make sense
+                # and likely would be a mistake if it happened)
+                self.known <= self.parents_known,
+            ),
+            InvariantCheck(
+                "Node.parents is in sync with known and parents_known",
+                self.parents_known
+                == frozenset(
+                    n for n in self.all_nodes if n.parents <= self.known
+                ),
+            ),
+            InvariantCheck(
+                "runnable is nonempty (at the very least root nodes can be run)",
+                len(self.runnable) > 0,
+            ),
+            InvariantCheck(
+                "Node.parents is in sync with runnable and restorable",
+                self.runnable
+                == frozenset(
+                    n for n in self.all_nodes if n.parents <= self.restorable
+                ),
+            ),
+            InvariantCheck(
+                "priority_work is first to make all known; "
+                "then make requested restorable.",
+                self.priority_work
+                == (
+                    (self.runnable & (self.all_nodes - self.known))
+                    if (self.known < self.all_nodes)
+                    else (self.runnable & (self.all_nodes - self.restorable))
+                ),
+            ),
+            InvariantCheck(
+                "priority_work is empty if and only if requested <= restorable",
+                (not self.priority_work) == (self.requested <= self.restorable),
+            ),
+        ]
+        failed = [c.description for c in invariant_checks if not c.result]
+        return failed
 
     @classmethod
     def from_requested(cls, requested: Iterable[Node]) -> "GraphState":
@@ -94,7 +134,6 @@ class GraphState:
             priority_work=frozenset(root_nodes),
             results={},
         )
-
 
     def _update(self, **changes):
         return dataclasses.replace(self, **changes)

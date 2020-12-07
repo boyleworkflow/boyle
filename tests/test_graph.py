@@ -83,39 +83,15 @@ def test_root():
     assert get_root_nodes(nodes["bottom2"]) == {nodes["root1"], nodes["root2"]}
 
 
-def test_root_node_runnable_on_init(root_node):
-    state = GraphState.from_requested([root_node])
-    assert state.runnable == {root_node}
-
-
-def test_root_node_parents_known_on_init(root_node):
-    state = GraphState.from_requested([root_node])
-    assert state.parents_known == {root_node}
-
-
-def test_root_node_not_known_on_init(root_node):
-    state = GraphState.from_requested([root_node])
-    assert state.known == set()
-
-
-def test_root_node_not_restorable_on_init(root_node):
-    state = GraphState.from_requested([root_node])
-    assert state.restorable == set()
-
-
-def test_root_node_priority_work_on_init(root_node):
-    state = GraphState.from_requested([root_node])
-    assert state.priority_work == {root_node}
-
-
-def test_root_node_is_all_nodes(root_node):
-    state = GraphState.from_requested([root_node])
-    assert state.all_nodes == {root_node}
-
-
-def test_no_results_on_init(root_node):
-    state = GraphState.from_requested([root_node])
-    assert not state.results
+def test_init_state(root_node: Node):
+    requested = [root_node]
+    root_nodes = frozenset(get_root_nodes(*requested))
+    state = GraphState.from_requested(requested)
+    assert not state.known
+    assert state.parents_known == root_nodes
+    assert state.runnable == root_nodes
+    assert not state.restorable
+    assert state.priority_work == root_nodes
 
 
 def test_can_add_results(root_node):
@@ -125,44 +101,23 @@ def test_can_add_results(root_node):
     assert updated.results == results
 
 
-def test_known_after_adding_result(root_node):
-    state = GraphState.from_requested([root_node])
-    results = {root_node: Mock()}
-    updated = state.add_results(results)
-    assert set(updated.results) == updated.known
-
-
-def test_can_update_restorable(root_node):
+def test_can_add_restorable(root_node):
     state = GraphState.from_requested([root_node])
     results = {root_node: Mock()}
     updated = state.add_results(results).add_restorable({root_node})
     assert set(updated.restorable) == {root_node}
 
 
-def test_restorable_must_have_result(root_node):
+def test_invariants_on_init(root_node):
     state = GraphState.from_requested([root_node])
-    with pytest.raises(ValueError):
-        state.add_restorable({root_node})
+    assert not state.failed_invariants()
 
 
-def test_derived_and_parent_is_all_nodes(root_node, derived_node):
+def test_invariants_along_modifications(root_node, derived_node):
     state = GraphState.from_requested([derived_node])
-    assert state.all_nodes == {root_node, derived_node}
-
-
-def test_derived_parents_known_iff_parent_result_added(root_node, derived_node):
-    state = GraphState.from_requested([derived_node])
-    assert derived_node not in state.parents_known
+    assert not state.failed_invariants()
     results = {root_node: Mock()}
     with_parent_known = state.add_results(results)
-    assert derived_node in with_parent_known.parents_known
-
-
-def test_runnable_iff_parent_restorable(root_node, derived_node):
-    state = GraphState.from_requested([derived_node])
-    assert derived_node not in state.runnable
-    results = {root_node: Mock()}
-    with_parent_known = state.add_results(results)
-    assert derived_node not in with_parent_known.runnable
+    assert not with_parent_known.failed_invariants()
     with_parent_restorable = with_parent_known.add_restorable(results)
-    assert derived_node in with_parent_restorable.runnable
+    assert not with_parent_restorable.failed_invariants()
