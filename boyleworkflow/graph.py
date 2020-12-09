@@ -1,16 +1,12 @@
-import itertools
 from boyleworkflow.calc import Loc, Op
 import dataclasses
 from dataclasses import dataclass
 from typing import (
-    Any,
-    Collection,
     FrozenSet,
     Iterable,
     Mapping,
     NewType,
     Set,
-    Tuple,
 )
 
 

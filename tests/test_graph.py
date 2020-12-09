@@ -2,9 +2,9 @@ from dataclasses import dataclass
 from typing import Mapping, Optional, Sequence
 import pytest
 from pytest import fixture
-from unittest.mock import Mock, call
+from unittest.mock import Mock
 from boyleworkflow.calc import Loc
-from boyleworkflow.graph import Digest, GraphState, Node, get_root_nodes
+from boyleworkflow.graph import GraphState, Node, get_root_nodes
 
 
 @dataclass(frozen=True)
@@ -53,7 +53,7 @@ def test_nodes_correctly_hashable():
     assert ids_a.isdisjoint(ids_b)
 
 
-def test_parents():
+def test_node_parents():
     nodes = build_node_network(
         {
             "root": [],
@@ -66,7 +66,7 @@ def test_parents():
     assert nodes["end"].parents == {nodes["mid"]}
 
 
-def test_root():
+def test_get_root_nodes():
     nodes = build_node_network(
         {
             "root1": [],
