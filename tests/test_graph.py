@@ -1,8 +1,81 @@
+from dataclasses import dataclass
+from typing import Iterator, Mapping, Sequence
 import pytest
 from unittest.mock import Mock
 from boyleworkflow.scheduling import GraphState
 from boyleworkflow.nodes import Node, get_root_nodes
-from tests.node_helpers import root_node, derived_node
+from tests.node_helpers import build_node_network, root_node, derived_node
+
+
+@dataclass
+class NetworkSpec:
+    spec: Mapping[str, Sequence[str]]
+    requested_names: Sequence[str]
+    number_of_states: int
+
+    @property
+    def requested_nodes(self):
+        nodes = build_node_network(self.spec)
+        return [
+            node for name, node in nodes.items() if name in self.requested_names
+        ]
+
+
+def _generate_allowed_steps(state: GraphState) -> Iterator[GraphState]:
+    allowed_new_result_nodes = state.parents_known - state.known
+    for node in allowed_new_result_nodes:
+        yield state.add_results({node: Mock()})
+
+    allowed_new_restorable_nodes = state.known - state.restorable
+    for node in allowed_new_restorable_nodes:
+        yield state.add_restorable({node})
+
+
+def generate_allowed_states(start_state: GraphState) -> Iterator[GraphState]:
+    yield start_state
+    for child_state in _generate_allowed_steps(start_state):
+        yield from generate_allowed_states(child_state)
+
+
+simple_networks = [
+    NetworkSpec(
+        {
+            "A": [],
+        },
+        ["A"],
+        3,
+    ),
+    NetworkSpec(
+        {
+            "A": [],
+            "B": ["A"],
+            "C": ["B"],
+            "D": ["C"],
+        },
+        ["D"],
+        313,
+    ),
+    NetworkSpec(
+        {
+            "A1": [],
+            "A2": [],
+            "B": ["A1", "A2"],
+        },
+        ["B"],
+        93,
+    ),
+    NetworkSpec(
+        {
+            "A": [],
+            "B": ["A"],
+            "C1": ["B"],
+            "C2": ["B"],
+        },
+        ["C1", "C2"],
+        616,
+    ),
+]
+
 
 def test_init_state(root_node: Node):
     requested = [root_node]
@@ -64,7 +137,7 @@ def test_invariants_on_init(root_node):
     assert not state.get_failed_invariants()
 
 
-def test_invariants_along_modifications(root_node, derived_node):
+def test_invariants_along_simple_modifications(root_node, derived_node):
     state = GraphState.from_requested([derived_node])
     assert not state.get_failed_invariants()
     results = {root_node: Mock()}
@@ -72,3 +145,26 @@ def test_invariants_along_modifications(root_node, derived_node):
     assert not with_parent_known.get_failed_invariants()
     with_parent_restorable = with_parent_known.add_restorable(results)
     assert not with_parent_restorable.get_failed_invariants()
+
+
+@pytest.mark.parametrize("network_spec", simple_networks)
+def test_priority_work_leads_to_finish(network_spec: NetworkSpec):
+    state = GraphState.from_requested(network_spec.requested_nodes)
+
+    while state.priority_work:
+        state = state.add_results(
+            {node: Mock() for node in state.priority_work}
+        )
+        state = state.add_restorable(state.priority_work)
+
+    assert state.requested <= state.restorable
+
+
+@pytest.mark.parametrize("network_spec", simple_networks)
+def test_invariants_along_permitted_paths(network_spec: NetworkSpec):
+    start_state = GraphState.from_requested(network_spec.requested_nodes)
+    count = 0
+    for state in generate_allowed_states(start_state):
+        count += 1
+        assert not state.get_failed_invariants()
+    assert network_spec.number_of_states == count

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import (
     Iterable,
     Mapping,
+    Optional,
     Set,
 )
 
@@ -12,6 +13,7 @@ class Node:
     inp: Mapping[Loc, "Node"]
     op: Op
     out: Loc
+    name: Optional[str] = None
 
     @property
     def parents(self) -> Set["Node"]:
@@ -19,6 +21,11 @@ class Node:
 
     def __hash__(self):
         return hash((tuple(self.inp.items()), self.op, self.out))
+
+    def __repr__(self):
+        if self.name:
+            return f"<Node {self.name}>"
+        return super().__repr__()
 
 
 def _iter_nodes_and_ancestors(nodes: Iterable[Node]) -> Iterable[Node]:

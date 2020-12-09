@@ -29,5 +29,6 @@ def build_node_network(
             {Loc(parent_name): nodes[parent_name] for parent_name in parents},
             MockOp(f"{name}_op"),
             Loc(f"{name}_out"),
+            name=name,
         )
     return nodes

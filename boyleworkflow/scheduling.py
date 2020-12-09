@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import (
     FrozenSet,
     Iterable,
+    Iterator,
     Mapping,
     NewType,
 )
@@ -93,19 +94,41 @@ class GraphState:
     def _update(self, **changes):
         return dataclasses.replace(self, **changes)
 
-    def _set_priority_work(self):
+    def _generate_priority_suggestions(self) -> Iterator[FrozenSet[Node]]:
         # TODO: think carefully about this. In first place we want to run
         # nodes that are unknown. But if that is not possible, we need to run
         # some known but not restorable node. This strategy is simple and
         # should probably guarantee that it will finish. But are there
         # more efficient ways to backtrace than to run everything runnable
         # that is not restorable?
+
+        # If any node is unknown, then we cannot be done.
+        # So in first place, run runnable nodes that are unknown.
         not_known = self.all_nodes - self.known
-        priority_work = self.runnable & not_known
-        if not priority_work:
-            not_restorable = self.all_nodes - self.restorable
-            priority_work = self.runnable & not_restorable
-        return self._update(priority_work=priority_work)
+        yield self.runnable & not_known
+
+        # Now there is a chance that all requested are restorable.
+        # If so, we are done.
+        not_restorable = self.all_nodes - self.restorable
+        requested_nonrestorable = self.requested & not_restorable
+        if not requested_nonrestorable:
+            return
+
+        # If not, those are prioritized
+        yield requested_nonrestorable & self.runnable
+
+        # Then take the rest
+        # TODO: Create a more optimal choice here
+        yield not_restorable & self.runnable
+
+    def _get_priority_work(self):
+        for suggestion in self._generate_priority_suggestions():
+            if suggestion:
+                return suggestion
+        return frozenset()
+
+    def _set_priority_work(self):
+        return self._update(priority_work=self._get_priority_work())
 
     def add_results(self, results: Mapping[Node, Digest]):
         added_before_parents = set(results) - self.parents_known
