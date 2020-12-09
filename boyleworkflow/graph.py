@@ -80,8 +80,6 @@ class GraphState:
             ),
             InvariantCheck(
                 "A node may not be known without its parents being known",
-                # (technically it is conceivable, but it does not make sense
-                # and likely would be a mistake if it happened)
                 self.known <= self.parents_known,
             ),
             InvariantCheck(
@@ -144,6 +142,22 @@ class GraphState:
         return self._update(priority_work=priority_work)
 
     def add_results(self, results: Mapping[Node, Digest]):
+        added_before_parents = set(results) - self.parents_known
+        if added_before_parents:
+            raise ValueError(
+                "cannot accept results for the following nodes "
+                f"because their parents are not known: {added_before_parents}"
+            )
+        conflicting_nodes = {
+            node: (self.results[node], new_result)
+            for node, new_result in results.items()
+            if node in self.results and new_result != self.results[node]
+        }
+        if conflicting_nodes:
+            raise ValueError(
+                "cannot add conflicting results "
+                f"for the following nodes: {conflicting_nodes}"
+            )
         updated_results = {**self.results, **results}
         updated_known = self.known.union(results)
         updated_parents_known = frozenset(
