@@ -1,87 +1,8 @@
-from dataclasses import dataclass
-from typing import Mapping, Optional, Sequence
 import pytest
-from pytest import fixture
 from unittest.mock import Mock
-from boyleworkflow.calc import Loc
-from boyleworkflow.graph import GraphState, Node, get_root_nodes
-
-
-@dataclass(frozen=True)
-class MockOp:
-    name: Optional[str] = None
-
-
-@fixture
-def root_node():
-    return Node({}, MockOp(), Loc("out"))
-
-
-@fixture
-def derived_node(root_node):
-    return Node({Loc("a"): root_node}, MockOp(), Loc("out"))
-
-
-def build_node_network(
-    parents_by_name: Mapping[str, Sequence[str]]
-) -> Mapping[str, Node]:
-    nodes = {}
-    for name, parents in parents_by_name.items():
-        nodes[name] = Node(
-            {Loc(parent_name): nodes[parent_name] for parent_name in parents},
-            MockOp(f"{name}_op"),
-            Loc(f"{name}_out"),
-        )
-    return nodes
-
-
-def test_nodes_correctly_hashable():
-    node_network_spec = {
-        "root1": [],
-        "root2": [],
-        "derived": ["root1", "root2"],
-    }
-
-    nodes_a = set(build_node_network(node_network_spec).values())
-    nodes_b = set(build_node_network(node_network_spec).values())
-
-    assert nodes_a == nodes_b
-
-    ids_a = set(map(id, nodes_a))
-    ids_b = set(map(id, nodes_b))
-
-    assert ids_a.isdisjoint(ids_b)
-
-
-def test_node_parents():
-    nodes = build_node_network(
-        {
-            "root": [],
-            "mid": ["root"],
-            "end": ["mid"],
-        }
-    )
-    assert nodes["root"].parents == set()
-    assert nodes["mid"].parents == {nodes["root"]}
-    assert nodes["end"].parents == {nodes["mid"]}
-
-
-def test_get_root_nodes():
-    nodes = build_node_network(
-        {
-            "root1": [],
-            "root2": [],
-            "mid1": ["root1"],
-            "mid2": ["root1", "root2"],
-            "bottom1": ["mid1"],
-            "bottom2": ["mid2"],
-        }
-    )
-
-    assert get_root_nodes(nodes["root1"]) == {nodes["root1"]}
-    assert get_root_nodes(nodes["bottom1"]) == {nodes["root1"]}
-    assert get_root_nodes(nodes["bottom2"]) == {nodes["root1"], nodes["root2"]}
-
+from boyleworkflow.scheduling import GraphState
+from boyleworkflow.nodes import Node, get_root_nodes
+from tests.node_helpers import root_node, derived_node
 
 def test_init_state(root_node: Node):
     requested = [root_node]
@@ -140,14 +61,14 @@ def test_only_add_restorable_if_known(root_node):
 
 def test_invariants_on_init(root_node):
     state = GraphState.from_requested([root_node])
-    assert not state.failed_invariants()
+    assert not state.get_failed_invariants()
 
 
 def test_invariants_along_modifications(root_node, derived_node):
     state = GraphState.from_requested([derived_node])
-    assert not state.failed_invariants()
+    assert not state.get_failed_invariants()
     results = {root_node: Mock()}
     with_parent_known = state.add_results(results)
-    assert not with_parent_known.failed_invariants()
+    assert not with_parent_known.get_failed_invariants()
     with_parent_restorable = with_parent_known.add_restorable(results)
-    assert not with_parent_restorable.failed_invariants()
+    assert not with_parent_restorable.get_failed_invariants()
