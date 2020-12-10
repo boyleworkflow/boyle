@@ -2,19 +2,19 @@ import dataclasses
 from dataclasses import dataclass
 from typing import (
     FrozenSet,
+    Generic,
     Iterable,
     Iterator,
     Mapping,
-    NewType,
+    TypeVar,
 )
 from boyleworkflow.nodes import Node, _iter_nodes_and_ancestors, get_root_nodes
 
-
-Digest = NewType("Digest", str)
+ResultType = TypeVar("ResultType")
 
 
 @dataclass
-class GraphState:
+class GraphState(Generic[ResultType]):
     all_nodes: FrozenSet[Node]
     requested: FrozenSet[Node]
     parents_known: FrozenSet[Node]
@@ -22,7 +22,7 @@ class GraphState:
     runnable: FrozenSet[Node]
     restorable: FrozenSet[Node]
     priority_work: FrozenSet[Node]
-    results: Mapping[Node, Digest]
+    results: Mapping[Node, ResultType]
 
     @classmethod
     def from_requested(cls, requested: Iterable[Node]) -> "GraphState":
@@ -79,7 +79,7 @@ class GraphState:
     def _set_priority_work(self):
         return self._update(priority_work=self._get_priority_work())
 
-    def add_results(self, results: Mapping[Node, Digest]):
+    def add_results(self, results: Mapping[Node, ResultType]):
         added_before_parents = set(results) - self.parents_known
         if added_before_parents:
             raise ValueError(
