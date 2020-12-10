@@ -40,6 +40,15 @@ def test_different_nodes_hash_unequal(nodes_a):
     assert len(hashes) == 3
 
 
+def test_equality_and_hash_insensitive_to_inp_order():
+    root1 = Node({}, "op1", Loc("out1"))
+    root2 = Node({}, "op2", Loc("out2"))
+    derived_a = Node({Loc("i1"): root1, Loc("i2"): root2}, "op", Loc("out"))
+    derived_b = Node({Loc("i2"): root2, Loc("i1"): root1}, "op", Loc("out"))
+    assert derived_a == derived_b
+    assert hash(derived_a) == hash(derived_b)
+
+
 def test_identical_nodes_hash_equal(nodes_a, nodes_b):
     hashes_a = set(map(hash, nodes_a.values()))
     hashes_b = set(map(hash, nodes_b.values()))

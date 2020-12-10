@@ -20,7 +20,7 @@ class Node:
         return set(self.inp.values())
 
     def __hash__(self):
-        return hash((tuple(self.inp.items()), self.op, self.out))
+        return hash((tuple(sorted(self.inp.items())), self.op, self.out))
 
     def __repr__(self):
         if self.name:
