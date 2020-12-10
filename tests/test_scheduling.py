@@ -88,44 +88,46 @@ class InvariantCheck:
     result: bool
 
 
-def get_failed_invariants(self):
+def get_failed_invariants(state: GraphState):
     invariant_checks = [
         InvariantCheck(
             "all_nodes == requested and its ancestors",
-            self.all_nodes
-            == frozenset(iter_nodes_and_ancestors(self.requested)),
+            state.all_nodes
+            == frozenset(iter_nodes_and_ancestors(state.requested)),
         ),
         InvariantCheck(
             "nodes are marked known if and only if they have results",
-            self.known == frozenset(self.results.keys()),
+            state.known == frozenset(state.results.keys()),
         ),
         InvariantCheck(
             "a node cannot be restorable without being known",
-            self.restorable <= self.known,
+            state.restorable <= state.known,
         ),
         InvariantCheck(
             "A node may not be known without its parents being known",
-            self.known <= self.parents_known,
+            state.known <= state.parents_known,
         ),
         InvariantCheck(
             "Node.parents is in sync with known and parents_known",
-            self.parents_known
-            == frozenset(n for n in self.all_nodes if n.parents <= self.known),
+            state.parents_known
+            == frozenset(
+                n for n in state.all_nodes if n.parents <= state.known
+            ),
         ),
         InvariantCheck(
             "runnable is nonempty (at the very least root nodes can be run)",
-            len(self.runnable) > 0,
+            len(state.runnable) > 0,
         ),
         InvariantCheck(
             "Node.parents is in sync with runnable and restorable",
-            self.runnable
+            state.runnable
             == frozenset(
-                n for n in self.all_nodes if n.parents <= self.restorable
+                n for n in state.all_nodes if n.parents <= state.restorable
             ),
         ),
         InvariantCheck(
             "priority_work is empty if and only if requested <= restorable",
-            (not self.priority_work) == (self.requested <= self.restorable),
+            (not state.priority_work) == (state.requested <= state.restorable),
         ),
     ]
     failed = [c.description for c in invariant_checks if not c.result]
