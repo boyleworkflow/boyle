@@ -3,7 +3,7 @@ from typing import Iterator, Mapping, Sequence
 import pytest
 from unittest.mock import Mock
 from boyleworkflow.scheduling import GraphState
-from boyleworkflow.nodes import Node, get_root_nodes
+from boyleworkflow.nodes import Node, get_root_nodes, _iter_nodes_and_ancestors
 from tests.node_helpers import build_node_network, root_node, derived_node
 
 
@@ -77,6 +77,56 @@ simple_networks = [
 ]
 
 
+@dataclass
+class InvariantCheck:
+    description: str
+    result: bool
+
+
+def get_failed_invariants(self):
+    invariant_checks = [
+        InvariantCheck(
+            "all_nodes == requested and its ancestors",
+            self.all_nodes
+            == frozenset(_iter_nodes_and_ancestors(self.requested)),
+        ),
+        InvariantCheck(
+            "nodes are marked known if and only if they have results",
+            self.known == frozenset(self.results.keys()),
+        ),
+        InvariantCheck(
+            "a node cannot be restorable without being known",
+            self.restorable <= self.known,
+        ),
+        InvariantCheck(
+            "A node may not be known without its parents being known",
+            self.known <= self.parents_known,
+        ),
+        InvariantCheck(
+            "Node.parents is in sync with known and parents_known",
+            self.parents_known
+            == frozenset(n for n in self.all_nodes if n.parents <= self.known),
+        ),
+        InvariantCheck(
+            "runnable is nonempty (at the very least root nodes can be run)",
+            len(self.runnable) > 0,
+        ),
+        InvariantCheck(
+            "Node.parents is in sync with runnable and restorable",
+            self.runnable
+            == frozenset(
+                n for n in self.all_nodes if n.parents <= self.restorable
+            ),
+        ),
+        InvariantCheck(
+            "priority_work is empty if and only if requested <= restorable",
+            (not self.priority_work) == (self.requested <= self.restorable),
+        ),
+    ]
+    failed = [c.description for c in invariant_checks if not c.result]
+    return failed
+
+
 def test_init_state(root_node: Node):
     requested = [root_node]
     root_nodes = frozenset(get_root_nodes(*requested))
@@ -134,17 +184,17 @@ def test_only_add_restorable_if_known(root_node):
 
 def test_invariants_on_init(root_node):
     state = GraphState.from_requested([root_node])
-    assert not state.get_failed_invariants()
+    assert not get_failed_invariants(state)
 
 
 def test_invariants_along_simple_modifications(root_node, derived_node):
     state = GraphState.from_requested([derived_node])
-    assert not state.get_failed_invariants()
+    assert not get_failed_invariants(state)
     results = {root_node: Mock()}
     with_parent_known = state.add_results(results)
-    assert not with_parent_known.get_failed_invariants()
+    assert not get_failed_invariants(with_parent_known)
     with_parent_restorable = with_parent_known.add_restorable(results)
-    assert not with_parent_restorable.get_failed_invariants()
+    assert not get_failed_invariants(with_parent_restorable)
 
 
 @pytest.mark.parametrize("network_spec", simple_networks)
@@ -166,5 +216,5 @@ def test_invariants_along_permitted_paths(network_spec: NetworkSpec):
     count = 0
     for state in generate_allowed_states(start_state):
         count += 1
-        assert not state.get_failed_invariants()
+        assert not get_failed_invariants(state)
     assert network_spec.number_of_states == count

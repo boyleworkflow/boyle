@@ -14,12 +14,6 @@ Digest = NewType("Digest", str)
 
 
 @dataclass
-class InvariantCheck:
-    description: str
-    result: bool
-
-
-@dataclass
 class GraphState:
     all_nodes: FrozenSet[Node]
     requested: FrozenSet[Node]
@@ -29,51 +23,6 @@ class GraphState:
     restorable: FrozenSet[Node]
     priority_work: FrozenSet[Node]
     results: Mapping[Node, Digest]
-
-    def get_failed_invariants(self):
-        invariant_checks = [
-            InvariantCheck(
-                "all_nodes == requested and its ancestors",
-                self.all_nodes
-                == frozenset(_iter_nodes_and_ancestors(self.requested)),
-            ),
-            InvariantCheck(
-                "nodes are marked known if and only if they have results",
-                self.known == frozenset(self.results.keys()),
-            ),
-            InvariantCheck(
-                "a node cannot be restorable without being known",
-                self.restorable <= self.known,
-            ),
-            InvariantCheck(
-                "A node may not be known without its parents being known",
-                self.known <= self.parents_known,
-            ),
-            InvariantCheck(
-                "Node.parents is in sync with known and parents_known",
-                self.parents_known
-                == frozenset(
-                    n for n in self.all_nodes if n.parents <= self.known
-                ),
-            ),
-            InvariantCheck(
-                "runnable is nonempty (at the very least root nodes can be run)",
-                len(self.runnable) > 0,
-            ),
-            InvariantCheck(
-                "Node.parents is in sync with runnable and restorable",
-                self.runnable
-                == frozenset(
-                    n for n in self.all_nodes if n.parents <= self.restorable
-                ),
-            ),
-            InvariantCheck(
-                "priority_work is empty if and only if requested <= restorable",
-                (not self.priority_work) == (self.requested <= self.restorable),
-            ),
-        ]
-        failed = [c.description for c in invariant_checks if not c.result]
-        return failed
 
     @classmethod
     def from_requested(cls, requested: Iterable[Node]) -> "GraphState":
