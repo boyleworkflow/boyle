@@ -1,24 +1,53 @@
+from boyleworkflow.calc import Loc
 from dataclasses import dataclass
-from tests.node_helpers import build_node_network
-from boyleworkflow.nodes import get_root_nodes, iter_nodes_and_ancestors
+from typing import Mapping
+
+from pytest import fixture
+from tests.node_helpers import build_node_network, NetworkSpec
+from boyleworkflow.nodes import Node, get_root_nodes, iter_nodes_and_ancestors
 
 
-def test_nodes_correctly_hashable():
-    node_network_spec = {
+@fixture
+def simple_node_network_spec() -> NetworkSpec:
+    return {
         "root1": [],
         "root2": [],
         "derived": ["root1", "root2"],
     }
 
-    nodes_a = set(build_node_network(node_network_spec).values())
-    nodes_b = set(build_node_network(node_network_spec).values())
 
-    assert nodes_a == nodes_b
+@fixture
+def nodes_a(simple_node_network_spec):
+    return build_node_network(simple_node_network_spec)
 
-    ids_a = set(map(id, nodes_a))
-    ids_b = set(map(id, nodes_b))
 
+@fixture
+def nodes_b(simple_node_network_spec):
+    return build_node_network(simple_node_network_spec)
+
+
+def test_node_networks_are_separate_objects(nodes_a, nodes_b):
+    # sort of a meta-test to check that the test data are what we expect
+    assert len(nodes_a) == 3
+    assert len(nodes_a) == len(nodes_b)
+    ids_a = set(map(id, nodes_a.values()))
+    ids_b = set(map(id, nodes_b.values()))
     assert ids_a.isdisjoint(ids_b)
+
+
+def test_different_nodes_hash_unequal(nodes_a):
+    hashes = set(map(hash, nodes_a.values()))
+    assert len(hashes) == 3
+
+
+def test_identical_nodes_hash_equal(nodes_a, nodes_b):
+    hashes_a = set(map(hash, nodes_a.values()))
+    hashes_b = set(map(hash, nodes_b.values()))
+    assert hashes_a == hashes_b
+
+
+def test_identical_nodes_compare_equal(nodes_a, nodes_b):
+    assert nodes_a == nodes_b
 
 
 def test_iter_nodes_and_ancestors():

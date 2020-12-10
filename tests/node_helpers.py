@@ -20,9 +20,10 @@ def derived_node(root_node):
     return Node({Loc("a"): root_node}, MockOp(), Loc("out"))
 
 
-def build_node_network(
-    parents_by_name: Mapping[str, Sequence[str]]
-) -> Mapping[str, Node]:
+NetworkSpec = Mapping[str, Sequence[str]]
+
+
+def build_node_network(parents_by_name: NetworkSpec) -> Mapping[str, Node]:
     nodes = {}
     for name, parents in parents_by_name.items():
         nodes[name] = Node(
