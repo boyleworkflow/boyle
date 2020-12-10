@@ -8,7 +8,7 @@ from typing import (
     Mapping,
     TypeVar,
 )
-from boyleworkflow.nodes import Node, _iter_nodes_and_ancestors, get_root_nodes
+from boyleworkflow.nodes import Node, iter_nodes_and_ancestors, get_root_nodes
 
 ResultType = TypeVar("ResultType")
 
@@ -26,7 +26,7 @@ class GraphState(Generic[ResultType]):
 
     @classmethod
     def from_requested(cls, requested: Iterable[Node]) -> "GraphState":
-        all_nodes = frozenset(_iter_nodes_and_ancestors(requested))
+        all_nodes = frozenset(iter_nodes_and_ancestors(requested))
         requested = frozenset(requested)
         root_nodes = get_root_nodes(*requested)
         return GraphState(

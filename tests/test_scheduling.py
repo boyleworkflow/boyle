@@ -3,7 +3,7 @@ from typing import Iterator, Mapping, Sequence
 import pytest
 from unittest.mock import Mock
 from boyleworkflow.scheduling import GraphState
-from boyleworkflow.nodes import Node, get_root_nodes, _iter_nodes_and_ancestors
+from boyleworkflow.nodes import Node, get_root_nodes, iter_nodes_and_ancestors
 from tests.node_helpers import build_node_network, root_node, derived_node
 
 
@@ -88,7 +88,7 @@ def get_failed_invariants(self):
         InvariantCheck(
             "all_nodes == requested and its ancestors",
             self.all_nodes
-            == frozenset(_iter_nodes_and_ancestors(self.requested)),
+            == frozenset(iter_nodes_and_ancestors(self.requested)),
         ),
         InvariantCheck(
             "nodes are marked known if and only if they have results",

@@ -28,7 +28,7 @@ class Node:
         return super().__repr__()
 
 
-def _iter_nodes_and_ancestors(nodes: Iterable[Node]) -> Iterable[Node]:
+def iter_nodes_and_ancestors(nodes: Iterable[Node]) -> Iterable[Node]:
     seen: Set[Node] = set()
     new = set(nodes)
     while True:
@@ -40,4 +40,4 @@ def _iter_nodes_and_ancestors(nodes: Iterable[Node]) -> Iterable[Node]:
 
 
 def get_root_nodes(*nodes: Node) -> Set[Node]:
-    return {n for n in _iter_nodes_and_ancestors(nodes) if not n.inp}
+    return {n for n in iter_nodes_and_ancestors(nodes) if not n.inp}

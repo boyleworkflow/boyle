@@ -1,9 +1,6 @@
 from dataclasses import dataclass
 from tests.node_helpers import build_node_network
-from typing import Mapping, Optional, Sequence
-from pytest import fixture
-from boyleworkflow.calc import Loc
-from boyleworkflow.nodes import get_root_nodes
+from boyleworkflow.nodes import get_root_nodes, iter_nodes_and_ancestors
 
 
 def test_nodes_correctly_hashable():
@@ -22,6 +19,27 @@ def test_nodes_correctly_hashable():
     ids_b = set(map(id, nodes_b))
 
     assert ids_a.isdisjoint(ids_b)
+
+
+def test_iter_nodes_and_ancestors():
+    nodes = build_node_network(
+        {
+            "root1": [],
+            "root2": [],
+            "mid1": ["root1"],
+            "mid2": ["root1", "root2"],
+            "bottom1": ["mid1"],
+            "bottom2": ["mid2"],
+        }
+    )
+
+    set(iter_nodes_and_ancestors([nodes["root1"]])) == {nodes["root1"]}
+    set(iter_nodes_and_ancestors([nodes["bottom2"]])) == {
+        nodes["root1"],
+        nodes["root2"],
+        nodes["mid2"],
+        nodes["bottom2"],
+    }
 
 
 def test_node_parents():
