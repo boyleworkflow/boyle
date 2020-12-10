@@ -4,12 +4,17 @@ import pytest
 from unittest.mock import Mock
 from boyleworkflow.scheduling import GraphState
 from boyleworkflow.nodes import Node, get_root_nodes, iter_nodes_and_ancestors
-from tests.node_helpers import build_node_network, root_node, derived_node
+from tests.node_helpers import (
+    NetworkSpec,
+    build_node_network,
+    root_node,
+    derived_node,
+)
 
 
 @dataclass
-class NetworkSpec:
-    spec: Mapping[str, Sequence[str]]
+class RequestAndStatesSpec:
+    spec: NetworkSpec
     requested_names: Sequence[str]
     number_of_states: int
 
@@ -38,14 +43,14 @@ def generate_allowed_states(start_state: GraphState) -> Iterator[GraphState]:
 
 
 simple_networks = [
-    NetworkSpec(
+    RequestAndStatesSpec(
         {
             "A": [],
         },
         ["A"],
         3,
     ),
-    NetworkSpec(
+    RequestAndStatesSpec(
         {
             "A": [],
             "B": ["A"],
@@ -55,7 +60,7 @@ simple_networks = [
         ["D"],
         313,
     ),
-    NetworkSpec(
+    RequestAndStatesSpec(
         {
             "A1": [],
             "A2": [],
@@ -64,7 +69,7 @@ simple_networks = [
         ["B"],
         93,
     ),
-    NetworkSpec(
+    RequestAndStatesSpec(
         {
             "A": [],
             "B": ["A"],
@@ -198,7 +203,7 @@ def test_invariants_along_simple_modifications(root_node, derived_node):
 
 
 @pytest.mark.parametrize("network_spec", simple_networks)
-def test_priority_work_leads_to_finish(network_spec: NetworkSpec):
+def test_priority_work_leads_to_finish(network_spec: RequestAndStatesSpec):
     state = GraphState.from_requested(network_spec.requested_nodes)
 
     while state.priority_work:
@@ -211,7 +216,7 @@ def test_priority_work_leads_to_finish(network_spec: NetworkSpec):
 
 
 @pytest.mark.parametrize("network_spec", simple_networks)
-def test_invariants_along_permitted_paths(network_spec: NetworkSpec):
+def test_invariants_along_permitted_paths(network_spec: RequestAndStatesSpec):
     start_state = GraphState.from_requested(network_spec.requested_nodes)
     count = 0
     for state in generate_allowed_states(start_state):
