@@ -2,14 +2,37 @@ from dataclasses import dataclass
 from typing import Iterator, Mapping, Sequence
 import pytest
 from unittest.mock import Mock
-from boyleworkflow.scheduling import GraphState
-from boyleworkflow.nodes import Node, get_root_nodes, iter_nodes_and_ancestors
-from tests.node_helpers import (
-    NetworkSpec,
-    build_node_network,
-    root_node,
-    derived_node,
+from boyleworkflow.scheduling import (
+    GraphState,
+    get_nodes_and_ancestors,
+    get_root_nodes,
 )
+from boyleworkflow.calc import Loc
+from boyleworkflow.nodes import Node
+
+
+@pytest.fixture
+def root_node():
+    return Node({}, "op", "out")
+
+
+@pytest.fixture
+def derived_node(root_node):
+    return Node({"inp": root_node}, "op", "out")
+
+
+NetworkSpec = Mapping[str, Sequence[str]]
+
+
+def build_node_network(parents_by_name: NetworkSpec) -> Mapping[str, Node]:
+    nodes = {}
+    for name, parent_names in parents_by_name.items():
+        nodes[name] = Node(
+            {parent_name: nodes[parent_name] for parent_name in parent_names},
+            f"op_{name}",
+            f"out_{name}",
+        )
+    return nodes
 
 
 @dataclass
@@ -91,9 +114,8 @@ class InvariantCheck:
 def get_failed_invariants(state: GraphState):
     invariant_checks = [
         InvariantCheck(
-            "all_nodes == requested and its ancestors",
-            state.all_nodes
-            == frozenset(iter_nodes_and_ancestors(state.requested)),
+            "all_nodes == requested and their ancestors",
+            state.all_nodes == get_nodes_and_ancestors(state.requested),
         ),
         InvariantCheck(
             "nodes are marked known if and only if they have results",

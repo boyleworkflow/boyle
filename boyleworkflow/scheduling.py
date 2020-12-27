@@ -1,20 +1,34 @@
 import dataclasses
 from dataclasses import dataclass
 from typing import (
+    Any,
     FrozenSet,
-    Generic,
     Iterable,
     Iterator,
     Mapping,
-    TypeVar,
+    Set,
 )
-from boyleworkflow.nodes import Node, iter_nodes_and_ancestors, get_root_nodes
+from boyleworkflow.nodes import Node
 
-ResultType = TypeVar("ResultType")
+NodeResult = Any
 
+
+def get_nodes_and_ancestors(nodes: Iterable[Node]) -> FrozenSet[Node]:
+    seen: Set[Node] = set()
+    new = set(nodes)
+    while new:
+        seen.update(new)
+        new = frozenset.union(*(node.parents for node in new)) - seen
+    return frozenset(seen)
+
+
+def get_root_nodes(*nodes: Node) -> FrozenSet[Node]:
+    return frozenset(
+        {n for n in get_nodes_and_ancestors(nodes) if not n.parents}
+    )
 
 @dataclass
-class GraphState(Generic[ResultType]):
+class GraphState:
     all_nodes: FrozenSet[Node]
     requested: FrozenSet[Node]
     parents_known: FrozenSet[Node]
@@ -22,11 +36,11 @@ class GraphState(Generic[ResultType]):
     runnable: FrozenSet[Node]
     restorable: FrozenSet[Node]
     priority_work: FrozenSet[Node]
-    results: Mapping[Node, ResultType]
+    results: Mapping[Node, NodeResult]
 
     @classmethod
     def from_requested(cls, requested: Iterable[Node]) -> "GraphState":
-        all_nodes = frozenset(iter_nodes_and_ancestors(requested))
+        all_nodes = frozenset(get_nodes_and_ancestors(requested))
         requested = frozenset(requested)
         root_nodes = get_root_nodes(*requested)
         return GraphState(
@@ -79,7 +93,7 @@ class GraphState(Generic[ResultType]):
     def _set_priority_work(self):
         return self._update(priority_work=self._get_priority_work())
 
-    def add_results(self, results: Mapping[Node, ResultType]):
+    def add_results(self, results: Mapping[Node, NodeResult]):
         added_before_parents = set(results) - self.parents_known
         if added_before_parents:
             raise ValueError(
