@@ -34,6 +34,9 @@ class Env(Protocol):
     def stow(self, sandbox: SandboxKey, loc: Loc) -> Result:
         ...
 
+    def deliver(self, loc: Loc, digest: Result):
+        ...
+
 
 def run(calc: Calc, env: Env) -> Mapping[Loc, Result]:
     sandbox = env.create_sandbox()
