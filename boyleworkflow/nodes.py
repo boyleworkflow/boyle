@@ -4,7 +4,6 @@ from typing import (
     Collection,
     FrozenSet,
     Mapping,
-    Optional,
     Set,
     Union,
 )
@@ -15,7 +14,6 @@ class NodeBundle:
     inp: Mapping[Loc, "Node"]
     op: Op
     out: FrozenSet[Loc]
-    name: Optional[str] = None
 
     @property
     def nodes(self) -> FrozenSet["Node"]:
@@ -23,11 +21,6 @@ class NodeBundle:
 
     def __hash__(self):
         return hash((tuple(sorted(self.inp.items())), self.op, self.out))
-
-    def __repr__(self):
-        if self.name:
-            return f"<Node {self.name}>"
-        return super().__repr__()
 
 
 @dataclass(frozen=True)
