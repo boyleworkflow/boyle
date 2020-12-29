@@ -1,15 +1,28 @@
+import itertools
 import dataclasses
 from dataclasses import dataclass
 from typing import (
     Any,
     FrozenSet,
+    Generic,
     Iterable,
     Iterator,
     Mapping,
+    Protocol,
     Set,
+    TypeVar,
 )
-from boyleworkflow.nodes import Node
 
+T = TypeVar("T")
+
+
+class HasParents(Protocol):
+    @property
+    def parents(self: T) -> FrozenSet[T]:
+        ...
+
+
+Node = TypeVar("Node", bound=HasParents)
 NodeResult = Any
 
 
@@ -29,7 +42,7 @@ def get_root_nodes(*nodes: Node) -> FrozenSet[Node]:
 
 
 @dataclass
-class GraphState:
+class GraphState(Generic[Node]):
     all_nodes: FrozenSet[Node]
     requested: FrozenSet[Node]
     parents_known: FrozenSet[Node]
@@ -40,7 +53,7 @@ class GraphState:
     results: Mapping[Node, NodeResult]
 
     @classmethod
-    def from_requested(cls, requested: Iterable[Node]) -> "GraphState":
+    def from_requested(cls, requested: Iterable[Node]) -> "GraphState[Node]":
         all_nodes = frozenset(get_nodes_and_ancestors(requested))
         requested = frozenset(requested)
         root_nodes = get_root_nodes(*requested)
