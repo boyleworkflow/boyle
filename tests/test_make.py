@@ -68,9 +68,6 @@ class StringFormatEnv:
         self.output[loc] = self._storage[digest]
 
 
-x: Env[StringFormatOp] = StringFormatEnv()
-
-
 @pytest.fixture
 def env():
     return StringFormatEnv()
