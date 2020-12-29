@@ -31,7 +31,7 @@ def get_nodes_and_ancestors(nodes: Iterable[Node]) -> FrozenSet[Node]:
     new = set(nodes)
     while new:
         seen.update(new)
-        new = frozenset.union(*(node.parents for node in new)) - seen
+        new = frozenset(itertools.chain(*(node.parents for node in new))) - seen
     return frozenset(seen)
 
 
@@ -68,7 +68,7 @@ class GraphState(Generic[Node]):
             results={},
         )
 
-    def _update(self, **changes):
+    def _update(self, **changes: Any):
         return dataclasses.replace(self, **changes)
 
     def _generate_priority_suggestions(self) -> Iterator[FrozenSet[Node]]:

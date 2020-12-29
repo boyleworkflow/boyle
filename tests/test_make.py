@@ -1,13 +1,16 @@
-from boyleworkflow.calc import Loc
+from boyleworkflow.calc import Env, Loc, Result, SandboxKey
 from dataclasses import dataclass, field
-from typing import MutableMapping, Sequence, Tuple
+from typing import Collection, Iterable, MutableMapping, Tuple
 import pytest
 import unittest.mock
 from boyleworkflow.make import make
-from boyleworkflow.nodes import create_simple_node, create_sibling_nodes
+from boyleworkflow.nodes import Node, create_simple_node, create_sibling_nodes
+
+StringFormatOp = Collection[Tuple[Loc, str]]
+StringNode = Node[StringFormatOp]
 
 
-def make_op(**definitions: str) -> Sequence[Tuple[Loc, str]]:
+def make_op(**definitions: str) -> StringFormatOp:
     return tuple((Loc(k), v) for k, v in definitions.items())
 
 
@@ -17,7 +20,7 @@ def hello_node():
 
 
 @pytest.fixture
-def hello_world_node(hello_node):
+def hello_world_node(hello_node: StringNode):
     return create_simple_node(
         dict(hello=hello_node), make_op(out="{hello} World"), "out"
     )
@@ -37,63 +40,70 @@ class StringFormatEnv:
         self._storage = {}
 
     def create_sandbox(self):
-        sandbox_key = "sandbox"
+        sandbox_key = SandboxKey("sandbox")
         self._sandboxes[sandbox_key] = {}
         return sandbox_key
 
-    def destroy_sandbox(self, sandbox_key):
+    def destroy_sandbox(self, sandbox_key: SandboxKey):
         del self._sandboxes[sandbox_key]
 
-    def run_op(self, op, sandbox_key):
+    def run_op(self, op: StringFormatOp, sandbox_key: SandboxKey):
         sandbox = self._sandboxes[sandbox_key]
         results = {
             out_loc: template.format(**sandbox) for out_loc, template in op
         }
         sandbox.update(results)
 
-    def stow(self, sandbox_key, loc):
+    def stow(self, sandbox_key: SandboxKey, loc: Loc):
         sandbox = self._sandboxes[sandbox_key]
         value = sandbox[loc]
-        digest = f"digest:{value}"
+        digest = Result(f"digest:{value}")
         self._storage[digest] = value
         return digest
 
-    def place(self, sandbox_key, loc, digest):
+    def place(self, sandbox_key: SandboxKey, loc: Loc, digest: Result):
         self._sandboxes[sandbox_key][loc] = self._storage[digest]
 
-    def deliver(self, loc, digest):
+    def deliver(self, loc: Loc, digest: Result):
         self.output[loc] = self._storage[digest]
 
 
+x: Env[StringFormatOp] = StringFormatEnv()
+
+
 @pytest.fixture
-def string_format_env():
+def env():
     return StringFormatEnv()
 
 
-def test_make_hello(string_format_env, hello_node):
-    make({Loc("hello"): hello_node}, string_format_env)
-    assert string_format_env.output["hello"] == "Hello"
+def test_make_hello(env: StringFormatEnv, hello_node: StringNode):
+    make({Loc("hello"): hello_node}, env)
+    assert env.output[Loc("hello")] == "Hello"
 
 
-def test_make_hello_world(string_format_env, hello_world_node):
-    make({Loc("hello_world"): hello_world_node}, string_format_env)
-    assert string_format_env.output["hello_world"] == "Hello World"
+def test_make_hello_world(env: StringFormatEnv, hello_world_node: StringNode):
+    make({Loc("hello_world"): hello_world_node}, env)
+    assert env.output[Loc("hello_world")] == "Hello World"
 
 
-def test_multi_output(string_format_env, multi_nodes):
-    make({n.out: n for n in multi_nodes}, string_format_env)
-    assert string_format_env.output["a"] == "one"
-    assert string_format_env.output["b"] == "two"
+def test_multi_output(env: StringFormatEnv, multi_nodes: Iterable[StringNode]):
+    make({n.out: n for n in multi_nodes}, env)
+    assert env.output[Loc("a")] == "one"
+    assert env.output[Loc("b")] == "two"
 
 
-def test_multi_output_runs_once(string_format_env, multi_nodes):
-    env = unittest.mock.Mock(wraps=string_format_env)
+def test_multi_output_runs_once(
+    env: StringFormatEnv, multi_nodes: Iterable[StringNode]
+):
+    env = unittest.mock.Mock(wraps=env)
     make({n.out: n for n in multi_nodes}, env)
     env.run_op.assert_called_once()
 
 
-def test_can_make_one_of_multi(string_format_env, multi_nodes):
+def test_can_make_one_of_multi(
+    env: StringFormatEnv, multi_nodes: Iterable[StringNode]
+):
     first, second = multi_nodes
-    make({first.out: first}, string_format_env)
-    assert first.out in string_format_env.output
-    assert second.out not in string_format_env.output
+    make({first.out: first}, env)
+    assert first.out in env.output
+    assert second.out not in env.output
