@@ -1,24 +1,23 @@
 from dataclasses import dataclass
-from typing import Iterator, Mapping, Sequence
+from typing import FrozenSet, Iterable, Iterator, Mapping, Sequence, FrozenSet
 import pytest
 from unittest.mock import Mock
+from boyleworkflow.nodes import create_simple_node, Node
 from boyleworkflow.scheduling import (
     GraphState,
     get_nodes_and_ancestors,
     get_root_nodes,
 )
-from boyleworkflow.calc import Loc
-from boyleworkflow.nodes import Node
 
 
 @pytest.fixture
 def root_node():
-    return Node({}, "op", "out")
+    return create_simple_node({}, "op", "out")
 
 
 @pytest.fixture
 def derived_node(root_node):
-    return Node({"inp": root_node}, "op", "out")
+    return create_simple_node({"inp": root_node}, "op", "out")
 
 
 NetworkSpec = Mapping[str, Sequence[str]]
@@ -27,11 +26,8 @@ NetworkSpec = Mapping[str, Sequence[str]]
 def build_node_network(parents_by_name: NetworkSpec) -> Mapping[str, Node]:
     nodes = {}
     for name, parent_names in parents_by_name.items():
-        nodes[name] = Node(
-            {parent_name: nodes[parent_name] for parent_name in parent_names},
-            f"op_{name}",
-            f"out_{name}",
-        )
+        parents = {n: nodes[n] for n in parent_names}
+        nodes[name] = create_simple_node(parents, f"op_{name}", f"out_{name}")
     return nodes
 
 

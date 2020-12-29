@@ -27,6 +27,7 @@ def get_root_nodes(*nodes: Node) -> FrozenSet[Node]:
         {n for n in get_nodes_and_ancestors(nodes) if not n.parents}
     )
 
+
 @dataclass
 class GraphState:
     all_nodes: FrozenSet[Node]

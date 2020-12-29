@@ -1,18 +1,26 @@
 from boyleworkflow.scheduling import GraphState
 from boyleworkflow.nodes import Node
-from typing import Iterable, Mapping
-from boyleworkflow.calc import Calc, Env, Loc, run
+from typing import Mapping
+from boyleworkflow.calc import Calc, Env, Loc, Result, run
+
+
+def _run_priority_work(state: GraphState, env: Env) -> Mapping[Node, Result]:
+    results = {}
+    node_bundles = {node.bundle for node in state.priority_work}
+    for bundle in node_bundles:
+        calc = Calc(
+            {loc: state.results[parent] for loc, parent in bundle.inp.items()},
+            bundle.op,
+            bundle.out,
+        )
+        calc_results = run(calc, env)
+        for node in bundle.nodes & state.priority_work:
+            results[node] = calc_results[node.out]
+    return results
 
 
 def _advance_state(state: GraphState, env: Env) -> GraphState:
-    results = {}
-    for node in state.priority_work:
-        calc = Calc(
-            {loc: state.results[parent] for loc, parent in node.inp.items()},
-            node.op,
-            [node.out],
-        )
-        results[node] = run(calc, env)[node.out]
+    results = _run_priority_work(state, env)
     return state.add_results(results).add_restorable(results)
 
 
