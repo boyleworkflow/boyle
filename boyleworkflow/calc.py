@@ -1,10 +1,8 @@
 from dataclasses import dataclass
-from typing import Collection, Hashable, Mapping, NewType, Protocol
+from typing import Collection, Generic, Hashable, Mapping, NewType, Protocol, TypeVar
 
 
-class Op(Hashable, Protocol):
-    ...
-
+Op = TypeVar("Op", bound=Hashable)
 
 Loc = NewType("Loc", str)
 Result = NewType("Result", str)
@@ -12,13 +10,13 @@ SandboxKey = NewType("SandboxKey", str)
 
 
 @dataclass
-class Calc:
+class Calc(Generic[Op]):
     inp: Mapping[Loc, Result]
     op: Op
     out: Collection[Loc]
 
 
-class Env(Protocol):
+class Env(Protocol[Op]):
     def run_op(self, op: Op, sandbox: SandboxKey):
         ...
 
@@ -38,7 +36,7 @@ class Env(Protocol):
         ...
 
 
-def run(calc: Calc, env: Env) -> Mapping[Loc, Result]:
+def run(calc: Calc[Op], env: Env[Op]) -> Mapping[Loc, Result]:
     sandbox = env.create_sandbox()
     try:
         for loc, digest in calc.inp.items():

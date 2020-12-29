@@ -3,6 +3,7 @@ from boyleworkflow.calc import Loc, Op
 from typing import (
     Collection,
     FrozenSet,
+    Generic,
     Mapping,
     Set,
     Union,
@@ -10,13 +11,13 @@ from typing import (
 
 
 @dataclass(frozen=True)
-class NodeBundle:
-    inp: Mapping[Loc, "Node"]
+class NodeBundle(Generic[Op]):
+    inp: Mapping[Loc, "Node[Op]"]
     op: Op
     out: FrozenSet[Loc]
 
     @property
-    def nodes(self) -> FrozenSet["Node"]:
+    def nodes(self: "NodeBundle[Op]") -> FrozenSet["Node[Op]"]:
         return frozenset({Node(self, loc) for loc in self.out})
 
     def __hash__(self):
@@ -24,12 +25,12 @@ class NodeBundle:
 
 
 @dataclass(frozen=True)
-class Node:
-    bundle: NodeBundle
+class Node(Generic[Op]):
+    bundle: NodeBundle[Op]
     out: Loc
 
     @property
-    def parents(self) -> FrozenSet["Node"]:
+    def parents(self) -> FrozenSet["Node[Op]"]:
         return frozenset(self.bundle.inp.values())
 
 
@@ -37,7 +38,7 @@ LocLike = Union[str, Loc]
 NodeInpLike = Mapping[LocLike, Node]
 
 
-def create_simple_node(inp: NodeInpLike, op: Op, out: LocLike) -> Node:
+def create_simple_node(inp: NodeInpLike, op: Op, out: LocLike) -> Node[Op]:
     out = Loc(out)
     node = NodeBundle({Loc(k): v for k, v in inp.items()}, op, frozenset([out]))
     return Node(node, out)
@@ -45,7 +46,7 @@ def create_simple_node(inp: NodeInpLike, op: Op, out: LocLike) -> Node:
 
 def create_sibling_nodes(
     inp: NodeInpLike, op: Op, out: Collection[LocLike]
-) -> Set[Node]:
+) -> Set[Node[Op]]:
     out_locs = frozenset(map(Loc, out))
     node = NodeBundle({Loc(k): v for k, v in inp.items()}, op, out_locs)
     return {Node(node, loc) for loc in out_locs}
