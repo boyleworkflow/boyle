@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass
 from boyleworkflow.calc import Loc, Op
 from typing import (
@@ -12,12 +13,12 @@ from typing import (
 
 @dataclass(frozen=True)
 class NodeBundle(Generic[Op]):
-    inp: Mapping[Loc, "Node[Op]"]
+    inp: Mapping[Loc, Node[Op]]
     op: Op
     out: FrozenSet[Loc]
 
     @property
-    def nodes(self: "NodeBundle[Op]") -> FrozenSet["Node[Op]"]:
+    def nodes(self: NodeBundle[Op]) -> FrozenSet[Node[Op]]:
         return frozenset({Node(self, loc) for loc in self.out})
 
     def __hash__(self):
@@ -30,7 +31,7 @@ class Node(Generic[Op]):
     out: Loc
 
     @property
-    def parents(self) -> FrozenSet["Node[Op]"]:
+    def parents(self) -> FrozenSet[Node[Op]]:
         return frozenset(self.bundle.inp.values())
 
 

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass
 from typing import FrozenSet
 import pytest
@@ -6,7 +7,7 @@ from boyleworkflow.scheduling import get_nodes_and_ancestors, get_root_nodes
 
 @dataclass(frozen=True)
 class Node:
-    parents: FrozenSet["Node"]
+    parents: FrozenSet[Node]
 
     @classmethod
     def from_parents(cls, parents):
