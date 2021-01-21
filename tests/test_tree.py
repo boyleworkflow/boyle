@@ -1,22 +1,8 @@
-from typing import Mapping, Union
 import pytest
 from boyleworkflow.tree import Tree, Leaf, TreeCollision, Path, Name
-
-StrTreeItem = Union["StrTree", str]
-StrTree = Mapping[str, StrTreeItem]
+from tests.util import tree_from_dict
 
 EMPTY_PATH_STR = "."
-
-
-def _create_tree_item(value: StrTreeItem):
-    if isinstance(value, str):
-        return Leaf(value)
-    else:
-        return tree_from_dict(value)
-
-
-def tree_from_dict(d: StrTree) -> Tree:
-    return Tree({Name(k): _create_tree_item(v) for k, v in d.items()})
 
 
 def test_name_cannot_be_empty():
