@@ -76,8 +76,9 @@ class Tree:
 
     @classmethod
     def from_nested_items(cls, d: Mapping[Path, TreeItem]) -> Tree:
+        empty_tree = Tree({})
         trees = (Tree._from_nested_item(path, item) for path, item in d.items())
-        return reduce(Tree.merge, trees)
+        return reduce(Tree.merge, trees, empty_tree)
 
     def _walk_prefixed(self, prefix: Path) -> Iterable[Tuple[Path, TreeItem]]:
         for k, v in self.children.items():

@@ -90,6 +90,12 @@ def test_from_nested_item():
     assert result == expected_result
 
 
+def test_from_nested_item():
+    empty_tree = Tree({})
+    result = Tree.from_nested_items({})
+    assert result == empty_tree
+
+
 def test_tree_pick():
     tree = tree_from_dict({"a": {"b": "x"}})
     path = Path.from_string("a/b")
