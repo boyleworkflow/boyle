@@ -1,26 +1,30 @@
 from boyleworkflow.scheduling import GraphState
 from boyleworkflow.nodes import Node
 from typing import Mapping
-from boyleworkflow.calc import Calc, Env, Loc, Result, run
+from boyleworkflow.calc import Calc, Env, run
+from boyleworkflow.tree import Path, Tree, TreeItem
 
 
-# TODO: await resolution of https://github.com/microsoft/pyright/issues/1326
+# TODO: await resolution of https://github.com/microsoft/pyright/issues/1330
 
 
 def _run_priority_work(
     state: GraphState[Node], env: Env
-) -> Mapping[Node, Result]:
+) -> Mapping[Node, TreeItem]:
     results = {}
     node_bundles = {node.bundle for node in state.priority_work}
     for bundle in node_bundles:
+        calc_input = Tree.from_nested_items(
+            {path: state.results[parent] for path, parent in bundle.inp.items()}
+        )
         calc = Calc(
-            {loc: state.results[parent] for loc, parent in bundle.inp.items()},
+            calc_input,
             bundle.op,
             bundle.out,
         )
         calc_results = run(calc, env)
         for node in bundle.nodes & state.priority_work:
-            results[node] = calc_results[node.out]
+            results[node] = calc_results.pick(node.out)
     return results
 
 
@@ -29,9 +33,11 @@ def _advance_state(state: GraphState[Node], env: Env) -> GraphState[Node]:
     return state.add_results(results).add_restorable(results)
 
 
-def make(requested: Mapping[Loc, Node], env: Env):
+def make(requested: Mapping[Path, Node], env: Env):
     state = GraphState.from_requested(requested.values())
     while state.priority_work:
         state = _advance_state(state, env)
-    for loc, node in requested.items():
-        env.deliver(loc, state.results[node])
+    result_tree = Tree.from_nested_items(
+        {path: state.results[node] for path, node in requested.items()}
+    )
+    env.deliver(result_tree)

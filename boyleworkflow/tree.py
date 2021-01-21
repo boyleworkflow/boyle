@@ -30,7 +30,7 @@ class Path:
             value = value[:-1]
         path_segments = (v for v in value.split(_SEPARATOR) if v != _DOT)
         return Path(tuple(map(Name, path_segments)))
-    
+
     def to_string(self) -> str:
         if self.names:
             return _SEPARATOR.join((n.value for n in self.names))
@@ -45,7 +45,7 @@ class Path:
         return Path(self.names[:-1])
 
 
-@dataclass
+@dataclass(frozen=True)
 class Leaf:
     data: str
 

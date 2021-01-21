@@ -1,17 +1,18 @@
-from boyleworkflow.calc import Env, Loc, Op, Result, SandboxKey
+from boyleworkflow.tree import Leaf, Path, Tree
+from boyleworkflow.calc import SandboxKey
 from dataclasses import dataclass, field
-from typing import Iterable, MutableMapping, Tuple
+from typing import Dict, Iterable, MutableMapping, Tuple
 import pytest
 import unittest.mock
 from boyleworkflow.make import make
 from boyleworkflow.nodes import Node, create_simple_node, create_sibling_nodes
 
-StringFormatOp = Tuple[Tuple[Loc, str], ...]
+StringFormatOp = Tuple[Tuple[Path, str], ...]
 StringNode = Node
 
 
 def make_op(**definitions: str) -> StringFormatOp:
-    return tuple((Loc(k), v) for k, v in definitions.items())
+    return tuple((Path.from_string(k), v) for k, v in definitions.items())
 
 
 @pytest.fixture
@@ -27,16 +28,16 @@ def hello_world_node(hello_node: StringNode):
 
 
 @pytest.fixture
-def multi_nodes():
+def sibling_nodes():
     return create_sibling_nodes({}, make_op(a="one", b="two"), ["a", "b"])
 
 
 @dataclass
 class StringFormatEnv:
-    output: MutableMapping[Loc, str] = field(default_factory=dict)
+    output: MutableMapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self):
-        self._sandboxes = {}
+        self._sandboxes: Dict[SandboxKey, Dict[str, str]] = {}
         self._storage = {}
 
     def create_sandbox(self):
@@ -50,22 +51,28 @@ class StringFormatEnv:
     def run_op(self, op: StringFormatOp, sandbox_key: SandboxKey):
         sandbox = self._sandboxes[sandbox_key]
         results = {
-            out_loc: template.format(**sandbox) for out_loc, template in op
+            path.to_string(): template.format(**sandbox)
+            for path, template in op
         }
         sandbox.update(results)
 
-    def stow(self, sandbox_key: SandboxKey, loc: Loc):
+    def stow(self, sandbox_key: SandboxKey, path: Path):
         sandbox = self._sandboxes[sandbox_key]
-        value = sandbox[loc]
-        digest = Result(f"digest:{value}")
-        self._storage[digest] = value
-        return digest
+        value = sandbox[path.to_string()]
+        leaf = Leaf(f"leaf:{value}")
+        self._storage[leaf] = value
+        return leaf
 
-    def place(self, sandbox_key: SandboxKey, loc: Loc, digest: Result):
-        self._sandboxes[sandbox_key][loc] = self._storage[digest]
+    def _place_into(self, tree: Tree, destination: MutableMapping[str, str]):
+        for path, item in tree.walk():
+            if isinstance(item, Leaf):
+                destination[path.to_string()] = self._storage[item]
 
-    def deliver(self, loc: Loc, digest: Result):
-        self.output[loc] = self._storage[digest]
+    def place(self, sandbox_key: SandboxKey, tree: Tree):
+        self._place_into(tree, self._sandboxes[sandbox_key])
+
+    def deliver(self, tree: Tree):
+        self._place_into(tree, self.output)
 
 
 @pytest.fixture
@@ -74,33 +81,32 @@ def env():
 
 
 def test_make_hello(env: StringFormatEnv, hello_node: StringNode):
-    make({Loc("hello"): hello_node}, env)
-    assert env.output[Loc("hello")] == "Hello"
+    make({Path.from_string("hello"): hello_node}, env)
+    assert env.output["hello"] == "Hello"
 
 
 def test_make_hello_world(env: StringFormatEnv, hello_world_node: StringNode):
-    make({Loc("hello_world"): hello_world_node}, env)
-    assert env.output[Loc("hello_world")] == "Hello World"
+    make({Path.from_string("hello_world"): hello_world_node}, env)
+    assert env.output["hello_world"] == "Hello World"
 
 
-def test_multi_output(env: StringFormatEnv, multi_nodes: Iterable[StringNode]):
-    make({n.out: n for n in multi_nodes}, env)
-    assert env.output[Loc("a")] == "one"
-    assert env.output[Loc("b")] == "two"
+def test_multi_output(env: StringFormatEnv, sibling_nodes: Iterable[StringNode]):
+    make({n.out: n for n in sibling_nodes}, env)
+    assert env.output["a"] == "one"
+    assert env.output["b"] == "two"
 
 
 def test_multi_output_runs_once(
-    env: StringFormatEnv, multi_nodes: Iterable[StringNode]
+    env: StringFormatEnv, sibling_nodes: Iterable[StringNode]
 ):
     env = unittest.mock.Mock(wraps=env)
-    make({n.out: n for n in multi_nodes}, env)
-    env.run_op.assert_called_once()
+    make({n.out: n for n in sibling_nodes}, env)
+    env.run_op.assert_called_once()  # type: ignore
 
 
-def test_can_make_one_of_multi(
-    env: StringFormatEnv, multi_nodes: Iterable[StringNode]
+def test_can_make_one_of_siblings(
+    env: StringFormatEnv, sibling_nodes: Iterable[StringNode]
 ):
-    first, second = multi_nodes
+    first, _ = sibling_nodes
     make({first.out: first}, env)
-    assert first.out in env.output
-    assert second.out not in env.output
+    assert env.output.keys() == {first.out.to_string()}

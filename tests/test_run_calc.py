@@ -1,17 +1,19 @@
+from boyleworkflow.tree import Leaf, Tree
 import pytest
 from pytest import fixture
 from unittest.mock import Mock, call
-from boyleworkflow.calc import run, Calc, Loc, Result
+from boyleworkflow.calc import run, Calc, Path
+from tests.util import tree_from_dict
 
 
 @fixture
 def calc():
     return Calc(
-        {Loc(name): Result(f"result:{name}") for name in ["i1", "i2", "i3"]},
+        tree_from_dict({name: f"result:{name}" for name in ["i1", "i2", "i3"]}),
         Mock(),
         [
-            Loc("o1"),
-            Loc("o2"),
+            Path.from_string("o1"),
+            Path.from_string("o2"),
         ],
     )
 
@@ -33,10 +35,7 @@ def test_places_inputs_in_sandbox(calc):
     env = Mock()
     sandbox = env.create_sandbox()
     run(calc, env)
-    expected_calls = [
-        call(sandbox, loc, digest) for loc, digest in calc.inp.items()
-    ]
-    assert expected_calls == env.place.call_args_list
+    env.place.assert_called_once_with(sandbox, calc.inp)
 
 
 def test_destroys_sandbox_after_finishing(calc):
@@ -56,16 +55,16 @@ def test_destroys_sandbox_after_failed_run(calc):
     env.destroy_sandbox.assert_called_once_with(sandbox)
 
 
-def test_stows_results(calc):
+def test_asks_env_to_stow_out_paths(calc):
     env = Mock()
     sandbox = env.create_sandbox()
     run(calc, env)
-    expected_calls = [call(sandbox, loc) for loc in calc.out]
-    assert expected_calls == env.stow.call_args_list
+    assert env.stow.call_args_list == [call(sandbox, path) for path in calc.out]
 
 
-def test_returns_digests(calc):
-    expected_results = {loc: f"digest:{loc}" for loc in calc.out}
-    env = Mock(stow=lambda sandbox, loc: expected_results[loc])
-    results = run(calc, env)
-    assert results == expected_results
+def test_returns_tree_representing_results(calc):
+    calc_results = {path: Leaf(f"digest:{path}") for path in calc.out}
+    expected_result_tree = Tree.from_nested_items(calc_results)
+    env = Mock(stow=lambda sandbox, path: calc_results[path])
+    result_tree = run(calc, env)
+    assert result_tree == expected_result_tree

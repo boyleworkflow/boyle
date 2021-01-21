@@ -1,18 +1,17 @@
 from dataclasses import dataclass
-from typing import Any, Collection, Mapping, NewType, Protocol
+from typing import Any, Collection, NewType, Protocol
+from boyleworkflow.tree import Leaf, Path, Tree
 
 
 Op = Any  # TODO replace this with something more specific
-Loc = NewType("Loc", str)
-Result = NewType("Result", str)
 SandboxKey = NewType("SandboxKey", str)
 
 
 @dataclass
 class Calc:
-    inp: Mapping[Loc, Result]
+    inp: Tree
     op: Op
-    out: Collection[Loc]
+    out: Collection[Path]
 
 
 class Env(Protocol):
@@ -25,23 +24,22 @@ class Env(Protocol):
     def destroy_sandbox(self, sandbox: SandboxKey):
         ...
 
-    def place(self, sandbox: SandboxKey, loc: Loc, digest: Result):
+    def place(self, sandbox: SandboxKey, tree: Tree):
         ...
 
-    def stow(self, sandbox: SandboxKey, loc: Loc) -> Result:
+    def stow(self, sandbox: SandboxKey, path: Path) -> Leaf:
         ...
 
-    def deliver(self, loc: Loc, digest: Result):
+    def deliver(self, tree: Tree):
         ...
 
 
-def run(calc: Calc, env: Env) -> Mapping[Loc, Result]:
+def run(calc: Calc, env: Env) -> Tree:
     sandbox = env.create_sandbox()
     try:
-        for loc, digest in calc.inp.items():
-            env.place(sandbox, loc, digest)
+        env.place(sandbox, calc.inp)
         env.run_op(calc.op, sandbox)
-        results = {loc: env.stow(sandbox, loc) for loc in calc.out}
-        return results
+        results = {path: env.stow(sandbox, path) for path in calc.out}
+        return Tree.from_nested_items(results)
     finally:
         env.destroy_sandbox(sandbox)
