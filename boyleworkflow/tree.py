@@ -13,17 +13,6 @@ _FORBIDDEN_NAMES = ["", _DOT, _DOUBLE_DOT]
 class Name:
     value: str
 
-    @classmethod
-    def from_string(cls, value: str) -> Name:
-        return Name(value)
-
-    @classmethod
-    def from_name_like(cls, value: NameLike) -> Name:
-        if isinstance(value, Name):
-            return value
-        else:
-            return Name(value)
-
     def __post_init__(self):
         if self.value in _FORBIDDEN_NAMES:
             raise ValueError(f"invalid Name: {repr(self.value)}")
@@ -40,14 +29,7 @@ class Path:
         if value.endswith(_SEPARATOR):
             value = value[:-1]
         path_segments = (v for v in value.split(_SEPARATOR) if v != _DOT)
-        return Path(tuple(map(Name.from_string, path_segments)))
-
-    @classmethod
-    def from_path_like(cls, value: PathLike) -> Path:
-        if isinstance(value, Path):
-            return value
-        else:
-            return Path.from_string(value)
+        return Path(tuple(map(Name, path_segments)))
 
     def __truediv__(self, name: Name) -> Path:
         return Path(self.names + (name,))
@@ -55,10 +37,6 @@ class Path:
     @property
     def parent(self):
         return Path(self.names[:-1])
-
-
-PathLike = Union[Path, str]
-NameLike = Union[Name, str]
 
 
 @dataclass
@@ -74,33 +52,20 @@ class TreeCollision(ValueError):
 class Tree:
     children: Mapping[Name, TreeItem]
 
-    def __getitem__(self, key: NameLike) -> TreeItem:
-        return self.children[Name.from_name_like(key)]
+    def __getitem__(self, key: Name) -> TreeItem:
+        return self.children[key]
 
     @classmethod
-    def from_dict(cls, d: Mapping[NameLike, TreeItemLike]) -> Tree:
-        return Tree(
-            {
-                Name.from_name_like(name): to_tree_item(value)
-                for name, value in d.items()
-            }
-        )
-
-    @classmethod
-    def _from_nested_item(cls, path: Path, value: TreeItemLike) -> Tree:
+    def _from_nested_item(cls, path: Path, item: TreeItem) -> Tree:
         reversed_names = reversed(path.names)
-        content = to_tree_item(value)
-        tree = Tree({next(reversed_names): content})
+        tree = Tree({next(reversed_names): item})
         for name in reversed_names:
             tree = Tree({name: tree})
         return tree
 
     @classmethod
-    def from_nested_items(cls, d: Mapping[PathLike, TreeItemLike]) -> Tree:
-        trees = (
-            Tree._from_nested_item(Path.from_path_like(path_like), value)
-            for path_like, value in d.items()
-        )
+    def from_nested_items(cls, d: Mapping[Path, TreeItem]) -> Tree:
+        trees = (Tree._from_nested_item(path, item) for path, item in d.items())
         return reduce(Tree.merge, trees)
 
     def _walk_prefixed(self, prefix: Path) -> Iterable[Tuple[Path, TreeItem]]:
@@ -132,15 +97,3 @@ class Tree:
 
 
 TreeItem = Union[Tree, Leaf]
-LeafLike = Union[Leaf, str]
-TreeLike = Union[Tree, Mapping[NameLike, Union["TreeLike", LeafLike]]]
-TreeItemLike = Union[TreeLike, LeafLike]
-
-
-def to_tree_item(value: TreeItemLike) -> TreeItem:
-    if isinstance(value, (Tree, Leaf)):
-        return value
-    elif isinstance(value, str):
-        return Leaf(value)
-    else:
-        return Tree.from_dict(value)

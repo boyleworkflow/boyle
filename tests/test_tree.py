@@ -1,5 +1,20 @@
+from typing import Mapping, Union
 import pytest
 from boyleworkflow.tree import Tree, Leaf, TreeCollision, Path, Name
+
+StrTreeItem = Union["StrTree", str]
+StrTree = Mapping[str, StrTreeItem]
+
+
+def _create_tree_item(value: StrTreeItem):
+    if isinstance(value, str):
+        return Leaf(value)
+    else:
+        return tree_from_dict(value)
+
+
+def tree_from_dict(d: StrTree) -> Tree:
+    return Tree({Name(k): _create_tree_item(v) for k, v in d.items()})
 
 
 def test_name_cannot_be_empty():
@@ -61,14 +76,10 @@ def test_path_cannot_have_double_slash():
         Path.from_string("a//b")
 
 
-def test_empty_tree():
-    expected = Tree.from_dict({})
-    assert Tree({}) == expected
-
-
 def test_from_nested_item():
-    expected = Tree.from_dict(
-        {  # type: ignore # TODO await resolution of this type problem
+    result = Tree.from_nested_items({Path.from_string("a/b/c"): Leaf("x")})
+    expected_result = tree_from_dict(
+        {
             "a": {
                 "b": {
                     "c": "x",
@@ -76,23 +87,23 @@ def test_from_nested_item():
             }
         }
     )
-    assert Tree.from_nested_items({"a/b/c": "x"}) == expected
+    assert result == expected_result
 
 
 def test_merge_disjoint():
-    tree_1 = Tree.from_dict(
+    tree_1 = tree_from_dict(
         {
             "a": {
                 "b": "x",
             }
         }
     )
-    tree_2 = Tree.from_dict(
+    tree_2 = tree_from_dict(
         {
             "c": "y",
         }
     )
-    combined = Tree.from_dict(
+    combined = tree_from_dict(
         {
             "a": {
                 "b": "x",
@@ -105,9 +116,21 @@ def test_merge_disjoint():
 
 
 def test_merge_inside():
-    tree_1 = Tree.from_nested_items({"a/b1": "x"})
-    tree_2 = Tree.from_nested_items({"a/b2": "x"})
-    combined = Tree.from_dict(
+    tree_1 = tree_from_dict(
+        {
+            "a": {
+                "b1": "x",
+            }
+        }
+    )
+    tree_2 = tree_from_dict(
+        {
+            "a": {
+                "b2": "x",
+            }
+        }
+    )
+    combined = tree_from_dict(
         {
             "a": {
                 "b1": "x",
@@ -120,51 +143,51 @@ def test_merge_inside():
 
 
 def test_merge_collision_leaf_leaf():
-    tree_1 = Tree.from_dict({"a": Leaf("x")})
-    tree_2 = Tree.from_dict({"a": Leaf("y")})
+    tree_1 = tree_from_dict({"a": "x"})
+    tree_2 = tree_from_dict({"a": "y"})
     with pytest.raises(TreeCollision):
         tree_1.merge(tree_2)
 
 
 def test_merge_collision_leaf_subtree():
-    tree_1 = Tree.from_dict({"a": Leaf("x")})
-    tree_2 = Tree.from_dict({"a": {}})
+    tree_1 = tree_from_dict({"a": "x"})
+    tree_2 = tree_from_dict({"a": {}})
     with pytest.raises(TreeCollision):
         tree_1.merge(tree_2)
 
 
 def test_merge_collision_nested():
-    tree_1 = Tree.from_nested_items({"a/b": "x"})
-    tree_2 = Tree.from_nested_items({"a/b": "y"})
+    tree_1 = tree_from_dict({"a": {"b": "x"}})
+    tree_2 = tree_from_dict({"a": {"b": "y"}})
     with pytest.raises(TreeCollision):
         tree_1.merge(tree_2)
 
 
 def test_merge_identical_leaf_no_collision():
-    tree_1 = Tree.from_dict({"a": "x"})
-    tree_2 = Tree.from_dict({"a": "x"})
+    tree_1 = tree_from_dict({"a": "x"})
+    tree_2 = tree_from_dict({"a": "x"})
     merged = tree_1.merge(tree_2)
     assert merged == tree_1
     assert merged == tree_2
 
 
 def test_merge_identical_tree_no_collision():
-    tree_1 = Tree.from_nested_items({"a/b": "x"})
-    tree_2 = Tree.from_nested_items({"a/b": "x"})
+    tree_1 = tree_from_dict({"a": {"b": "x"}})
+    tree_2 = tree_from_dict({"a": {"b": "x"}})
     merged = tree_1.merge(tree_2)
     assert merged == tree_1
     assert merged == tree_2
 
 
 def test_walk():
-    tree = Tree.from_nested_items(
+    tree = tree_from_dict(
         {
-            "a/b": "x",
+            "a": {"b": "x"},
             "c": "y",
         }
     )
     items = {
-        Path.from_string("a"): tree["a"],
+        Path.from_string("a"): tree[Name("a")],
         Path.from_string("a/b"): Leaf("x"),
         Path.from_string("c"): Leaf("y"),
     }
