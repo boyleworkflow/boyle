@@ -1,13 +1,13 @@
-from boyleworkflow.calc import Env, Loc, Result, SandboxKey
+from boyleworkflow.calc import Env, Loc, Op, Result, SandboxKey
 from dataclasses import dataclass, field
-from typing import Collection, Iterable, MutableMapping, Tuple
+from typing import Iterable, MutableMapping, Tuple
 import pytest
 import unittest.mock
 from boyleworkflow.make import make
 from boyleworkflow.nodes import Node, create_simple_node, create_sibling_nodes
 
-StringFormatOp = Collection[Tuple[Loc, str]]
-StringNode = Node[StringFormatOp]
+StringFormatOp = Tuple[Tuple[Loc, str], ...]
+StringNode = Node
 
 
 def make_op(**definitions: str) -> StringFormatOp:
