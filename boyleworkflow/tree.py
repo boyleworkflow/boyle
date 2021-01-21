@@ -55,6 +55,17 @@ class Tree:
     def __getitem__(self, key: Name) -> TreeItem:
         return self.children[key]
 
+    def pick(self, path: Path) -> TreeItem:
+        result = self
+        for name in path.names:
+            if isinstance(result, Leaf):
+                raise ValueError(f"{path} too long ({name} is a leaf)")
+            try:
+                result = result[name]
+            except KeyError:
+                raise ValueError(f"no item {name} found")
+        return result
+
     @classmethod
     def _from_nested_item(cls, path: Path, item: TreeItem) -> Tree:
         reversed_names = reversed(path.names)

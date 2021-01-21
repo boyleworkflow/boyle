@@ -90,6 +90,32 @@ def test_from_nested_item():
     assert result == expected_result
 
 
+def test_tree_pick():
+    tree = tree_from_dict({"a": {"b": "x"}})
+    path = Path.from_string("a/b")
+    assert tree.pick(path) == Leaf("x")
+
+
+def test_tree_pick_empty_path():
+    tree = tree_from_dict({"a": {"b": "x"}})
+    path = Path.from_string(".")
+    assert tree.pick(path) == tree
+
+
+def test_tree_no_picking_too_deep():
+    tree = tree_from_dict({"a": {"b": "x"}})
+    path = Path.from_string("a/b/x/z")
+    with pytest.raises(ValueError):
+        tree.pick(path)
+
+
+def test_tree_no_picking_unavailable():
+    tree = tree_from_dict({"a": {"b": "x"}})
+    path = Path.from_string("a/c")
+    with pytest.raises(ValueError):
+        tree.pick(path)
+
+
 def test_merge_disjoint():
     tree_1 = tree_from_dict(
         {
