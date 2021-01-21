@@ -9,7 +9,7 @@ _DOUBLE_DOT = ".."
 _FORBIDDEN_NAMES = ["", _DOT, _DOUBLE_DOT]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, order=True)
 class Name:
     value: str
 
@@ -20,7 +20,7 @@ class Name:
             raise ValueError(f"invalid Name with separator: {self.value}")
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, order=True)
 class Path:
     names: Tuple[Name, ...] = ()
 
