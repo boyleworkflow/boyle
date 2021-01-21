@@ -5,6 +5,8 @@ from boyleworkflow.tree import Tree, Leaf, TreeCollision, Path, Name
 StrTreeItem = Union["StrTree", str]
 StrTree = Mapping[str, StrTreeItem]
 
+EMPTY_PATH_STR = "."
+
 
 def _create_tree_item(value: StrTreeItem):
     if isinstance(value, str):
@@ -37,6 +39,15 @@ def test_path_from_string():
     assert path.names == (Name("a"), Name("b"))
 
 
+def test_path_to_string():
+    path_str = "a/b"
+    assert Path.from_string(path_str).to_string() == path_str
+
+
+def test_empty_path_to_string():
+    assert Path().to_string() == EMPTY_PATH_STR
+
+
 def test_path_must_be_relative():
     with pytest.raises(ValueError):
         Path.from_string("/a")
@@ -47,7 +58,7 @@ def test_empty_path_has_no_names():
 
 
 def test_empty_path_from_string():
-    assert Path() == Path.from_string(".")
+    assert Path() == Path.from_string(EMPTY_PATH_STR)
 
 
 def test_no_path_from_empty_string():

@@ -30,6 +30,12 @@ class Path:
             value = value[:-1]
         path_segments = (v for v in value.split(_SEPARATOR) if v != _DOT)
         return Path(tuple(map(Name, path_segments)))
+    
+    def to_string(self) -> str:
+        if self.names:
+            return _SEPARATOR.join((n.value for n in self.names))
+        else:
+            return _DOT
 
     def __truediv__(self, name: Name) -> Path:
         return Path(self.names + (name,))
