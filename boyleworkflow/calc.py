@@ -1,5 +1,6 @@
+from __future__ import annotations
 from dataclasses import dataclass
-from typing import Any, Collection, NewType, Protocol
+from typing import Any, FrozenSet, Mapping, NewType, Protocol
 from boyleworkflow.tree import Path, Tree, TreeItem
 
 
@@ -7,11 +8,18 @@ Op = Any  # TODO replace this with something more specific
 SandboxKey = NewType("SandboxKey", str)
 
 
-@dataclass
+@dataclass(frozen=True)
+class CalcBundle:
+    inp: Tree
+    op: Op
+    out: FrozenSet[Path]
+
+
+@dataclass(frozen=True)
 class Calc:
     inp: Tree
     op: Op
-    out: Collection[Path]
+    out: Path
 
 
 class Env(Protocol):
@@ -34,12 +42,11 @@ class Env(Protocol):
         ...
 
 
-def run(calc: Calc, env: Env) -> Tree:
+def run(calc_bundle: CalcBundle, env: Env) -> Mapping[Path, TreeItem]:
     sandbox = env.create_sandbox()
     try:
-        env.place(sandbox, calc.inp)
-        env.run_op(calc.op, sandbox)
-        results = {path: env.stow(sandbox, path) for path in calc.out}
-        return Tree.from_nested_items(results)
+        env.place(sandbox, calc_bundle.inp)
+        env.run_op(calc_bundle.op, sandbox)
+        return {path: env.stow(sandbox, path) for path in calc_bundle.out}
     finally:
         env.destroy_sandbox(sandbox)
