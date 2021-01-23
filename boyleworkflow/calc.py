@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import Any, Collection, NewType, Protocol
-from boyleworkflow.tree import Leaf, Path, Tree
+from boyleworkflow.tree import Path, Tree, TreeItem
 
 
 Op = Any  # TODO replace this with something more specific
@@ -27,7 +27,7 @@ class Env(Protocol):
     def place(self, sandbox: SandboxKey, tree: Tree):
         ...
 
-    def stow(self, sandbox: SandboxKey, path: Path) -> Leaf:
+    def stow(self, sandbox: SandboxKey, path: Path) -> TreeItem:
         ...
 
     def deliver(self, tree: Tree):
