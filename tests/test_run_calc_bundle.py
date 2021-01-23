@@ -20,56 +20,56 @@ def calc_bundle():
     )
 
 
-def test_creates_exactly_one_sandbox(calc_bundle):
+def test_creates_exactly_one_sandbox(calc_bundle: CalcBundle):
     env = Mock()
     run(calc_bundle, env)
-    env.create_sandbox.assert_called_once()
+    env.create_sandbox.assert_called_once()  # type: ignore
 
 
-def test_runs_op_in_sandbox(calc_bundle):
+def test_runs_op_in_sandbox(calc_bundle: CalcBundle):
     env = Mock()
-    sandbox = env.create_sandbox()
+    sandbox = env.create_sandbox()  # type: ignore
     run(calc_bundle, env)
-    env.run_op.assert_called_with(calc_bundle.op, sandbox)
+    env.run_op.assert_called_with(calc_bundle.op, sandbox)  # type: ignore
 
 
-def test_places_inputs_in_sandbox(calc_bundle):
+def test_places_inputs_in_sandbox(calc_bundle: CalcBundle):
     env = Mock()
-    sandbox = env.create_sandbox()
+    sandbox = env.create_sandbox()  # type: ignore
     run(calc_bundle, env)
-    env.place.assert_called_once_with(sandbox, calc_bundle.inp)
+    env.place.assert_called_once_with(sandbox, calc_bundle.inp)  # type: ignore
 
 
-def test_destroys_sandbox_after_finishing(calc_bundle):
+def test_destroys_sandbox_after_finishing(calc_bundle: CalcBundle):
     env = Mock()
-    sandbox = env.create_sandbox()
+    sandbox = env.create_sandbox()  # type: ignore
     run(calc_bundle, env)
-    env.destroy_sandbox.assert_called_once_with(sandbox)
+    env.destroy_sandbox.assert_called_once_with(sandbox)  # type: ignore
 
 
-def test_destroys_sandbox_after_failed_run(calc_bundle):
+def test_destroys_sandbox_after_failed_run(calc_bundle: CalcBundle):
     env = Mock(
         run_op=Mock(side_effect=Exception()),
     )
-    sandbox = env.create_sandbox()
+    sandbox = env.create_sandbox()  # type: ignore
     with pytest.raises(Exception):
         run(calc_bundle, env)
-    env.destroy_sandbox.assert_called_once_with(sandbox)
+    env.destroy_sandbox.assert_called_once_with(sandbox)  # type: ignore
 
 
-def test_asks_env_to_stow_out_paths(calc_bundle):
+def test_asks_env_to_stow_out_paths(calc_bundle: CalcBundle):
     env = Mock()
-    sandbox = env.create_sandbox()
+    sandbox = env.create_sandbox()  # type: ignore
     run(calc_bundle, env)
-    assert env.stow.call_args_list == [
-        call(sandbox, path) for path in calc_bundle.out
+    assert env.stow.call_args_list == [  # type:ignore
+        call(sandbox, path) for path in calc_bundle.out  # type:ignore
     ]
 
 
-def test_returns_mapping_with_results(calc_bundle):
+def test_returns_mapping_with_results(calc_bundle: CalcBundle):
     expected_results = {
         path: Leaf(f"digest:{path}") for path in calc_bundle.out
     }
-    env = Mock(stow=lambda sandbox, path: expected_results[path])
+    env = Mock(stow=lambda sandbox, path: expected_results[path])  # type: ignore
     results = run(calc_bundle, env)
     assert results == expected_results

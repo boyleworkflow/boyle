@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import FrozenSet, Iterable, Iterator, Mapping, Sequence, FrozenSet
+from typing import Iterator, Mapping, Sequence
 import pytest
 from unittest.mock import Mock
 from boyleworkflow.nodes import create_simple_node, Node
@@ -16,7 +16,7 @@ def root_node():
 
 
 @pytest.fixture
-def derived_node(root_node):
+def derived_node(root_node: Node):
     return create_simple_node({"inp": root_node}, "op", "out")
 
 
@@ -163,21 +163,21 @@ def test_init_state(root_node: Node):
     assert state.priority_work == root_nodes
 
 
-def test_can_add_results(root_node):
+def test_can_add_results(root_node: Node):
     state = GraphState.from_requested([root_node])
     results = {root_node: Mock()}
     updated = state.add_results(results)
     assert updated.results == results
 
 
-def test_can_add_same_results_twice(root_node):
+def test_can_add_same_results_twice(root_node: Node):
     state = GraphState.from_requested([root_node])
     results = {root_node: Mock()}
     updated = state.add_results(results).add_results(results)
     assert updated.results == results
 
 
-def test_cannot_add_conflicting_results(root_node):
+def test_cannot_add_conflicting_results(root_node: Node):
     state = GraphState.from_requested([root_node])
     results1 = {root_node: Mock()}
     results2 = {root_node: Mock()}
@@ -186,7 +186,7 @@ def test_cannot_add_conflicting_results(root_node):
         updated.add_results(results2)
 
 
-def test_only_allow_add_result_if_parents_known(derived_node):
+def test_only_allow_add_result_if_parents_known(derived_node: Node):
     state = GraphState.from_requested([derived_node])
     assert derived_node not in state.parents_known
     results = {derived_node: Mock()}
@@ -194,25 +194,27 @@ def test_only_allow_add_result_if_parents_known(derived_node):
         state.add_results(results)
 
 
-def test_can_add_restorable(root_node):
+def test_can_add_restorable(root_node: Node):
     state = GraphState.from_requested([root_node])
     results = {root_node: Mock()}
     updated = state.add_results(results).add_restorable({root_node})
     assert set(updated.restorable) == {root_node}
 
 
-def test_only_add_restorable_if_known(root_node):
+def test_only_add_restorable_if_known(root_node: Node):
     state = GraphState.from_requested([root_node])
     with pytest.raises(ValueError):
         state.add_restorable({root_node})
 
 
-def test_invariants_on_init(root_node):
+def test_invariants_on_init(root_node: Node):
     state = GraphState.from_requested([root_node])
     assert not get_failed_invariants(state)
 
 
-def test_invariants_along_simple_modifications(root_node, derived_node):
+def test_invariants_along_simple_modifications(
+    root_node: Node, derived_node: Node
+):
     state = GraphState.from_requested([derived_node])
     assert not get_failed_invariants(state)
     results = {root_node: Mock()}
@@ -222,7 +224,7 @@ def test_invariants_along_simple_modifications(root_node, derived_node):
     assert not get_failed_invariants(with_parent_restorable)
 
 
-@pytest.mark.parametrize("network_spec", simple_networks)
+@pytest.mark.parametrize("network_spec", simple_networks)  # type: ignore
 def test_priority_work_leads_to_finish(network_spec: RequestAndStatesSpec):
     state = GraphState.from_requested(network_spec.requested_nodes)
 
@@ -235,7 +237,7 @@ def test_priority_work_leads_to_finish(network_spec: RequestAndStatesSpec):
     assert state.requested <= state.restorable
 
 
-@pytest.mark.parametrize("network_spec", simple_networks)
+@pytest.mark.parametrize("network_spec", simple_networks)  # type: ignore
 def test_invariants_along_permitted_paths(network_spec: RequestAndStatesSpec):
     start_state = GraphState.from_requested(network_spec.requested_nodes)
     count = 0
