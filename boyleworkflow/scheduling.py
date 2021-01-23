@@ -24,9 +24,7 @@ def get_nodes_and_ancestors(nodes: Iterable[Node]) -> FrozenSet[Node]:
 
 
 def get_root_nodes(*nodes: Node) -> FrozenSet[Node]:
-    return frozenset(
-        {n for n in get_nodes_and_ancestors(nodes) if not n.parents}
-    )
+    return frozenset({n for n in get_nodes_and_ancestors(nodes) if not n.parents})
 
 
 @dataclass
@@ -95,9 +93,7 @@ class GraphState:
     def _set_priority_work(self):
         return self._update(priority_work=self._get_priority_work())
 
-    def _check_results_not_added_before_parents(
-        self, results: Mapping[Node, TreeItem]
-    ):
+    def _check_results_not_added_before_parents(self, results: Mapping[Node, TreeItem]):
         added_before_parents = set(results) - self.parents_known
         if added_before_parents:
             raise ValueError(
@@ -105,9 +101,7 @@ class GraphState:
                 f"because their parents are not known: {added_before_parents}"
             )
 
-    def _check_results_not_conflicting(
-        self, results: Mapping[Node, TreeItem]
-    ):
+    def _check_results_not_conflicting(self, results: Mapping[Node, TreeItem]):
         conflicting_nodes = {
             node: (self.results[node], new_result)
             for node, new_result in results.items()

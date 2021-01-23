@@ -67,9 +67,7 @@ def test_asks_env_to_stow_out_paths(calc_bundle: CalcBundle):
 
 
 def test_returns_mapping_with_results(calc_bundle: CalcBundle):
-    expected_results = {
-        path: Leaf(f"digest:{path}") for path in calc_bundle.out
-    }
+    expected_results = {path: Leaf(f"digest:{path}") for path in calc_bundle.out}
     env = Mock(stow=lambda sandbox, path: expected_results[path])  # type: ignore
     results = run(calc_bundle, env)
     assert results == expected_results

@@ -47,7 +47,5 @@ def create_sibling_nodes(
     inp: Mapping[str, Node], op: Op, out: Collection[str]
 ) -> Set[Node]:
     out_paths = frozenset(map(Path.from_string, out))
-    node = NodeBundle(
-        {Path.from_string(k): v for k, v in inp.items()}, op, out_paths
-    )
+    node = NodeBundle({Path.from_string(k): v for k, v in inp.items()}, op, out_paths)
     return {Node(node, loc) for loc in out_paths}

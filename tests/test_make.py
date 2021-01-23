@@ -51,8 +51,7 @@ class StringFormatEnv:
     def run_op(self, op: StringFormatOp, sandbox_key: SandboxKey):
         sandbox = self._sandboxes[sandbox_key]
         results = {
-            path.to_string(): template.format(**sandbox)
-            for path, template in op
+            path.to_string(): template.format(**sandbox) for path, template in op
         }
         sandbox.update(results)
 

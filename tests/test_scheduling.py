@@ -40,9 +40,7 @@ class RequestAndStatesSpec:
     @property
     def requested_nodes(self):
         nodes = build_node_network(self.spec)
-        return [
-            node for name, node in nodes.items() if name in self.requested_names
-        ]
+        return [node for name, node in nodes.items() if name in self.requested_names]
 
 
 def _generate_allowed_steps(state: GraphState) -> Iterator[GraphState]:
@@ -128,9 +126,7 @@ def get_failed_invariants(state: GraphState):
         InvariantCheck(
             "Node.parents is in sync with known and parents_known",
             state.parents_known
-            == frozenset(
-                n for n in state.all_nodes if n.parents <= state.known
-            ),
+            == frozenset(n for n in state.all_nodes if n.parents <= state.known),
         ),
         InvariantCheck(
             "runnable is nonempty (at the very least root nodes can be run)",
@@ -139,9 +135,7 @@ def get_failed_invariants(state: GraphState):
         InvariantCheck(
             "Node.parents is in sync with runnable and restorable",
             state.runnable
-            == frozenset(
-                n for n in state.all_nodes if n.parents <= state.restorable
-            ),
+            == frozenset(n for n in state.all_nodes if n.parents <= state.restorable),
         ),
         InvariantCheck(
             "priority_work is empty if and only if requested <= restorable",
@@ -212,9 +206,7 @@ def test_invariants_on_init(root_node: Node):
     assert not get_failed_invariants(state)
 
 
-def test_invariants_along_simple_modifications(
-    root_node: Node, derived_node: Node
-):
+def test_invariants_along_simple_modifications(root_node: Node, derived_node: Node):
     state = GraphState.from_requested([derived_node])
     assert not get_failed_invariants(state)
     results = {root_node: Mock()}
@@ -229,9 +221,7 @@ def test_priority_work_leads_to_finish(network_spec: RequestAndStatesSpec):
     state = GraphState.from_requested(network_spec.requested_nodes)
 
     while state.priority_work:
-        state = state.add_results(
-            {node: Mock() for node in state.priority_work}
-        )
+        state = state.add_results({node: Mock() for node in state.priority_work})
         state = state.add_restorable(state.priority_work)
 
     assert state.requested <= state.restorable
