@@ -107,13 +107,19 @@ class GraphState(Generic[Node]):
     def _set_priority_work(self):
         return self._update(priority_work=self._get_priority_work())
 
-    def add_results(self, results: Mapping[Node, NodeResult]):
+    def _check_results_not_added_before_parents(
+        self, results: Mapping[Node, NodeResult]
+    ):
         added_before_parents = set(results) - self.parents_known
         if added_before_parents:
             raise ValueError(
                 "cannot accept results for the following nodes "
                 f"because their parents are not known: {added_before_parents}"
             )
+
+    def _check_results_not_conflicting(
+        self, results: Mapping[Node, NodeResult]
+    ):
         conflicting_nodes = {
             node: (self.results[node], new_result)
             for node, new_result in results.items()
@@ -124,6 +130,11 @@ class GraphState(Generic[Node]):
                 "cannot add conflicting results "
                 f"for the following nodes: {conflicting_nodes}"
             )
+
+    def add_results(self, results: Mapping[Node, NodeResult]):
+        self._check_results_not_added_before_parents(results)
+        self._check_results_not_conflicting(results)
+
         updated_results = {**self.results, **results}
         updated_known = self.known.union(results)
         updated_parents_known = frozenset(
