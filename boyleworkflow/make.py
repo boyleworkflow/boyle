@@ -5,12 +5,7 @@ from boyleworkflow.calc import Calc, Env, run
 from boyleworkflow.tree import Path, Tree, TreeItem
 
 
-# TODO: await resolution of https://github.com/microsoft/pyright/issues/1330
-
-
-def _run_priority_work(
-    state: GraphState[Node], env: Env
-) -> Mapping[Node, TreeItem]:
+def _run_priority_work(state: GraphState, env: Env) -> Mapping[Node, TreeItem]:
     results = {}
     node_bundles = {node.bundle for node in state.priority_work}
     for bundle in node_bundles:
@@ -28,7 +23,7 @@ def _run_priority_work(
     return results
 
 
-def _advance_state(state: GraphState[Node], env: Env) -> GraphState[Node]:
+def _advance_state(state: GraphState, env: Env) -> GraphState:
     results = _run_priority_work(state, env)
     return state.add_results(results).add_restorable(results)
 

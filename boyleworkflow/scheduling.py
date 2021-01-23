@@ -1,29 +1,17 @@
+from __future__ import annotations
 import itertools
 import dataclasses
 from dataclasses import dataclass
 from typing import (
     Any,
     FrozenSet,
-    Generic,
     Iterable,
     Iterator,
     Mapping,
-    Protocol,
     Set,
-    TypeVar,
 )
-
-T = TypeVar("T")
-
-
-class HasParents(Protocol):
-    @property
-    def parents(self: T) -> FrozenSet[T]:
-        ...
-
-
-Node = TypeVar("Node", bound=HasParents)
-NodeResult = Any
+from boyleworkflow.nodes import Node
+from boyleworkflow.tree import TreeItem
 
 
 def get_nodes_and_ancestors(nodes: Iterable[Node]) -> FrozenSet[Node]:
@@ -42,7 +30,7 @@ def get_root_nodes(*nodes: Node) -> FrozenSet[Node]:
 
 
 @dataclass
-class GraphState(Generic[Node]):
+class GraphState:
     all_nodes: FrozenSet[Node]
     requested: FrozenSet[Node]
     parents_known: FrozenSet[Node]
@@ -50,10 +38,10 @@ class GraphState(Generic[Node]):
     runnable: FrozenSet[Node]
     restorable: FrozenSet[Node]
     priority_work: FrozenSet[Node]
-    results: Mapping[Node, NodeResult]
+    results: Mapping[Node, TreeItem]
 
     @classmethod
-    def from_requested(cls, requested: Iterable[Node]) -> "GraphState[Node]":
+    def from_requested(cls, requested: Iterable[Node]) -> GraphState:
         all_nodes = frozenset(get_nodes_and_ancestors(requested))
         requested = frozenset(requested)
         root_nodes = get_root_nodes(*requested)
@@ -108,7 +96,7 @@ class GraphState(Generic[Node]):
         return self._update(priority_work=self._get_priority_work())
 
     def _check_results_not_added_before_parents(
-        self, results: Mapping[Node, NodeResult]
+        self, results: Mapping[Node, TreeItem]
     ):
         added_before_parents = set(results) - self.parents_known
         if added_before_parents:
@@ -118,7 +106,7 @@ class GraphState(Generic[Node]):
             )
 
     def _check_results_not_conflicting(
-        self, results: Mapping[Node, NodeResult]
+        self, results: Mapping[Node, TreeItem]
     ):
         conflicting_nodes = {
             node: (self.results[node], new_result)
@@ -131,7 +119,7 @@ class GraphState(Generic[Node]):
                 f"for the following nodes: {conflicting_nodes}"
             )
 
-    def add_results(self, results: Mapping[Node, NodeResult]):
+    def add_results(self, results: Mapping[Node, TreeItem]):
         self._check_results_not_added_before_parents(results)
         self._check_results_not_conflicting(results)
 
