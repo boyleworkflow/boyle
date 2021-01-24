@@ -1,4 +1,5 @@
 from __future__ import annotations
+from boyleworkflow.frozendict import FrozenDict
 from dataclasses import dataclass
 from functools import reduce
 from typing import Iterable, Mapping, Tuple, Union
@@ -57,9 +58,12 @@ class TreeCollision(ValueError):
     pass
 
 
-@dataclass
+@dataclass(frozen=True, init=False)
 class Tree:
-    children: Mapping[Name, TreeItem]
+    children: FrozenDict[Name, TreeItem]
+
+    def __init__(self, children: Mapping[Name, TreeItem]):
+        object.__setattr__(self, "children", FrozenDict(children))
 
     def __getitem__(self, key: Name) -> TreeItem:
         return self.children[key]

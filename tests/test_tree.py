@@ -93,6 +93,18 @@ def test_from_nested_item():
     assert result == empty_tree
 
 
+def test_tree_eq_independent_of_order():
+    tree_1 = Tree({Name("a1"): Leaf("b"), Name("a2"): Tree({})})
+    tree_2 = Tree({Name("a2"): Tree({}), Name("a1"): Leaf("b")})
+    assert tree_1 == tree_2
+
+
+def test_tree_hash_independent_of_order():
+    tree_1 = Tree({Name("a1"): Leaf("b"), Name("a2"): Tree({})})
+    tree_2 = Tree({Name("a2"): Tree({}), Name("a1"): Leaf("b")})
+    assert hash(tree_1) == hash(tree_2)
+
+
 def test_tree_pick():
     tree = tree_from_dict({"a": {"b": "x"}})
     path = Path.from_string("a/b")
@@ -230,6 +242,7 @@ def test_iter_empty_tree_level_0():
     result = dict(tree.iter_level(0))
     assert result == expected_result
 
+
 def test_iter_non_empty_tree_level_0():
     tree = tree_from_dict(
         {
@@ -240,6 +253,7 @@ def test_iter_non_empty_tree_level_0():
     expected_result = {Path(()): tree}
     result = dict(tree.iter_level(0))
     assert result == expected_result
+
 
 def test_iter_non_empty_tree_level_1():
     tree = tree_from_dict(
