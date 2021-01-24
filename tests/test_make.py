@@ -2,32 +2,22 @@ from boyleworkflow.tree import Leaf, Path, Tree
 from boyleworkflow.calc import SandboxKey
 from dataclasses import dataclass, field
 from typing import Dict, Iterable, MutableMapping, Tuple
-import pytest
 import unittest.mock
 from boyleworkflow.make import make
 from boyleworkflow.nodes import Node, NodeBundle
 
 StringFormatOp = Tuple[Tuple[Path, str], ...]
-StringNode = Node
 
 
 def make_op(**definitions: str) -> StringFormatOp:
     return tuple((Path.from_string(k), v) for k, v in definitions.items())
 
 
-@pytest.fixture
-def hello_node():
-    return Node.create({}, make_op(out="Hello"), "out")
-
-
-@pytest.fixture
-def hello_world_node(hello_node: StringNode):
-    return Node.create(dict(hello=hello_node), make_op(out="{hello} World"), "out")
-
-
-@pytest.fixture
-def sibling_nodes():
-    return NodeBundle.create({}, make_op(a="one", b="two"), ["a", "b"])
+HELLO_NODE = Node.create({}, make_op(out="Hello"), "out")
+HELLO_WORLD_NODE = Node.create(
+    dict(hello=HELLO_NODE), make_op(out="{hello} World"), "out"
+)
+SIBLING_NODES = NodeBundle.create({}, make_op(a="one", b="two"), ["a", "b"])
 
 
 @dataclass
@@ -72,34 +62,33 @@ class StringFormatEnv:
         self._place_into(tree, self.output)
 
 
-@pytest.fixture
-def env():
-    return StringFormatEnv()
-
-
-def test_make_hello(env: StringFormatEnv, hello_node: StringNode):
-    make({Path.from_string("hello"): hello_node}, env)
+def test_make_hello():
+    env = StringFormatEnv()
+    make({Path.from_string("hello"): HELLO_NODE}, env)
     assert env.output["hello"] == "Hello"
 
 
-def test_make_hello_world(env: StringFormatEnv, hello_world_node: StringNode):
-    make({Path.from_string("hello_world"): hello_world_node}, env)
+def test_make_hello_world():
+    env = StringFormatEnv()
+    make({Path.from_string("hello_world"): HELLO_WORLD_NODE}, env)
     assert env.output["hello_world"] == "Hello World"
 
 
-def test_multi_output(env: StringFormatEnv, sibling_nodes: NodeBundle):
-    make({n.out: n for n in sibling_nodes.nodes}, env)
+def test_multi_output():
+    env = StringFormatEnv()
+    make({n.out: n for n in SIBLING_NODES.nodes}, env)
     assert env.output["a"] == "one"
     assert env.output["b"] == "two"
 
 
-def test_multi_output_runs_once(env: StringFormatEnv, sibling_nodes: NodeBundle):
-    env = unittest.mock.Mock(wraps=env)
-    make({n.out: n for n in sibling_nodes.nodes}, env)
+def test_multi_output_runs_once():
+    env = unittest.mock.Mock(wraps=StringFormatEnv())
+    make({n.out: n for n in SIBLING_NODES.nodes}, env)
     env.run_op.assert_called_once()  # type: ignore
 
 
-def test_can_make_one_of_siblings(env: StringFormatEnv, sibling_nodes: NodeBundle):
-    first, _ = sibling_nodes.nodes
+def test_can_make_one_of_siblings():
+    env = StringFormatEnv()
+    first, _ = SIBLING_NODES.nodes
     make({first.out: first}, env)
     assert env.output.keys() == {first.out.to_string()}

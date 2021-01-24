@@ -9,14 +9,8 @@ from boyleworkflow.scheduling import (
     get_root_nodes,
 )
 
-@pytest.fixture
-def root_node():
-    return Node.create({}, "op", "out")
-
-
-@pytest.fixture
-def derived_node(root_node: Node):
-    return Node.create({"inp": root_node}, "op", "out")
+ROOT_NODE = Node.create({}, "op", "out")
+DERIVED_NODE = Node.create({"inp": ROOT_NODE}, "op", "out")
 
 
 NetworkSpec = Mapping[str, Sequence[str]]
@@ -145,8 +139,8 @@ def get_failed_invariants(state: GraphState):
     return failed
 
 
-def test_init_state(root_node: Node):
-    requested = [root_node]
+def test_init_state():
+    requested = [ROOT_NODE]
     root_nodes = frozenset(get_root_nodes(*requested))
     state = GraphState.from_requested(requested)
     assert not state.known
@@ -156,59 +150,59 @@ def test_init_state(root_node: Node):
     assert state.priority_work == root_nodes
 
 
-def test_can_add_results(root_node: Node):
-    state = GraphState.from_requested([root_node])
-    results = {root_node: Mock()}
+def test_can_add_results():
+    state = GraphState.from_requested([ROOT_NODE])
+    results = {ROOT_NODE: Mock()}
     updated = state.add_results(results)
     assert updated.results == results
 
 
-def test_can_add_same_results_twice(root_node: Node):
-    state = GraphState.from_requested([root_node])
-    results = {root_node: Mock()}
+def test_can_add_same_results_twice():
+    state = GraphState.from_requested([ROOT_NODE])
+    results = {ROOT_NODE: Mock()}
     updated = state.add_results(results).add_results(results)
     assert updated.results == results
 
 
-def test_cannot_add_conflicting_results(root_node: Node):
-    state = GraphState.from_requested([root_node])
-    results1 = {root_node: Mock()}
-    results2 = {root_node: Mock()}
+def test_cannot_add_conflicting_results():
+    state = GraphState.from_requested([ROOT_NODE])
+    results1 = {ROOT_NODE: Mock()}
+    results2 = {ROOT_NODE: Mock()}
     updated = state.add_results(results1)
     with pytest.raises(ValueError):
         updated.add_results(results2)
 
 
-def test_only_allow_add_result_if_parents_known(derived_node: Node):
-    state = GraphState.from_requested([derived_node])
-    assert derived_node not in state.parents_known
-    results = {derived_node: Mock()}
+def test_only_allow_add_result_if_parents_known():
+    state = GraphState.from_requested([DERIVED_NODE])
+    assert DERIVED_NODE not in state.parents_known
+    results = {DERIVED_NODE: Mock()}
     with pytest.raises(ValueError):
         state.add_results(results)
 
 
-def test_can_add_restorable(root_node: Node):
-    state = GraphState.from_requested([root_node])
-    results = {root_node: Mock()}
-    updated = state.add_results(results).add_restorable({root_node})
-    assert set(updated.restorable) == {root_node}
+def test_can_add_restorable():
+    state = GraphState.from_requested([ROOT_NODE])
+    results = {ROOT_NODE: Mock()}
+    updated = state.add_results(results).add_restorable({ROOT_NODE})
+    assert set(updated.restorable) == {ROOT_NODE}
 
 
-def test_only_add_restorable_if_known(root_node: Node):
-    state = GraphState.from_requested([root_node])
+def test_only_add_restorable_if_known():
+    state = GraphState.from_requested([ROOT_NODE])
     with pytest.raises(ValueError):
-        state.add_restorable({root_node})
+        state.add_restorable({ROOT_NODE})
 
 
-def test_invariants_on_init(root_node: Node):
-    state = GraphState.from_requested([root_node])
+def test_invariants_on_init():
+    state = GraphState.from_requested([ROOT_NODE])
     assert not get_failed_invariants(state)
 
 
-def test_invariants_along_simple_modifications(root_node: Node, derived_node: Node):
-    state = GraphState.from_requested([derived_node])
+def test_invariants_along_simple_modifications():
+    state = GraphState.from_requested([DERIVED_NODE])
     assert not get_failed_invariants(state)
-    results = {root_node: Mock()}
+    results = {ROOT_NODE: Mock()}
     with_parent_known = state.add_results(results)
     assert not get_failed_invariants(with_parent_known)
     with_parent_restorable = with_parent_known.add_restorable(results)
