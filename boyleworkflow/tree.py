@@ -44,6 +44,9 @@ class Path:
     def parent(self):
         return Path(self.names[:-1])
 
+    def __repr__(self):
+        return f"Path('{self.to_string()}')"
+
 
 @dataclass(frozen=True)
 class Leaf:
