@@ -222,3 +222,86 @@ def test_walk():
     }
 
     assert items == dict(tree.walk())
+
+
+def test_iter_empty_tree_level_0():
+    tree = tree_from_dict({})
+    expected_result = {Path(()): tree}
+    result = dict(tree.iter_level(0))
+    assert result == expected_result
+
+def test_iter_non_empty_tree_level_0():
+    tree = tree_from_dict(
+        {
+            "a1": "b",
+            "a2": {"b": "c"},
+        }
+    )
+    expected_result = {Path(()): tree}
+    result = dict(tree.iter_level(0))
+    assert result == expected_result
+
+def test_iter_non_empty_tree_level_1():
+    tree = tree_from_dict(
+        {
+            "a1": "b",
+            "a2": {"b": "c"},
+        }
+    )
+    expected_result = {
+        Path.from_string("a1"): Leaf("b"),
+        Path.from_string("a2"): tree_from_dict({"b": "c"}),
+    }
+    result = dict(tree.iter_level(1))
+    assert result == expected_result
+
+
+def test_iter_tree_level():
+    tree = tree_from_dict(
+        {
+            "a1": {
+                "b1": {
+                    "c1": "111",
+                    "c2": "112",
+                },
+                "b2": {
+                    "c1": "121",
+                    "c2": "122",
+                },
+            },
+            "a2": {
+                "b1": {
+                    "c1": {"d1": "2111"},
+                },
+            },
+            "a3": {
+                "b1": {},
+            },
+        }
+    )
+
+    result = dict(tree.iter_level(2))
+    expected_result = {
+        path: tree.pick(path)
+        for path in [
+            Path.from_string("a1/b1"),
+            Path.from_string("a1/b2"),
+            Path.from_string("a2/b1"),
+            Path.from_string("a3/b1"),
+        ]
+    }
+
+    assert result == expected_result
+
+
+def test_cannot_iter_trees_beyond_min_depth():
+    tree = tree_from_dict(
+        {
+            "a1": {"b": "c"},
+            "a2": "b",
+        }
+    )
+
+    list(tree.iter_level(1))  # level a works
+    with pytest.raises(ValueError):
+        list(tree.iter_level(2))  # level b does not work

@@ -95,6 +95,33 @@ class Tree:
     def walk(self) -> Iterable[Tuple[Path, TreeItem]]:
         yield from self._walk_prefixed(Path(()))
 
+    def _iter_level(self, level: int, prefix: Path) -> Iterable[Tuple[Path, TreeItem]]:
+        # here we can assume level >= 1
+        if not self.children:
+            raise ValueError(f"empty subtree encountered at {prefix}")
+
+        if level == 1:
+            # if level == 1 we yield all the children which may be Tree or Leaf
+            for name, value in self.children.items():
+                yield (prefix / name), value
+        elif level > 1:
+            # We are supposed to descend further, and all children must be Tree
+            for name, value in self.children.items():
+                if isinstance(value, Leaf):
+                    raise ValueError(f"leaf encountered at {prefix / name}")
+                yield from value._iter_level(level - 1, prefix / name)
+        else:
+            raise RuntimeError(f"how did this happen? level={level}")
+
+    def iter_level(self, level: int) -> Iterable[Tuple[Path, TreeItem]]:
+        root = Path(())
+        if level < 0:
+            raise ValueError(f"negative level {level}")
+        elif level == 0:
+            yield root, self
+        else:
+            yield from self._iter_level(level, root)
+
     def _merge_one(self, other: Tree) -> Tree:
         name_collisions = set(self.children) & set(other.children)
         merged_trees: Mapping[Name, Tree] = {}
