@@ -5,7 +5,7 @@ from typing import Dict, Iterable, MutableMapping, Tuple
 import pytest
 import unittest.mock
 from boyleworkflow.make import make
-from boyleworkflow.nodes import Node, create_simple_node, create_sibling_nodes
+from boyleworkflow.nodes import Node, NodeBundle
 
 StringFormatOp = Tuple[Tuple[Path, str], ...]
 StringNode = Node
@@ -17,19 +17,17 @@ def make_op(**definitions: str) -> StringFormatOp:
 
 @pytest.fixture
 def hello_node():
-    return create_simple_node({}, make_op(out="Hello"), "out")
+    return Node.create({}, make_op(out="Hello"), "out")
 
 
 @pytest.fixture
 def hello_world_node(hello_node: StringNode):
-    return create_simple_node(
-        dict(hello=hello_node), make_op(out="{hello} World"), "out"
-    )
+    return Node.create(dict(hello=hello_node), make_op(out="{hello} World"), "out")
 
 
 @pytest.fixture
 def sibling_nodes():
-    return create_sibling_nodes({}, make_op(a="one", b="two"), ["a", "b"])
+    return NodeBundle.create({}, make_op(a="one", b="two"), ["a", "b"])
 
 
 @dataclass
@@ -89,23 +87,19 @@ def test_make_hello_world(env: StringFormatEnv, hello_world_node: StringNode):
     assert env.output["hello_world"] == "Hello World"
 
 
-def test_multi_output(env: StringFormatEnv, sibling_nodes: Iterable[StringNode]):
-    make({n.out: n for n in sibling_nodes}, env)
+def test_multi_output(env: StringFormatEnv, sibling_nodes: NodeBundle):
+    make({n.out: n for n in sibling_nodes.nodes}, env)
     assert env.output["a"] == "one"
     assert env.output["b"] == "two"
 
 
-def test_multi_output_runs_once(
-    env: StringFormatEnv, sibling_nodes: Iterable[StringNode]
-):
+def test_multi_output_runs_once(env: StringFormatEnv, sibling_nodes: NodeBundle):
     env = unittest.mock.Mock(wraps=env)
-    make({n.out: n for n in sibling_nodes}, env)
+    make({n.out: n for n in sibling_nodes.nodes}, env)
     env.run_op.assert_called_once()  # type: ignore
 
 
-def test_can_make_one_of_siblings(
-    env: StringFormatEnv, sibling_nodes: Iterable[StringNode]
-):
-    first, _ = sibling_nodes
+def test_can_make_one_of_siblings(env: StringFormatEnv, sibling_nodes: NodeBundle):
+    first, _ = sibling_nodes.nodes
     make({first.out: first}, env)
     assert env.output.keys() == {first.out.to_string()}
