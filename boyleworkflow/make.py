@@ -2,10 +2,10 @@ from boyleworkflow.scheduling import GraphState
 from boyleworkflow.nodes import Node
 from typing import Mapping
 from boyleworkflow.calc import CalcBundle, Env, run
-from boyleworkflow.tree import Path, Tree, TreeItem
+from boyleworkflow.tree import Path, Tree
 
 
-def _run_priority_work(state: GraphState, env: Env) -> Mapping[Node, TreeItem]:
+def _run_priority_work(state: GraphState, env: Env) -> Mapping[Node, Tree]:
     results = {}
     node_bundles = {node.bundle for node in state.priority_work}
     for node_bundle in node_bundles:

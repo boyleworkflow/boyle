@@ -1,9 +1,9 @@
 from boyleworkflow.frozendict import FrozenDict
 from tests.util import tree_from_dict
-from boyleworkflow.tree import Leaf, Path, Tree, TreeItem
+from boyleworkflow.tree import Name, Path, Tree
 from boyleworkflow.calc import SandboxKey
 from dataclasses import dataclass, field
-from typing import Dict, Union
+from typing import Dict, Mapping, Sequence, Union
 import unittest.mock
 from boyleworkflow.make import make
 from boyleworkflow.nodes import Node, NodeBundle
@@ -18,11 +18,9 @@ def make_op(**definitions: str) -> StringFormatOp:
 NestedStrDictItem = Union["NestedStrDict", str]
 NestedStrDict = Dict[str, NestedStrDictItem]
 
-PATH_SEP = "/"
 
-
-def place_nested(mapping: NestedStrDict, path: str, value: NestedStrDictItem):
-    *descend_segments, final_segment = path.split(PATH_SEP)
+def place_nested(mapping: NestedStrDict, path: Path, value: NestedStrDictItem):
+    *descend_segments, final_segment = [name.value for name in path.names]
     for segment in descend_segments:
         if segment not in mapping:
             mapping[segment] = {}
@@ -35,15 +33,39 @@ def place_nested(mapping: NestedStrDict, path: str, value: NestedStrDictItem):
     mapping[final_segment] = value
 
 
-def pick_nested(mapping: NestedStrDict, path: str) -> NestedStrDictItem:
-    *descend_segments, final_segment = path.split(PATH_SEP)
-    for segment in descend_segments:
-        descend_into = mapping[segment]
-        if not isinstance(descend_into, dict):
-            raise ValueError(f"{segment}: {descend_into}")
-        mapping = descend_into
+def _pick_nested(
+    item: NestedStrDictItem, path_segments: Sequence[Name]
+) -> NestedStrDictItem:
+    if not path_segments:
+        return item
 
-    return mapping[final_segment]
+    if not isinstance(item, dict):
+        raise ValueError(f"cannot descend to {path_segments} in {repr(item)}")
+    first, *rest = path_segments
+    return _pick_nested(item[first.value], rest)
+
+
+def pick_nested(item: NestedStrDictItem, path: Path) -> NestedStrDictItem:
+    return _pick_nested(item, path.names)
+
+
+def build_tree_description(item: NestedStrDictItem) -> Tree:
+    if isinstance(item, str):
+        return Tree({}, f"leaf:{item}")
+
+    return Tree({Name(k): build_tree_description(v) for k, v in item.items()})
+
+
+def build_item_from_storage(
+    tree: Tree, storage: Mapping[Tree, NestedStrDictItem]
+) -> NestedStrDictItem:
+    if tree.data:
+        return storage[tree]
+
+    return {
+        name.value: build_item_from_storage(subtree, storage)
+        for name, subtree in tree.children.items()
+    }
 
 
 @dataclass
@@ -52,7 +74,7 @@ class StringFormatEnv:
 
     def __post_init__(self):
         self._sandboxes: Dict[SandboxKey, NestedStrDict] = {}
-        self._storage: Dict[TreeItem, NestedStrDictItem] = {}
+        self._storage: Dict[Tree, NestedStrDictItem] = {}
 
     def create_sandbox(self):
         sandbox_key = SandboxKey("sandbox")
@@ -64,32 +86,26 @@ class StringFormatEnv:
 
     def run_op(self, op: StringFormatOp, sandbox_key: SandboxKey):
         sandbox = self._sandboxes[sandbox_key]
-        op_results = {path: template.format(**sandbox) for path, template in op.items()}
+        op_results = {
+            Path.from_string(path): template.format(**sandbox)
+            for path, template in op.items()
+        }
         for path, value in op_results.items():
             place_nested(sandbox, path, value)
 
     def stow(self, sandbox_key: SandboxKey, path: Path):
         sandbox = self._sandboxes[sandbox_key]
-        value = pick_nested(sandbox, path.to_string())
-
-        tree_item = Leaf(value) if isinstance(value, str) else tree_from_dict(value)
-        self._storage[tree_item] = value
-        return tree_item
-
-    def _build_value_from_storage(self, tree_item: TreeItem) -> NestedStrDictItem:
-        if isinstance(tree_item, Leaf):
-            return self._storage[tree_item]
-
-        return {
-            name.value: self._build_value_from_storage(child_item)
-            for name, child_item in tree_item.children.items()
-        }
+        result = pick_nested(sandbox, path)
+        tree = build_tree_description(result)
+        for path, subtree in tree.walk():
+            self._storage[subtree] = pick_nested(result, path)
+        return tree
 
     def _place_into(self, tree: Tree, destination: NestedStrDict):
-        value = self._build_value_from_storage(tree)
-        if not isinstance(value, dict):
-            raise ValueError(f"expected a dict but found {repr(value)}")
-        destination.update(value)
+        item = build_item_from_storage(tree, self._storage)
+        if not isinstance(item, dict):
+            raise ValueError(f"expected a dict but found {repr(item)}")
+        destination.update(item)
 
     def place(self, sandbox_key: SandboxKey, tree: Tree):
         self._place_into(tree, self._sandboxes[sandbox_key])

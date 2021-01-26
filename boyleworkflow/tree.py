@@ -2,7 +2,7 @@ from __future__ import annotations
 from boyleworkflow.frozendict import FrozenDict
 from dataclasses import dataclass
 from functools import reduce
-from typing import Iterable, Mapping, Tuple, Union
+from typing import Iterable, Mapping, Optional, Tuple, Union
 
 _SEPARATOR = "/"
 _DOT = "."
@@ -49,103 +49,89 @@ class Path:
         return f"Path('{self.to_string()}')"
 
 
-@dataclass(frozen=True)
-class Leaf:
-    data: str
-
-
 class TreeCollision(ValueError):
     pass
 
 
+TreeData = Optional[str]
+
+
 @dataclass(frozen=True, init=False)
 class Tree:
-    children: FrozenDict[Name, TreeItem]
+    children: FrozenDict[Name, Tree]
+    data: TreeData
 
-    def __init__(self, children: Mapping[Name, TreeItem]):
+    def __init__(self, children: Mapping[Name, Tree], data: TreeData = None):
         object.__setattr__(self, "children", FrozenDict(children))
+        object.__setattr__(self, "data", data)
 
-    def __getitem__(self, key: Name) -> TreeItem:
+    def __getitem__(self, key: Name) -> Tree:
         return self.children[key]
 
-    def pick(self, path: Path) -> TreeItem:
+    def pick(self, path: Path) -> Tree:
         result = self
         for name in path.names:
-            if isinstance(result, Leaf):
-                raise ValueError(f"{path} too long ({name} is a leaf)")
             try:
                 result = result[name]
             except KeyError:
                 raise ValueError(f"no item {name} found")
         return result
 
-    @classmethod
-    def _from_nested_item(cls, path: Path, item: TreeItem) -> Tree:
+    def nest(self, path: Path) -> Tree:
+        if not path.names:
+            return self
         reversed_names = reversed(path.names)
-        tree = Tree({next(reversed_names): item})
+        tree = Tree({next(reversed_names): self})
         for name in reversed_names:
             tree = Tree({name: tree})
         return tree
 
     @classmethod
-    def from_nested_items(cls, d: Mapping[Path, TreeItem]) -> Tree:
+    def from_nested_items(cls, subtrees: Mapping[Path, Tree]) -> Tree:
         empty_tree = Tree({})
-        trees = (Tree._from_nested_item(path, item) for path, item in d.items())
+        trees = (subtree.nest(path) for path, subtree in subtrees.items())
         return reduce(Tree.merge, trees, empty_tree)
 
-    def _walk_prefixed(self, prefix: Path) -> Iterable[Tuple[Path, TreeItem]]:
+    def _walk_prefixed(self, prefix: Path) -> Iterable[Tuple[Path, Tree]]:
+        yield (prefix, self)
         for k, v in self.children.items():
-            if isinstance(v, Tree):
-                yield from v._walk_prefixed(prefix / k)
-            yield (prefix / k, v)
+            yield from v._walk_prefixed(prefix / k)
 
-    def walk(self) -> Iterable[Tuple[Path, TreeItem]]:
+    def walk(self) -> Iterable[Tuple[Path, Tree]]:
         yield from self._walk_prefixed(Path(()))
 
-    def _iter_level(self, level: int, prefix: Path) -> Iterable[Tuple[Path, TreeItem]]:
-        # here we can assume level >= 1
-        if not self.children:
-            raise ValueError(f"empty subtree encountered at {prefix}")
-
-        if level == 1:
-            # if level == 1 we yield all the children which may be Tree or Leaf
-            for name, value in self.children.items():
-                yield (prefix / name), value
-        elif level > 1:
-            # We are supposed to descend further, and all children must be Tree
-            for name, value in self.children.items():
-                if isinstance(value, Leaf):
-                    raise ValueError(f"leaf encountered at {prefix / name}")
-                yield from value._iter_level(level - 1, prefix / name)
+    def _iter_level(self, level: int, prefix: Path) -> Iterable[Tuple[Path, Tree]]:
+        if level == 0:
+            yield prefix, self
         else:
-            raise RuntimeError(f"how did this happen? level={level}")
+            if not self.children:
+                raise ValueError("no children found below {prefix}")
+            for name, subtree in self.children.items():
+                yield from subtree._iter_level(level - 1, (prefix / name))
 
-    def iter_level(self, level: int) -> Iterable[Tuple[Path, TreeItem]]:
+    def iter_level(self, level: int) -> Iterable[Tuple[Path, Tree]]:
         root = Path(())
         if level < 0:
             raise ValueError(f"negative level {level}")
-        elif level == 0:
-            yield root, self
         else:
             yield from self._iter_level(level, root)
 
     def _merge_one(self, other: Tree) -> Tree:
+        if self.data != other.data:
+            raise TreeCollision(f"data mismatch")
         name_collisions = set(self.children) & set(other.children)
         merged_trees: Mapping[Name, Tree] = {}
         for name in name_collisions:
             left = self.children[name]
             right = other.children[name]
-            if isinstance(left, Tree) and isinstance(right, Tree):
-                merged_trees[name] = left.merge(right)
-            else:
-                if left != right:
-                    raise TreeCollision(name)
+            merged_trees[name] = left.merge(right)
 
-        return Tree({**self.children, **other.children, **merged_trees})
+        return Tree({**self.children, **other.children, **merged_trees}, self.data)
 
     def merge(self: Tree, *other: Tree) -> Tree:
         trees = [self, *other]
         return reduce(Tree._merge_one, trees)
 
-
-TreeItem = Union[Tree, Leaf]
+    def __repr__(self):
+        data_repr = "" if self.data is None else f", {repr(self.data)}"
+        return f"Tree({repr(dict(self.children))}{data_repr})"

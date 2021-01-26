@@ -1,5 +1,5 @@
 from typing import Mapping, Union, Collection, Set
-from boyleworkflow.tree import Tree, Name, Leaf, Path
+from boyleworkflow.tree import Tree, Name, Path
 from boyleworkflow.calc import Op
 from boyleworkflow.nodes import Node, NodeBundle
 
@@ -9,7 +9,7 @@ StrTree = Mapping[str, StrTreeItem]
 
 def _create_tree_item(value: StrTreeItem):
     if isinstance(value, str):
-        return Leaf(value)
+        return Tree({}, value)
     else:
         return tree_from_dict(value)
 

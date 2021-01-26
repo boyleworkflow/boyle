@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, FrozenSet, Mapping, NewType, Protocol
-from boyleworkflow.tree import Path, Tree, TreeItem
+from boyleworkflow.tree import Path, Tree
 
 
 Op = Any  # TODO replace this with something more specific
@@ -35,14 +35,14 @@ class Env(Protocol):
     def place(self, sandbox: SandboxKey, tree: Tree):
         ...
 
-    def stow(self, sandbox: SandboxKey, path: Path) -> TreeItem:
+    def stow(self, sandbox: SandboxKey, path: Path) -> Tree:
         ...
 
     def deliver(self, tree: Tree):
         ...
 
 
-def run(calc_bundle: CalcBundle, env: Env) -> Mapping[Path, TreeItem]:
+def run(calc_bundle: CalcBundle, env: Env) -> Mapping[Path, Tree]:
     sandbox = env.create_sandbox()
     try:
         env.place(sandbox, calc_bundle.inp)

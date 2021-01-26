@@ -11,7 +11,7 @@ from typing import (
     Set,
 )
 from boyleworkflow.nodes import Node
-from boyleworkflow.tree import TreeItem
+from boyleworkflow.tree import Tree
 
 
 def get_nodes_and_ancestors(nodes: Iterable[Node]) -> FrozenSet[Node]:
@@ -36,7 +36,7 @@ class GraphState:
     runnable: FrozenSet[Node]
     restorable: FrozenSet[Node]
     priority_work: FrozenSet[Node]
-    results: Mapping[Node, TreeItem]
+    results: Mapping[Node, Tree]
 
     @classmethod
     def from_requested(cls, requested: Iterable[Node]) -> GraphState:
@@ -93,7 +93,7 @@ class GraphState:
     def _set_priority_work(self):
         return self._update(priority_work=self._get_priority_work())
 
-    def _check_results_not_added_before_parents(self, results: Mapping[Node, TreeItem]):
+    def _check_results_not_added_before_parents(self, results: Mapping[Node, Tree]):
         added_before_parents = set(results) - self.parents_known
         if added_before_parents:
             raise ValueError(
@@ -101,7 +101,7 @@ class GraphState:
                 f"because their parents are not known: {added_before_parents}"
             )
 
-    def _check_results_not_conflicting(self, results: Mapping[Node, TreeItem]):
+    def _check_results_not_conflicting(self, results: Mapping[Node, Tree]):
         conflicting_nodes = {
             node: (self.results[node], new_result)
             for node, new_result in results.items()
@@ -113,7 +113,7 @@ class GraphState:
                 f"for the following nodes: {conflicting_nodes}"
             )
 
-    def add_results(self, results: Mapping[Node, TreeItem]):
+    def add_results(self, results: Mapping[Node, Tree]):
         self._check_results_not_added_before_parents(results)
         self._check_results_not_conflicting(results)
 

@@ -1,4 +1,4 @@
-from boyleworkflow.tree import Leaf
+from boyleworkflow.tree import Tree
 import pytest
 from unittest.mock import Mock, call
 from boyleworkflow.calc import run, CalcBundle, Path
@@ -63,7 +63,7 @@ def test_asks_env_to_stow_out_paths():
 
 
 def test_returns_mapping_with_results():
-    expected_results = {path: Leaf(f"digest:{path}") for path in CALC_BUNDLE.out}
+    expected_results = {path: Tree({}, f"digest:{path}") for path in CALC_BUNDLE.out}
     env = Mock(stow=lambda sandbox, path: expected_results[path])  # type: ignore
     results = run(CALC_BUNDLE, env)
     assert results == expected_results

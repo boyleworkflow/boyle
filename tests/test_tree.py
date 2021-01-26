@@ -1,5 +1,5 @@
 import pytest
-from boyleworkflow.tree import Tree, Leaf, TreeCollision, Path, Name
+from boyleworkflow.tree import Tree, TreeCollision, Path, Name
 from tests.util import tree_from_dict
 
 EMPTY_PATH_STR = "."
@@ -74,7 +74,7 @@ def test_path_cannot_have_double_slash():
 
 
 def test_from_nested_item():
-    result = Tree.from_nested_items({Path.from_string("a/b/c"): Leaf("x")})
+    result = Tree.from_nested_items({Path.from_string("a/b/c"): Tree({}, "x")})
     expected_result = tree_from_dict(
         {
             "a": {
@@ -94,21 +94,21 @@ def test_from_nested_item():
 
 
 def test_tree_eq_independent_of_order():
-    tree_1 = Tree({Name("a1"): Leaf("b"), Name("a2"): Tree({})})
-    tree_2 = Tree({Name("a2"): Tree({}), Name("a1"): Leaf("b")})
+    tree_1 = Tree({Name("a1"): Tree({}, "b"), Name("a2"): Tree({})})
+    tree_2 = Tree({Name("a2"): Tree({}), Name("a1"): Tree({}, "b")})
     assert tree_1 == tree_2
 
 
 def test_tree_hash_independent_of_order():
-    tree_1 = Tree({Name("a1"): Leaf("b"), Name("a2"): Tree({})})
-    tree_2 = Tree({Name("a2"): Tree({}), Name("a1"): Leaf("b")})
+    tree_1 = Tree({Name("a1"): Tree({}, "b"), Name("a2"): Tree({})})
+    tree_2 = Tree({Name("a2"): Tree({}), Name("a1"): Tree({}, "b")})
     assert hash(tree_1) == hash(tree_2)
 
 
 def test_tree_pick():
     tree = tree_from_dict({"a": {"b": "x"}})
     path = Path.from_string("a/b")
-    assert tree.pick(path) == Leaf("x")
+    assert tree.pick(path) == Tree({}, "x")
 
 
 def test_tree_pick_empty_path():
@@ -227,11 +227,8 @@ def test_walk():
             "c": "y",
         }
     )
-    items = {
-        Path.from_string("a"): tree[Name("a")],
-        Path.from_string("a/b"): Leaf("x"),
-        Path.from_string("c"): Leaf("y"),
-    }
+    all_paths = [Path.from_string(s) for s in [".", "a", "a/b", "c"]]
+    items = {path: tree.pick(path) for path in all_paths}
 
     assert items == dict(tree.walk())
 
@@ -262,15 +259,13 @@ def test_iter_non_empty_tree_level_1():
             "a2": {"b": "c"},
         }
     )
-    expected_result = {
-        Path.from_string("a1"): Leaf("b"),
-        Path.from_string("a2"): tree_from_dict({"b": "c"}),
-    }
+    level_1_paths = [Path.from_string(s) for s in ["a1", "a2"]]
+    expected_result = {path: tree.pick(path) for path in level_1_paths}
     result = dict(tree.iter_level(1))
     assert result == expected_result
 
 
-def test_iter_tree_level():
+def test_iter_tree_level_2():
     tree = tree_from_dict(
         {
             "a1": {
@@ -294,17 +289,9 @@ def test_iter_tree_level():
         }
     )
 
+    level_2_paths = [Path.from_string(s) for s in ["a1/b1", "a1/b2", "a2/b1", "a3/b1"]]
+    expected_result = {path: tree.pick(path) for path in level_2_paths}
     result = dict(tree.iter_level(2))
-    expected_result = {
-        path: tree.pick(path)
-        for path in [
-            Path.from_string("a1/b1"),
-            Path.from_string("a1/b2"),
-            Path.from_string("a2/b1"),
-            Path.from_string("a3/b1"),
-        ]
-    }
-
     assert result == expected_result
 
 
@@ -319,3 +306,14 @@ def test_cannot_iter_trees_beyond_min_depth():
     list(tree.iter_level(1))  # level a works
     with pytest.raises(ValueError):
         list(tree.iter_level(2))  # level b does not work
+
+
+def test_nest_at_root():
+    tree = tree_from_dict({"a": "b"})
+    assert tree.nest(Path(())) == tree
+
+
+def test_nest_deep_below():
+    tree = tree_from_dict({"c": "d"})
+    path = Path.from_string("a/b")
+    assert tree.nest(path).pick(path) == tree

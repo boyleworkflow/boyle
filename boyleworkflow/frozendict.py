@@ -24,3 +24,9 @@ class FrozenDict(Mapping[KT, VT]):
 
     def __hash__(self) -> int:
         return hash(frozenset(self._data.items()))
+
+    def __repr__(self) -> str:
+        return f"FrozenDict({repr(self._data)})"
+    
+    def __str__(self) -> str:
+        return f"FrozenDict({str(self._data)})"
