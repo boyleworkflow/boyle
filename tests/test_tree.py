@@ -105,6 +105,32 @@ def test_tree_hash_independent_of_order():
     assert hash(tree_1) == hash(tree_2)
 
 
+def tree_getitem():
+    tree = tree_from_dict({"a": {"b": "x"}})
+    subtree = tree_from_dict({"b": "x"})
+    assert tree[Name("a")] == subtree
+
+
+def tree_iter():
+    tree = tree_from_dict(
+        {
+            "a": {},
+            "b": "x",
+        }
+    )
+    assert list(iter(tree)) == [Name("a"), Name("b")]
+
+
+def tree_len():
+    tree = tree_from_dict(
+        {
+            "a": {},
+            "b": "x",
+        }
+    )
+    assert len(tree) == 2
+
+
 def test_tree_pick():
     tree = tree_from_dict({"a": {"b": "x"}})
     path = Path.from_string("a/b")
@@ -317,3 +343,15 @@ def test_nest_deep_below():
     tree = tree_from_dict({"c": "d"})
     path = Path.from_string("a/b")
     assert tree.nest(path).pick(path) == tree
+
+
+def _convert_to_upper_case(tree: Tree) -> Tree:
+    return Tree(
+        {Name(name.value.upper()): subtree for name, subtree in tree.items()},
+        tree.data.upper(),  # type: ignore
+    )
+
+
+def test_tree_items():
+    tree = tree_from_dict({"a1": {"b": "c"}, "a2": {}})
+    assert dict(tree.items()) == {name: tree[name] for name in map(Name, ["a1", "a2"])}

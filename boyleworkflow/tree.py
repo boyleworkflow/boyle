@@ -2,7 +2,7 @@ from __future__ import annotations
 from boyleworkflow.frozendict import FrozenDict
 from dataclasses import dataclass
 from functools import reduce
-from typing import Iterable, Mapping, Optional, Tuple, Union
+from typing import AbstractSet, Iterable, Iterator, Mapping, Optional, Tuple, Union
 
 _SEPARATOR = "/"
 _DOT = "."
@@ -57,16 +57,22 @@ TreeData = Optional[str]
 
 
 @dataclass(frozen=True, init=False)
-class Tree:
-    children: FrozenDict[Name, Tree]
+class Tree(Mapping[Name, "Tree"]):
+    _children: FrozenDict[Name, Tree]
     data: TreeData
 
     def __init__(self, children: Mapping[Name, Tree], data: TreeData = None):
-        object.__setattr__(self, "children", FrozenDict(children))
+        object.__setattr__(self, "_children", FrozenDict(children))
         object.__setattr__(self, "data", data)
 
     def __getitem__(self, key: Name) -> Tree:
-        return self.children[key]
+        return self._children[key]
+
+    def __iter__(self) -> Iterator[Name]:
+        return iter(self._children)
+
+    def __len__(self) -> int:
+        return len(self._children)
 
     def pick(self, path: Path) -> Tree:
         result = self
@@ -94,7 +100,7 @@ class Tree:
 
     def _walk_prefixed(self, prefix: Path) -> Iterable[Tuple[Path, Tree]]:
         yield (prefix, self)
-        for k, v in self.children.items():
+        for k, v in self.items():
             yield from v._walk_prefixed(prefix / k)
 
     def walk(self) -> Iterable[Tuple[Path, Tree]]:
@@ -104,9 +110,9 @@ class Tree:
         if level == 0:
             yield prefix, self
         else:
-            if not self.children:
+            if not len(self):
                 raise ValueError("no children found below {prefix}")
-            for name, subtree in self.children.items():
+            for name, subtree in self.items():
                 yield from subtree._iter_level(level - 1, (prefix / name))
 
     def iter_level(self, level: int) -> Iterable[Tuple[Path, Tree]]:
@@ -119,14 +125,14 @@ class Tree:
     def _merge_one(self, other: Tree) -> Tree:
         if self.data != other.data:
             raise TreeCollision(f"data mismatch")
-        name_collisions = set(self.children) & set(other.children)
+        name_collisions = set(self) & set(other)
         merged_trees: Mapping[Name, Tree] = {}
         for name in name_collisions:
-            left = self.children[name]
-            right = other.children[name]
+            left = self[name]
+            right = other[name]
             merged_trees[name] = left.merge(right)
 
-        return Tree({**self.children, **other.children, **merged_trees}, self.data)
+        return Tree({**self, **other, **merged_trees}, self.data)
 
     def merge(self: Tree, *other: Tree) -> Tree:
         trees = [self, *other]
@@ -134,4 +140,4 @@ class Tree:
 
     def __repr__(self):
         data_repr = "" if self.data is None else f", {repr(self.data)}"
-        return f"Tree({repr(dict(self.children))}{data_repr})"
+        return f"Tree({repr(dict(self))}{data_repr})"

@@ -64,7 +64,7 @@ def build_item_from_storage(
 
     return {
         name.value: build_item_from_storage(subtree, storage)
-        for name, subtree in tree.children.items()
+        for name, subtree in tree.items()
     }
 
 
