@@ -103,9 +103,8 @@ class Tree(Mapping[Name, "Tree"]):
 
     @classmethod
     def from_nested_items(cls, subtrees: Mapping[Path, Tree]) -> Tree:
-        empty_tree = Tree({})
         trees = (subtree.nest(path) for path, subtree in subtrees.items())
-        return reduce(Tree.merge, trees, empty_tree)
+        return Tree.merge(trees)
 
     def _walk_prefixed(self, prefix: Path) -> Iterable[Tuple[Path, Tree]]:
         yield (prefix, self)
@@ -144,12 +143,15 @@ class Tree(Mapping[Name, "Tree"]):
         for name in name_collisions:
             left = self[name]
             right = other[name]
-            merged_trees[name] = left.merge(right)
+            merged_trees[name] = Tree.merge([left, right])
 
         return Tree({**self, **other, **merged_trees}, self.data)
 
-    def merge(self: Tree, *other: Tree) -> Tree:
-        trees = [self, *other]
+    @staticmethod
+    def merge(trees: Iterable[Tree]) -> Tree:
+        trees = tuple(trees)
+        if not trees:
+            return Tree({})
         return reduce(Tree._merge_one, trees)
 
     def __repr__(self):

@@ -178,9 +178,11 @@ def test_merge_disjoint():
             "c": "y",
         }
     )
-    merged = tree_1.merge(tree_2)
+    merged = Tree.merge([tree_1, tree_2])
     assert merged == combined
 
+def test_merge_none_creates_empty():
+    assert Tree.merge([]) == Tree({})
 
 def test_merge_inside():
     tree_1 = tree_from_dict(
@@ -205,7 +207,7 @@ def test_merge_inside():
             }
         }
     )
-    merged = tree_1.merge(tree_2)
+    merged = Tree.merge([tree_1, tree_2])
     assert merged == combined
 
 
@@ -213,27 +215,27 @@ def test_merge_collision_leaf_leaf():
     tree_1 = tree_from_dict({"a": "x"})
     tree_2 = tree_from_dict({"a": "y"})
     with pytest.raises(TreeCollision):
-        tree_1.merge(tree_2)
+        Tree.merge([tree_1, tree_2])
 
 
 def test_merge_collision_leaf_subtree():
     tree_1 = tree_from_dict({"a": "x"})
     tree_2 = tree_from_dict({"a": {}})
     with pytest.raises(TreeCollision):
-        tree_1.merge(tree_2)
+        Tree.merge([tree_1, tree_2])
 
 
 def test_merge_collision_nested():
     tree_1 = tree_from_dict({"a": {"b": "x"}})
     tree_2 = tree_from_dict({"a": {"b": "y"}})
     with pytest.raises(TreeCollision):
-        tree_1.merge(tree_2)
+        Tree.merge([tree_1, tree_2])
 
 
 def test_merge_identical_leaf_no_collision():
     tree_1 = tree_from_dict({"a": "x"})
     tree_2 = tree_from_dict({"a": "x"})
-    merged = tree_1.merge(tree_2)
+    merged = Tree.merge([tree_1, tree_2])
     assert merged == tree_1
     assert merged == tree_2
 
@@ -241,7 +243,7 @@ def test_merge_identical_leaf_no_collision():
 def test_merge_identical_tree_no_collision():
     tree_1 = tree_from_dict({"a": {"b": "x"}})
     tree_2 = tree_from_dict({"a": {"b": "x"}})
-    merged = tree_1.merge(tree_2)
+    merged = Tree.merge([tree_1, tree_2])
     assert merged == tree_1
     assert merged == tree_2
 
