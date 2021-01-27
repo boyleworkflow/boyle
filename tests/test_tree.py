@@ -348,10 +348,58 @@ def test_nest_deep_below():
 def _convert_to_upper_case(tree: Tree) -> Tree:
     return Tree(
         {Name(name.value.upper()): subtree for name, subtree in tree.items()},
-        tree.data.upper(),  # type: ignore
+        tree.data.upper() if isinstance(tree.data, str) else tree.data,
     )
 
 
 def test_tree_items():
     tree = tree_from_dict({"a1": {"b": "c"}, "a2": {}})
     assert dict(tree.items()) == {name: tree[name] for name in map(Name, ["a1", "a2"])}
+
+
+def test_map_level_0():
+    tree = tree_from_dict(
+        {
+            "a1": {"b": "c"},
+            "a2": "b",
+        }
+    )
+
+    expected_result = tree_from_dict(
+        {
+            "A1": {"b": "c"},
+            "A2": "b",
+        }
+    )
+
+    assert tree.map_level(0, _convert_to_upper_case) == expected_result
+
+
+def test_map_level_2():
+    tree = tree_from_dict(
+        {
+            "a1": {
+                "b11": {
+                    "c111": "d1111",
+                },
+                "b12": {},
+            },
+            "a2": {
+                "b21": "c211",
+            },
+        }
+    )
+
+    expected_result = tree_from_dict(
+        {
+            "a1": {
+                "b11": {
+                    "C111": "d1111",
+                },
+                "b12": {},
+            },
+            "a2": {"b21": "C211"},
+        }
+    )
+
+    assert tree.map_level(2, _convert_to_upper_case) == expected_result

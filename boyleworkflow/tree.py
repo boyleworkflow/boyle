@@ -2,7 +2,16 @@ from __future__ import annotations
 from boyleworkflow.frozendict import FrozenDict
 from dataclasses import dataclass
 from functools import reduce
-from typing import AbstractSet, Iterable, Iterator, Mapping, Optional, Tuple, Union
+from typing import (
+    AbstractSet,
+    Callable,
+    Iterable,
+    Iterator,
+    Mapping,
+    Optional,
+    Tuple,
+    Union,
+)
 
 _SEPARATOR = "/"
 _DOT = "."
@@ -121,6 +130,11 @@ class Tree(Mapping[Name, "Tree"]):
             raise ValueError(f"negative level {level}")
         else:
             yield from self._iter_level(level, root)
+
+    def map_level(self, level: int, func: Callable[[Tree], Tree]) -> Tree:
+        return Tree.from_nested_items(
+            {path: func(subtree) for path, subtree in self.iter_level(level)}
+        )
 
     def _merge_one(self, other: Tree) -> Tree:
         if self.data != other.data:
