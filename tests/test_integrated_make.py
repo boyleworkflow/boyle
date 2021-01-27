@@ -1,5 +1,4 @@
 from boyleworkflow.frozendict import FrozenDict
-from tests.util import tree_from_dict
 from boyleworkflow.tree import Name, Path, Tree
 from boyleworkflow.calc import SandboxKey
 from dataclasses import dataclass, field
@@ -151,3 +150,29 @@ def test_can_make_one_of_siblings():
     first, _ = SIBLING_NODES.nodes
     make({first.out: first}, env)
     assert env.output.keys() == {first.out.to_string()}
+
+
+def test_can_make_nested():
+    env = StringFormatEnv()
+    names = Node.create(
+        {},
+        make_op(
+            **{
+                "out/first": "Robert",
+                "out/last": "Boyle",
+            }
+        ),
+        "out",
+    )
+    greetings = Node.create(
+        {"name": names},
+        make_op(greeting="Hello {name}!"),
+        "greeting",
+    ).descend("name_level")
+    make({greetings.out: greetings}, env)
+    assert env.output == {
+        "greeting": {
+            "first": "Hello Robert!",
+            "last": "Hello Boyle!",
+        }
+    }

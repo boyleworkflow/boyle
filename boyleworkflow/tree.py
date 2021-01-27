@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from functools import reduce
 from typing import (
     AbstractSet,
+    Any,
     Callable,
     Iterable,
     Iterator,
@@ -130,9 +131,18 @@ class Tree(Mapping[Name, "Tree"]):
         else:
             yield from self._iter_level(level, root)
 
-    def map_level(self, level: int, func: Callable[[Tree], Tree]) -> Tree:
+    def map_level(
+        self,
+        level: int,
+        func: Callable[[Tree, Any], Tree],
+        *args: Any,
+        **kwargs: Any,
+    ) -> Tree:
         return Tree.from_nested_items(
-            {path: func(subtree) for path, subtree in self.iter_level(level)}
+            {
+                path: func(subtree, *args, **kwargs)
+                for path, subtree in self.iter_level(level)
+            }
         )
 
     def _merge_one(self, other: Tree) -> Tree:

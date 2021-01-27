@@ -1,26 +1,35 @@
 from boyleworkflow.scheduling import GraphState
-from boyleworkflow.nodes import Node
+from boyleworkflow.nodes import Node, NodeBundle
 from typing import Mapping
-from boyleworkflow.calc import CalcBundle, Env, run
+from boyleworkflow.calc import Env, run
 from boyleworkflow.tree import Path, Tree
 
 
-def _run_priority_work(state: GraphState, env: Env) -> Mapping[Node, Tree]:
-    results = {}
-    node_bundles = {node.bundle for node in state.priority_work}
+NodeResults = Mapping[Node, Tree]
+
+
+def _run_node_bundle(
+    node_bundle: NodeBundle, results: NodeResults, env: Env
+) -> NodeResults:
+    calc_bundles = node_bundle.build_calc_bundles(results)
+
+    node_bundle_results = Tree.from_nested_items(
+        {
+            index: Tree.from_nested_items(run(cb, env))
+            for index, cb in calc_bundles.items()
+        }
+    )
+    return node_bundle.extract_node_results(node_bundle_results)
+
+
+def _run_priority_work(state: GraphState, env: Env) -> NodeResults:
+    nodes = state.priority_work
+    node_bundles = {node.bundle for node in nodes}
+    all_results = {}
     for node_bundle in node_bundles:
-        calc_input = Tree.from_nested_items(
-            {path: state.results[parent] for path, parent in node_bundle.inp.items()}
-        )
-        calc_bundle = CalcBundle(
-            calc_input,
-            node_bundle.op,
-            node_bundle.out,
-        )
-        calc_results = run(calc_bundle, env)
-        for node in node_bundle.nodes & state.priority_work:
-            results[node] = calc_results[node.out]
-    return results
+        all_results.update(_run_node_bundle(node_bundle, state.results, env))
+    requested_results = {n: all_results[n] for n in nodes}
+    return requested_results
 
 
 def _advance_state(state: GraphState, env: Env) -> GraphState:

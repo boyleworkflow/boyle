@@ -1,9 +1,9 @@
 from __future__ import annotations
-from boyleworkflow.tree import Name
+from boyleworkflow.tree import Name, Tree
 from boyleworkflow.frozendict import FrozenDict
 import dataclasses
 from dataclasses import dataclass
-from boyleworkflow.calc import Path, Op
+from boyleworkflow.calc import CalcBundle, Path, Op
 from typing import (
     AbstractSet,
     Collection,
@@ -43,6 +43,10 @@ class NodeBundle:
     out: FrozenSet[Path]
     levels: Tuple[Name, ...] = ()
 
+    @property
+    def depth(self) -> int:
+        return len(self.levels)
+
     @staticmethod
     def create(inp: Mapping[PathLike, Node], op: Op, out: PathLikePlural) -> NodeBundle:
         return NodeBundle(
@@ -68,6 +72,27 @@ class NodeBundle:
         if not self.levels:
             raise ValueError("cannot ascend non-nested")
         return dataclasses.replace(self, levels=self.levels[:-1])
+
+    def _build_input_tree(self, results: Mapping[Node, Tree]) -> Tree:
+        return Tree.merge(
+            results[inp_node].map_level(self.depth, Tree.nest, inp_path)
+            for inp_path, inp_node in self.inp.items()
+        )
+
+    def build_calc_bundles(
+        self, results: Mapping[Node, Tree]
+    ) -> Mapping[Path, CalcBundle]:
+        inp_tree = self._build_input_tree(results)
+        return {
+            index: CalcBundle(calc_inp, self.op, self.out)
+            for index, calc_inp in inp_tree.iter_level(self.depth)
+        }
+
+    def extract_node_results(self, node_bundle_results: Tree) -> Mapping[Node, Tree]:
+        return {
+            node: node_bundle_results.map_level(self.depth, Tree.pick, node.out)
+            for node in self.nodes
+        }
 
 
 @dataclass(frozen=True)
