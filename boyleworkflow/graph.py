@@ -12,15 +12,15 @@ from typing import (
 )
 from boyleworkflow.tree import Name, Path, Tree
 from boyleworkflow.frozendict import FrozenDict
-from boyleworkflow.calc import Calc, Op
+from boyleworkflow.calc import Calc, Op, NO_OP
 
 PathLike = Union[Path, str]
 NameLike = Union[Name, str]
 
 # Allowing Collection[PathLike] is possible but opens for mistakes because
 # str is also a Collection[PathLike]. So 'abc' could be confused with ['a', 'b', 'c']
-PathLikePlural = Union[Tuple[PathLike], List[PathLike], AbstractSet[PathLike]]
-NameLikePlural = Union[Tuple[NameLike], List[NameLike], AbstractSet[NameLike]]
+PathLikePlural = Union[Tuple[PathLike, ...], List[PathLike], AbstractSet[PathLike]]
+NameLikePlural = Union[Tuple[NameLike, ...], List[NameLike], AbstractSet[NameLike]]
 
 
 def _ensure_path(value: PathLike) -> Path:
@@ -37,54 +37,68 @@ def _ensure_name(value: NameLike) -> Name:
         return value
 
 
+def _get_common_inp_level(inp: Mapping[Path, Node]):
+    different_inp_levels = {inp_node.task.out_levels for inp_node in inp.values()}
+    if not len(different_inp_levels) == 1:
+        raise ValueError(f"input levels do not match: {different_inp_levels}")
+
+    (inp_levels,) = different_inp_levels
+    return inp_levels
+
+
 @dataclass(frozen=True, init=False)
 class Task:
     inp: FrozenDict[Path, Node]
     op: Op
     out: FrozenSet[Path]
-    levels: Tuple[Name, ...]
+    out_levels: Tuple[Name, ...]
 
     def __init__(
         self,
-        inp: Mapping[PathLike, Node],
+        inp: Union[Mapping[PathLike, Node], Mapping[Path, Node]],
         op: Op,
         out: PathLikePlural,
-        levels: Optional[NameLikePlural] = None,
+        out_levels: Optional[NameLikePlural] = None,
     ):
         inp_converted = FrozenDict(
             {_ensure_path(path): node for path, node in inp.items()}
         )
         if inp_converted:
-            inp_levels = {inp_node.task.levels for inp_node in inp.values()}
-            if not len(inp_levels) == 1:
-                raise ValueError(f"input levels do not match: {inp_levels}")
-
-            (levels_default,) = inp_levels
+            inp_levels = _get_common_inp_level(inp_converted)
         else:
-            levels_default = ()
+            inp_levels: Tuple[Name, ...] = ()
 
         out_converted = frozenset(map(_ensure_path, out))
 
-        levels_converted = (
-            tuple(map(_ensure_name, levels)) if levels is not None else levels_default
+        out_levels_converted = (
+            tuple(map(_ensure_name, out_levels))
+            if out_levels is not None
+            else inp_levels
         )
 
         attributes = {
             "inp": inp_converted,
             "op": op,
             "out": out_converted,
-            "levels": levels_converted,
+            "out_levels": out_levels_converted,
         }
 
         for name, value in attributes.items():
             object.__setattr__(self, name, value)
 
     @property
+    def inp_levels(self) -> Tuple[Name, ...]:
+        return _get_common_inp_level(self.inp)
+
+    @property
     def depth(self) -> int:
-        return len(self.levels)
+        return len(self.out_levels)
 
     def __getitem__(self, key: PathLike) -> Node:
-        return dict({node.out: node for node in self.nodes})[_ensure_path(key)]
+        path = _ensure_path(key)
+        if path not in self.out:
+            raise ValueError(f"no output defined at {path}")
+        return Node(self, path)
 
     @property
     def nodes(self: Task) -> FrozenSet[Node]:
@@ -92,14 +106,24 @@ class Task:
 
     def descend(self, level_name: NameLike):
         converted_name = _ensure_name(level_name)
-        if converted_name in self.levels:
+        if converted_name in self.out_levels:
             raise ValueError(f"duplicate level name {converted_name}")
-        return dataclasses.replace(self, levels=self.levels + (converted_name,))
+        return Task(
+            {path: self[path] for path in self.out},
+            NO_OP,
+            self.out,
+            out_levels=self.out_levels + (converted_name,),
+        )
 
     def ascend(self):
-        if not self.levels:
+        if not self.out_levels:
             raise ValueError("cannot ascend non-nested")
-        return dataclasses.replace(self, levels=self.levels[:-1])
+        return Task(
+            {path: self[path] for path in self.out},
+            NO_OP,
+            self.out,
+            out_levels=self.out_levels[:-1],
+        )
 
     def _build_input_tree(self, results: Mapping[Node, Tree]) -> Tree:
         return Tree.merge(

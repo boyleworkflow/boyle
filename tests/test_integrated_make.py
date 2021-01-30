@@ -165,10 +165,10 @@ def test_can_make_nested():
         "out",
     )
     greetings = Node.create(
-        {"name": names},
+        {"name": names.descend("name_level")},
         make_op(greeting="Hello {name}!"),
         "greeting",
-    ).descend("name_level")
+    )
     make({greetings.out: greetings}, env)
     assert env.output == {
         "greeting": {

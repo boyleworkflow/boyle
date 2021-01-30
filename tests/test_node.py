@@ -62,4 +62,12 @@ def test_descend():
 
 def test_ascend():
     node = Node.create({}, "op", "out")
-    assert node.descend("level_name").ascend() == node
+    task = node.task
+
+    nested_node = node.descend("level_name")
+    nested_task = task.descend("level_name")
+
+    unnested_node = nested_node.ascend()
+    unnested_task = nested_task.ascend()
+
+    assert unnested_task["out"] == unnested_node

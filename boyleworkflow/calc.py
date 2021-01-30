@@ -9,6 +9,14 @@ SandboxKey = NewType("SandboxKey", str)
 
 
 @dataclass(frozen=True)
+class NoOp:
+    pass
+
+
+NO_OP = NoOp()
+
+
+@dataclass(frozen=True)
 class Calc:
     inp: Tree
     op: Op
@@ -43,6 +51,8 @@ class Env(Protocol):
 
 
 def run(calc: Calc, env: Env) -> Mapping[Path, Tree]:
+    if calc.op is NO_OP:
+        return {path: calc.inp.pick(path) for path in calc.out}
     sandbox = env.create_sandbox()
     try:
         env.place(sandbox, calc.inp)
