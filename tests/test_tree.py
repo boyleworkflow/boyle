@@ -1,76 +1,18 @@
 import pytest
-from boyleworkflow.tree import Tree, TreeCollision, Path, Name
+from boyleworkflow.tree import Name, Path, Tree, TreeCollision
 from tests.util import tree_from_dict
 
-EMPTY_PATH_STR = "."
+
+def test_tree_eq_independent_of_order():
+    tree_1 = Tree({Name("a1"): Tree({}, "b"), Name("a2"): Tree({})})
+    tree_2 = Tree({Name("a2"): Tree({}), Name("a1"): Tree({}, "b")})
+    assert tree_1 == tree_2
 
 
-def test_name_cannot_be_empty():
-    with pytest.raises(ValueError):
-        Name("")
-
-
-def test_name_cannot_have_slash():
-    with pytest.raises(ValueError):
-        Name("a/b")
-
-
-def test_name_cannot_have_slash():
-    with pytest.raises(ValueError):
-        Name("a/b")
-
-
-def test_path_from_string():
-    path = Path.from_string("a/b")
-    assert path.names == (Name("a"), Name("b"))
-
-
-def test_path_to_string():
-    path_str = "a/b"
-    assert Path.from_string(path_str).to_string() == path_str
-
-
-def test_empty_path_to_string():
-    assert Path().to_string() == EMPTY_PATH_STR
-
-
-def test_path_must_be_relative():
-    with pytest.raises(ValueError):
-        Path.from_string("/a")
-
-
-def test_empty_path_has_no_names():
-    assert Path().names == ()
-
-
-def test_empty_path_from_string():
-    assert Path() == Path.from_string(EMPTY_PATH_STR)
-
-
-def test_no_path_from_empty_string():
-    with pytest.raises(ValueError):
-        Path.from_string("")
-
-
-def test_path_from_string_eliminates_leading_dot():
-    assert Path.from_string("./a") == Path.from_string("a")
-
-
-def test_path_from_string_eliminates_trailing_dot():
-    assert Path.from_string("a/.") == Path.from_string("a")
-
-
-def test_path_from_string_eliminates_inner_dots():
-    assert Path.from_string("a/./b/./c") == Path.from_string("a/b/c")
-
-
-def test_path_from_string_eliminates_trailing_slash():
-    assert Path.from_string("a/b/") == Path.from_string("a/b")
-
-
-def test_path_cannot_have_double_slash():
-    with pytest.raises(ValueError):
-        Path.from_string("a//b")
+def test_tree_hash_independent_of_order():
+    tree_1 = Tree({Name("a1"): Tree({}, "b"), Name("a2"): Tree({})})
+    tree_2 = Tree({Name("a2"): Tree({}), Name("a1"): Tree({}, "b")})
+    assert hash(tree_1) == hash(tree_2)
 
 
 def test_from_nested_item():
@@ -87,22 +29,10 @@ def test_from_nested_item():
     assert result == expected_result
 
 
-def test_from_nested_item():
+def test_empty_from_no_nested_item():
     empty_tree = Tree({})
     result = Tree.from_nested_items({})
     assert result == empty_tree
-
-
-def test_tree_eq_independent_of_order():
-    tree_1 = Tree({Name("a1"): Tree({}, "b"), Name("a2"): Tree({})})
-    tree_2 = Tree({Name("a2"): Tree({}), Name("a1"): Tree({}, "b")})
-    assert tree_1 == tree_2
-
-
-def test_tree_hash_independent_of_order():
-    tree_1 = Tree({Name("a1"): Tree({}, "b"), Name("a2"): Tree({})})
-    tree_2 = Tree({Name("a2"): Tree({}), Name("a1"): Tree({}, "b")})
-    assert hash(tree_1) == hash(tree_2)
 
 
 def tree_getitem():
@@ -181,8 +111,10 @@ def test_merge_disjoint():
     merged = Tree.merge([tree_1, tree_2])
     assert merged == combined
 
+
 def test_merge_none_creates_empty():
     assert Tree.merge([]) == Tree({})
+
 
 def test_merge_inside():
     tree_1 = tree_from_dict(
