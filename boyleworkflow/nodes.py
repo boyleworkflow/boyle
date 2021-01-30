@@ -1,18 +1,17 @@
 from __future__ import annotations
-from boyleworkflow.tree import Name, Tree
-from boyleworkflow.frozendict import FrozenDict
 import dataclasses
 from dataclasses import dataclass
-from boyleworkflow.calc import Calc, Path, Op
 from typing import (
     AbstractSet,
-    Collection,
     FrozenSet,
     List,
     Mapping,
     Tuple,
     Union,
 )
+from boyleworkflow.tree import Name, Path, Tree
+from boyleworkflow.frozendict import FrozenDict
+from boyleworkflow.calc import Calc, Op
 
 PathLike = Union[Path, str]
 NameLike = Union[Name, str]

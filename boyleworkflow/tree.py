@@ -1,9 +1,7 @@
 from __future__ import annotations
-from boyleworkflow.frozendict import FrozenDict
 from dataclasses import dataclass
 from functools import reduce
 from typing import (
-    AbstractSet,
     Any,
     Callable,
     Iterable,
@@ -11,8 +9,8 @@ from typing import (
     Mapping,
     Optional,
     Tuple,
-    Union,
 )
+from boyleworkflow.frozendict import FrozenDict
 
 _SEPARATOR = "/"
 _DOT = "."

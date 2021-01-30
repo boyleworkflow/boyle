@@ -1,7 +1,7 @@
 from __future__ import annotations
-import itertools
 import dataclasses
 from dataclasses import dataclass
+import itertools
 from typing import (
     Any,
     FrozenSet,

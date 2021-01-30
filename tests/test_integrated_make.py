@@ -1,9 +1,9 @@
-from boyleworkflow.frozendict import FrozenDict
-from boyleworkflow.tree import Name, Path, Tree
-from boyleworkflow.calc import SandboxKey
 from dataclasses import dataclass, field
 from typing import Dict, Mapping, Sequence, Union
 import unittest.mock
+from boyleworkflow.frozendict import FrozenDict
+from boyleworkflow.tree import Name, Path, Tree
+from boyleworkflow.calc import SandboxKey
 from boyleworkflow.make import make
 from boyleworkflow.nodes import Node, Task
 
