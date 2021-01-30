@@ -9,14 +9,14 @@ SandboxKey = NewType("SandboxKey", str)
 
 
 @dataclass(frozen=True)
-class CalcBundle:
+class Calc:
     inp: Tree
     op: Op
     out: FrozenSet[Path]
 
 
 @dataclass(frozen=True)
-class Calc:
+class CalcOut:
     inp: Tree
     op: Op
     out: Path
@@ -42,11 +42,11 @@ class Env(Protocol):
         ...
 
 
-def run(calc_bundle: CalcBundle, env: Env) -> Mapping[Path, Tree]:
+def run(calc: Calc, env: Env) -> Mapping[Path, Tree]:
     sandbox = env.create_sandbox()
     try:
-        env.place(sandbox, calc_bundle.inp)
-        env.run_op(calc_bundle.op, sandbox)
-        return {path: env.stow(sandbox, path) for path in calc_bundle.out}
+        env.place(sandbox, calc.inp)
+        env.run_op(calc.op, sandbox)
+        return {path: env.stow(sandbox, path) for path in calc.out}
     finally:
         env.destroy_sandbox(sandbox)

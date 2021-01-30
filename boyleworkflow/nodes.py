@@ -3,7 +3,7 @@ from boyleworkflow.tree import Name, Tree
 from boyleworkflow.frozendict import FrozenDict
 import dataclasses
 from dataclasses import dataclass
-from boyleworkflow.calc import CalcBundle, Path, Op
+from boyleworkflow.calc import Calc, Path, Op
 from typing import (
     AbstractSet,
     Collection,
@@ -37,7 +37,7 @@ def _ensure_name(value: NameLike) -> Name:
 
 
 @dataclass(frozen=True)
-class NodeBundle:
+class Task:
     inp: FrozenDict[Path, Node]
     op: Op
     out: FrozenSet[Path]
@@ -48,8 +48,8 @@ class NodeBundle:
         return len(self.levels)
 
     @staticmethod
-    def create(inp: Mapping[PathLike, Node], op: Op, out: PathLikePlural) -> NodeBundle:
-        return NodeBundle(
+    def create(inp: Mapping[PathLike, Node], op: Op, out: PathLikePlural) -> Task:
+        return Task(
             inp=FrozenDict({_ensure_path(path): node for path, node in inp.items()}),
             op=op,
             out=frozenset(map(_ensure_path, out)),
@@ -59,7 +59,7 @@ class NodeBundle:
         return dict({node.out: node for node in self.nodes})[_ensure_path(key)]
 
     @property
-    def nodes(self: NodeBundle) -> FrozenSet[Node]:
+    def nodes(self: Task) -> FrozenSet[Node]:
         return frozenset({Node(self, path) for path in self.out})
 
     def descend(self, level_name: NameLike):
@@ -79,37 +79,35 @@ class NodeBundle:
             for inp_path, inp_node in self.inp.items()
         )
 
-    def build_calc_bundles(
-        self, results: Mapping[Node, Tree]
-    ) -> Mapping[Path, CalcBundle]:
+    def build_calcs(self, results: Mapping[Node, Tree]) -> Mapping[Path, Calc]:
         inp_tree = self._build_input_tree(results)
         return {
-            index: CalcBundle(calc_inp, self.op, self.out)
+            index: Calc(calc_inp, self.op, self.out)
             for index, calc_inp in inp_tree.iter_level(self.depth)
         }
 
-    def extract_node_results(self, node_bundle_results: Tree) -> Mapping[Node, Tree]:
+    def extract_node_results(self, task_results: Tree) -> Mapping[Node, Tree]:
         return {
-            node: node_bundle_results.map_level(self.depth, Tree.pick, node.out)
+            node: task_results.map_level(self.depth, Tree.pick, node.out)
             for node in self.nodes
         }
 
 
 @dataclass(frozen=True)
 class Node:
-    bundle: NodeBundle
+    task: Task
     out: Path
 
     @property
     def parents(self) -> FrozenSet[Node]:
-        return frozenset(self.bundle.inp.values())
+        return frozenset(self.task.inp.values())
 
     @staticmethod
     def create(inp: Mapping[PathLike, Node], op: Op, out: PathLike) -> Node:
-        return NodeBundle.create(inp, op, [out])[out]
+        return Task.create(inp, op, [out])[out]
 
     def descend(self, level_name: NameLike):
-        return self.bundle.descend(level_name)[self.out]
+        return self.task.descend(level_name)[self.out]
 
     def ascend(self):
-        return self.bundle.ascend()[self.out]
+        return self.task.ascend()[self.out]

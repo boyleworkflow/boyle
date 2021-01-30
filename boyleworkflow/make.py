@@ -1,5 +1,5 @@
 from boyleworkflow.scheduling import GraphState
-from boyleworkflow.nodes import Node, NodeBundle
+from boyleworkflow.nodes import Node, Task
 from typing import Mapping
 from boyleworkflow.calc import Env, run
 from boyleworkflow.tree import Path, Tree
@@ -8,26 +8,21 @@ from boyleworkflow.tree import Path, Tree
 NodeResults = Mapping[Node, Tree]
 
 
-def _run_node_bundle(
-    node_bundle: NodeBundle, results: NodeResults, env: Env
-) -> NodeResults:
-    calc_bundles = node_bundle.build_calc_bundles(results)
+def _run_task(task: Task, results: NodeResults, env: Env) -> NodeResults:
+    calcs = task.build_calcs(results)
 
-    node_bundle_results = Tree.from_nested_items(
-        {
-            index: Tree.from_nested_items(run(cb, env))
-            for index, cb in calc_bundles.items()
-        }
+    task_results = Tree.from_nested_items(
+        {index: Tree.from_nested_items(run(calc, env)) for index, calc in calcs.items()}
     )
-    return node_bundle.extract_node_results(node_bundle_results)
+    return task.extract_node_results(task_results)
 
 
 def _run_priority_work(state: GraphState, env: Env) -> NodeResults:
     nodes = state.priority_work
-    node_bundles = {node.bundle for node in nodes}
+    tasks = {node.task for node in nodes}
     all_results = {}
-    for node_bundle in node_bundles:
-        all_results.update(_run_node_bundle(node_bundle, state.results, env))
+    for task in tasks:
+        all_results.update(_run_task(task, state.results, env))
     requested_results = {n: all_results[n] for n in nodes}
     return requested_results
 

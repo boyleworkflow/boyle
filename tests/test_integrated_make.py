@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import Dict, Mapping, Sequence, Union
 import unittest.mock
 from boyleworkflow.make import make
-from boyleworkflow.nodes import Node, NodeBundle
+from boyleworkflow.nodes import Node, Task
 
 StringFormatOp = FrozenDict[str, str]
 
@@ -117,7 +117,7 @@ HELLO_NODE = Node.create({}, make_op(out="Hello"), "out")
 HELLO_WORLD_NODE = Node.create(
     dict(hello=HELLO_NODE), make_op(out="{hello} World"), "out"
 )
-SIBLING_NODES = NodeBundle.create({}, make_op(a="one", b="two"), ["a", "b"])
+SIBLING_NODES = Task.create({}, make_op(a="one", b="two"), ["a", "b"])
 
 
 def test_make_hello():

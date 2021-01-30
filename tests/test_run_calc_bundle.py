@@ -1,10 +1,10 @@
-from boyleworkflow.tree import Tree
+from boyleworkflow.tree import Tree, Path
 import pytest
 from unittest.mock import Mock, call
-from boyleworkflow.calc import run, CalcBundle, Path
+from boyleworkflow.calc import run, Calc
 from tests.util import tree_from_dict
 
-CALC_BUNDLE = CalcBundle(
+CALC = Calc(
     tree_from_dict({name: f"result:{name}" for name in ["i1", "i2", "i3"]}),
     Mock(),
     frozenset(
@@ -18,28 +18,28 @@ CALC_BUNDLE = CalcBundle(
 
 def test_creates_exactly_one_sandbox():
     env = Mock()
-    run(CALC_BUNDLE, env)
+    run(CALC, env)
     env.create_sandbox.assert_called_once()  # type: ignore
 
 
 def test_runs_op_in_sandbox():
     env = Mock()
     sandbox = env.create_sandbox()  # type: ignore
-    run(CALC_BUNDLE, env)
-    env.run_op.assert_called_with(CALC_BUNDLE.op, sandbox)  # type: ignore
+    run(CALC, env)
+    env.run_op.assert_called_with(CALC.op, sandbox)  # type: ignore
 
 
 def test_places_inputs_in_sandbox():
     env = Mock()
     sandbox = env.create_sandbox()  # type: ignore
-    run(CALC_BUNDLE, env)
-    env.place.assert_called_once_with(sandbox, CALC_BUNDLE.inp)  # type: ignore
+    run(CALC, env)
+    env.place.assert_called_once_with(sandbox, CALC.inp)  # type: ignore
 
 
 def test_destroys_sandbox_after_finishing():
     env = Mock()
     sandbox = env.create_sandbox()  # type: ignore
-    run(CALC_BUNDLE, env)
+    run(CALC, env)
     env.destroy_sandbox.assert_called_once_with(sandbox)  # type: ignore
 
 
@@ -49,21 +49,21 @@ def test_destroys_sandbox_after_failed_run():
     )
     sandbox = env.create_sandbox()  # type: ignore
     with pytest.raises(Exception):
-        run(CALC_BUNDLE, env)
+        run(CALC, env)
     env.destroy_sandbox.assert_called_once_with(sandbox)  # type: ignore
 
 
 def test_asks_env_to_stow_out_paths():
     env = Mock()
     sandbox = env.create_sandbox()  # type: ignore
-    run(CALC_BUNDLE, env)
+    run(CALC, env)
     assert env.stow.call_args_list == [  # type:ignore
-        call(sandbox, path) for path in CALC_BUNDLE.out  # type:ignore
+        call(sandbox, path) for path in CALC.out  # type:ignore
     ]
 
 
 def test_returns_mapping_with_results():
-    expected_results = {path: Tree({}, f"digest:{path}") for path in CALC_BUNDLE.out}
+    expected_results = {path: Tree({}, f"digest:{path}") for path in CALC.out}
     env = Mock(stow=lambda sandbox, path: expected_results[path])  # type: ignore
-    results = run(CALC_BUNDLE, env)
+    results = run(CALC, env)
     assert results == expected_results

@@ -1,6 +1,6 @@
 import pytest
 from boyleworkflow.tree import Name
-from boyleworkflow.nodes import Node, NodeBundle
+from boyleworkflow.nodes import Node, Task
 
 
 ROOT1 = Node.create({}, "op1", "loc1")
@@ -8,9 +8,9 @@ ROOT2 = Node.create({}, "op2", "loc2")
 DERIVED = Node.create({"i1": ROOT1, "i2": ROOT2}, "op", "out")
 DERIVED_IDENTICAL = Node.create({"i2": ROOT2, "i1": ROOT1}, "op", "out")
 
-BUNDLE = NodeBundle.create({}, "op", ["out"])
-BUNDLE_L1 = BUNDLE.descend("level1")
-BUNDLE_L2 = BUNDLE_L1.descend("level2")
+TASK = Task.create({}, "op", ["out"])
+TASK_L1 = TASK.descend("level1")
+TASK_L2 = TASK_L1.descend("level2")
 
 
 def test_input_loc_affects_hash():
@@ -48,10 +48,10 @@ def test_equality_and_hash_insensitive_to_inp_order():
     assert hash(DERIVED) == hash(DERIVED_IDENTICAL)
 
 
-def test_bundle_getitem():
-    bundle = NodeBundle.create({}, "op", ["out"])
-    (node,) = bundle.nodes
-    assert node == bundle["out"]
+def test_task_getitem():
+    task = Task.create({}, "op", ["out"])
+    (node,) = task.nodes
+    assert node == task["out"]
 
 
 def test_root_has_no_parents():
@@ -62,50 +62,50 @@ def test_derived_has_parents():
     assert DERIVED.parents == {ROOT1, ROOT2}
 
 
-def test_node_bundle_default_not_nested():
-    bundle = NodeBundle.create({}, "op", ["out"])
-    assert bundle.levels == ()
+def test_task_default_not_nested():
+    task = Task.create({}, "op", ["out"])
+    assert task.levels == ()
 
 
-def test_node_bundle_descend_does_not_alter():
-    bundle = NodeBundle.create({}, "op", ["out"])
-    bundle.descend("level1")
-    assert bundle.levels == ()
+def test_task_descend_does_not_alter():
+    task = Task.create({}, "op", ["out"])
+    task.descend("level1")
+    assert task.levels == ()
 
 
-def test_node_bundle_descend():
-    assert BUNDLE.descend("level1").levels == (Name("level1"),)
+def test_task_descend():
+    assert TASK.descend("level1").levels == (Name("level1"),)
 
 
-def test_node_bundle_descend_twice():
-    assert BUNDLE.descend("l1").descend("l2").levels == (Name("l1"), Name("l2"))
+def test_task_descend_twice():
+    assert TASK.descend("l1").descend("l2").levels == (Name("l1"), Name("l2"))
 
 
-def test_node_bundle_descend_levels_must_be_unique():
+def test_task_descend_levels_must_be_unique():
     with pytest.raises(ValueError):
-        BUNDLE.descend("level1").descend("level1")
+        TASK.descend("level1").descend("level1")
 
 
-def test_node_bundle_ascend():
-    assert BUNDLE_L1.ascend() == BUNDLE
-    assert BUNDLE_L2.ascend() == BUNDLE_L1
+def test_task_ascend():
+    assert TASK_L1.ascend() == TASK
+    assert TASK_L2.ascend() == TASK_L1
 
 
-def test_node_bundle_cannot_ascend_unless_nested():
+def test_task_cannot_ascend_unless_nested():
     with pytest.raises(ValueError):
-        BUNDLE.ascend()
+        TASK.ascend()
 
 
 def test_node_descend():
-    bundle = BUNDLE
-    nested_bundle = bundle.descend("level_name")
+    task = TASK
+    nested_task = task.descend("level_name")
 
-    node = bundle["out"]
+    node = task["out"]
     nested_node = node.descend("level_name")
 
-    assert nested_bundle["out"] == nested_node
+    assert nested_task["out"] == nested_node
 
 
 def test_node_ascend():
-    node = BUNDLE["out"]
+    node = TASK["out"]
     assert node.descend("level_name").ascend() == node
