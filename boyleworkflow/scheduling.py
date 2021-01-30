@@ -10,7 +10,7 @@ from typing import (
     Mapping,
     Set,
 )
-from boyleworkflow.nodes import Node
+from boyleworkflow.graph import Node
 from boyleworkflow.tree import Tree
 
 

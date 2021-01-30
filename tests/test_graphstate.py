@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Iterator, Mapping, Sequence
 import pytest
 from unittest.mock import Mock
-from boyleworkflow.nodes import Node, PathLike
+from boyleworkflow.graph import Node, PathLike
 from boyleworkflow.scheduling import (
     GraphState,
     get_nodes_and_ancestors,

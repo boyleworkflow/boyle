@@ -1,4 +1,4 @@
-from boyleworkflow.nodes import Node
+from boyleworkflow.graph import Node
 
 
 ROOT1 = Node.create({}, "op1", "loc1")

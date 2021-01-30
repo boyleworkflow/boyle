@@ -1,6 +1,6 @@
 import pytest
 from boyleworkflow.tree import Name
-from boyleworkflow.nodes import Task
+from boyleworkflow.graph import Task
 
 TASK = Task.create({}, "op", ["out"])
 TASK_L1 = TASK.descend("level1")

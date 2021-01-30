@@ -1,5 +1,5 @@
 from boyleworkflow.scheduling import GraphState
-from boyleworkflow.nodes import Node, Task
+from boyleworkflow.graph import Node, Task
 from typing import Mapping
 from boyleworkflow.calc import Env, run
 from boyleworkflow.tree import Path, Tree
