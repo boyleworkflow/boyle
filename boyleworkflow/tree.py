@@ -118,7 +118,7 @@ class Tree(Mapping[Name, "Tree"]):
             yield prefix, self
         else:
             if not len(self):
-                raise ValueError("no children found below {prefix}")
+                raise ValueError(f"no children found below {prefix}")
             for name, subtree in self.items():
                 yield from subtree._iter_level(level - 1, (prefix / name))
 
