@@ -214,3 +214,35 @@ def test_can_make_twice_nested():
             },
         }
     }
+
+
+def test_can_nest_node_with_non_nestable_sibling():
+    env = StringFormatEnv()
+
+    task_1 = Task(
+        {},
+        make_op(
+            **{
+                "to be nested/key 1": "value 1",
+                "to be nested/key 2": "value 2",
+                "not to be nested": "...",
+            }
+        ),
+        ["to be nested", "not to be nested"],
+    )
+
+    parent_node = task_1["to be nested"].descend("nested level")
+
+    derived_node = Node.create(
+        {"parent": parent_node},
+        make_op(result="{parent.upper()}"),
+        "result",
+    )
+
+    make({derived_node.out: derived_node}, env)
+    assert env.output == {
+        "result": {
+            "key 1": "VALUE 1",
+            "key 2": "VALUE 2",
+        }
+    }
