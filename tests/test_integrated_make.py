@@ -117,7 +117,7 @@ HELLO_NODE = Node.create({}, make_op(out="Hello"), "out")
 HELLO_WORLD_NODE = Node.create(
     dict(hello=HELLO_NODE), make_op(out="{hello} World"), "out"
 )
-SIBLING_NODES = Task.create({}, make_op(a="one", b="two"), ["a", "b"])
+SIBLING_NODES = Task({}, make_op(a="one", b="two"), ["a", "b"])
 
 
 def test_make_hello():

@@ -6,6 +6,7 @@ from typing import (
     FrozenSet,
     List,
     Mapping,
+    Optional,
     Tuple,
     Union,
 )
@@ -19,6 +20,7 @@ NameLike = Union[Name, str]
 # Allowing Collection[PathLike] is possible but opens for mistakes because
 # str is also a Collection[PathLike]. So 'abc' could be confused with ['a', 'b', 'c']
 PathLikePlural = Union[Tuple[PathLike], List[PathLike], AbstractSet[PathLike]]
+NameLikePlural = Union[Tuple[NameLike], List[NameLike], AbstractSet[NameLike]]
 
 
 def _ensure_path(value: PathLike) -> Path:
@@ -35,24 +37,51 @@ def _ensure_name(value: NameLike) -> Name:
         return value
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, init=False)
 class Task:
     inp: FrozenDict[Path, Node]
     op: Op
     out: FrozenSet[Path]
-    levels: Tuple[Name, ...] = ()
+    levels: Tuple[Name, ...]
+
+    def __init__(
+        self,
+        inp: Mapping[PathLike, Node],
+        op: Op,
+        out: PathLikePlural,
+        levels: Optional[NameLikePlural] = None,
+    ):
+        inp_converted = FrozenDict(
+            {_ensure_path(path): node for path, node in inp.items()}
+        )
+        if inp_converted:
+            inp_levels = {inp_node.task.levels for inp_node in inp.values()}
+            if not len(inp_levels) == 1:
+                raise ValueError(f"input levels do not match: {inp_levels}")
+
+            (levels_default,) = inp_levels
+        else:
+            levels_default = ()
+
+        out_converted = frozenset(map(_ensure_path, out))
+
+        levels_converted = (
+            tuple(map(_ensure_name, levels)) if levels is not None else levels_default
+        )
+
+        attributes = {
+            "inp": inp_converted,
+            "op": op,
+            "out": out_converted,
+            "levels": levels_converted,
+        }
+
+        for name, value in attributes.items():
+            object.__setattr__(self, name, value)
 
     @property
     def depth(self) -> int:
         return len(self.levels)
-
-    @staticmethod
-    def create(inp: Mapping[PathLike, Node], op: Op, out: PathLikePlural) -> Task:
-        return Task(
-            inp=FrozenDict({_ensure_path(path): node for path, node in inp.items()}),
-            op=op,
-            out=frozenset(map(_ensure_path, out)),
-        )
 
     def __getitem__(self, key: PathLike) -> Node:
         return dict({node.out: node for node in self.nodes})[_ensure_path(key)]
@@ -103,7 +132,7 @@ class Node:
 
     @staticmethod
     def create(inp: Mapping[PathLike, Node], op: Op, out: PathLike) -> Node:
-        return Task.create(inp, op, [out])[out]
+        return Task(inp, op, [out])[out]
 
     def descend(self, level_name: NameLike):
         return self.task.descend(level_name)[self.out]
