@@ -176,3 +176,41 @@ def test_can_make_nested():
             "last": "Hello Boyle!",
         }
     }
+
+
+def test_can_make_twice_nested():
+    env = StringFormatEnv()
+    names = Node.create(
+        {},
+        make_op(
+            **{
+                "out/first": "Robert",
+                "out/last": "Boyle",
+            }
+        ),
+        "out",
+    )
+    greetings = Node.create(
+        {"name": names.descend("name_level")},
+        make_op(
+            **{
+                "greetings/English": "Hello {name}!",
+                "greetings/Swedish": "Hej {name}!",
+            }
+        ),
+        "greetings",
+    ).descend("language")
+
+    make({greetings.out: greetings}, env)
+    assert env.output == {
+        "greetings": {
+            "first": {
+                "English": "Hello Robert!",
+                "Swedish": "Hej Robert!",
+            },
+            "last": {
+                "English": "Hello Boyle!",
+                "Swedish": "Hej Boyle!",
+            },
+        }
+    }
