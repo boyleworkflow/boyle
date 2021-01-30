@@ -1,18 +1,16 @@
 from __future__ import annotations
-import dataclasses
+from boyleworkflow.frozendict import FrozenDict
 from dataclasses import dataclass
 from typing import (
     AbstractSet,
+    Collection,
     FrozenSet,
     List,
-    Mapping,
-    Optional,
     Tuple,
     Union,
 )
 from boyleworkflow.tree import Name, Path, Tree
-from boyleworkflow.frozendict import FrozenDict
-from boyleworkflow.calc import Calc, Op, NO_OP
+from boyleworkflow.calc import Op
 
 PathLike = Union[Path, str]
 NameLike = Union[Name, str]
@@ -37,129 +35,108 @@ def _ensure_name(value: NameLike) -> Name:
         return value
 
 
-def _get_common_inp_level(inp: Mapping[Path, Node]):
-    different_inp_levels = {inp_node.task.out_levels for inp_node in inp.values()}
-    if not len(different_inp_levels) == 1:
-        raise ValueError(f"input levels do not match: {different_inp_levels}")
+def _get_out_levels(nodes: Collection[Node]) -> Tuple[Name, ...]:
+    nodes = set(nodes)
+    if not nodes:
+        return ()
 
-    (inp_levels,) = different_inp_levels
-    return inp_levels
+    different_levels = {node.out_levels for node in nodes}
+    if not len(different_levels) == 1:
+        raise ValueError(f"input levels do not match: {different_levels}")
+
+    (levels,) = different_levels
+    return levels
 
 
-@dataclass(frozen=True, init=False)
-class Task:
+@dataclass(frozen=True)
+class Node:
     inp: FrozenDict[Path, Node]
-    op: Op
-    out: FrozenSet[Path]
-    out_levels: Tuple[Name, ...]
 
-    def __init__(
-        self,
-        inp: Union[Mapping[PathLike, Node], Mapping[Path, Node]],
-        op: Op,
-        out: PathLikePlural,
-        out_levels: Optional[NameLikePlural] = None,
-    ):
-        inp_converted = FrozenDict(
-            {_ensure_path(path): node for path, node in inp.items()}
-        )
-        if inp_converted:
-            inp_levels = _get_common_inp_level(inp_converted)
-        else:
-            inp_levels: Tuple[Name, ...] = ()
+    def __post_init__(self):
+        self.inp_levels  # to raise an error if input levels do not match
 
-        out_converted = frozenset(map(_ensure_path, out))
+    @property
+    def parents(self) -> FrozenSet[Node]:
+        return frozenset(self.inp.values())
 
-        out_levels_converted = (
-            tuple(map(_ensure_name, out_levels))
-            if out_levels is not None
-            else inp_levels
-        )
+    def __getitem__(self, key: PathLike) -> Node:
+        return self.pick(key)
 
-        attributes = {
-            "inp": inp_converted,
-            "op": op,
-            "out": out_converted,
-            "out_levels": out_levels_converted,
-        }
+    def pick(self, path: PathLike) -> Node:
+        path = _ensure_path(path)
+        return PickNode(FrozenDict({Path(): self}), path)
 
-        for name, value in attributes.items():
-            object.__setattr__(self, name, value)
+    def nest(self, path: PathLike) -> Node:
+        path = _ensure_path(path)
+        return RenameNode(FrozenDict({path: self}))
+
+    def merge(self, *other: Node) -> Node:
+        nodes = (self,) + other
+        inp = {Path.from_string(str(i)): node for (i, node) in enumerate(nodes)}
+        return MergeNode(FrozenDict(inp))
+
+    def split(self, level: NameLike) -> Node:
+        level = _ensure_name(level)
+        return SplitNode(FrozenDict({Path(): self}), level)
 
     @property
     def inp_levels(self) -> Tuple[Name, ...]:
-        return _get_common_inp_level(self.inp)
+        return _get_out_levels(self.parents)
+
+    @property
+    def out_levels(self) -> Tuple[Name, ...]:
+        return self.inp_levels
 
     @property
     def depth(self) -> int:
         return len(self.out_levels)
 
-    def __getitem__(self, key: PathLike) -> Node:
-        path = _ensure_path(key)
-        if path not in self.out:
-            raise ValueError(f"no output defined at {path}")
-        return Node(self, path)
 
-    @property
-    def nodes(self: Task) -> FrozenSet[Node]:
-        return frozenset({Node(self, path) for path in self.out})
-
-    def descend(self, level_name: NameLike):
-        converted_name = _ensure_name(level_name)
-        if converted_name in self.out_levels:
-            raise ValueError(f"duplicate level name {converted_name}")
-        return Task(
-            {path: self[path] for path in self.out},
-            NO_OP,
-            self.out,
-            out_levels=self.out_levels + (converted_name,),
-        )
-
-    def ascend(self):
-        if not self.out_levels:
-            raise ValueError("cannot ascend non-nested")
-        return Task(
-            {path: self[path] for path in self.out},
-            NO_OP,
-            self.out,
-            out_levels=self.out_levels[:-1],
-        )
-
-    def _build_input_tree(self, results: Mapping[Node, Tree]) -> Tree:
-        return Tree.merge(
-            results[inp_node].map_level(self.depth, Tree.nest, inp_path)
-            for inp_path, inp_node in self.inp.items()
-        )
-
-    def build_calcs(self, results: Mapping[Node, Tree]) -> Mapping[Path, Calc]:
-        inp_tree = self._build_input_tree(results)
-        return {
-            index: Calc(calc_inp, self.op, self.out)
-            for index, calc_inp in inp_tree.iter_level(self.depth)
-        }
-
-    def extract_node_results(self, task_results: Tree) -> Mapping[Node, Tree]:
-        return {
-            node: task_results.map_level(self.depth, Tree.pick, node.out)
-            for node in self.nodes
-        }
+@dataclass(frozen=True)
+class VirtualNode(Node):
+    def run(self, input_tree: Tree) -> Tree:
+        raise NotImplemented
 
 
 @dataclass(frozen=True)
-class Node:
-    task: Task
-    out: Path
+class PickNode(VirtualNode):
+    pick_path: Path
+
+    def run(self, input_tree: Tree) -> Tree:
+        return input_tree.map_level(self.depth, Tree.pick, self.pick_path)
+
+
+@dataclass(frozen=True)
+class RenameNode(VirtualNode):
+    def run(self, input_tree: Tree) -> Tree:
+        return input_tree
+
+
+@dataclass(frozen=True)
+class MergeNode(VirtualNode):
+    def run(self, input_tree: Tree) -> Tree:
+        return Tree.merge(subtree for _, subtree in input_tree.iter_level(1))
+
+
+@dataclass(frozen=True)
+class SplitNode(VirtualNode):
+    level: Name
+
+    def __post_init__(self):
+        if self.level in self.inp_levels:
+            raise ValueError(
+                f"trying to add duplicate level {self.level} to {self.inp_levels}"
+            )
+
+    def run(self, input_tree: Tree) -> Tree:
+        return input_tree
 
     @property
-    def parents(self) -> FrozenSet[Node]:
-        return frozenset(self.task.inp.values())
+    def out_levels(self):
+        return self.inp_levels + (self.level,)
 
-    @staticmethod
-    def create(inp: Mapping[PathLike, Node], op: Op, out: PathLike) -> Node:
-        return Task(inp, op, [out])[out]
 
-    def descend(self, level_name: NameLike):
-        return self.task.descend(level_name)[self.out]
-
-    def ascend(self):
-        return self.task.ascend()[self.out]
+@dataclass(frozen=True)
+class EnvNode(Node):
+    op: Op
+    out: FrozenSet[Path]

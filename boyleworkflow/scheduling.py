@@ -1,4 +1,6 @@
 from __future__ import annotations
+from boyleworkflow.calc import Calc, Env, run
+from boyleworkflow.graph import Node, EnvNode, VirtualNode
 import dataclasses
 from dataclasses import dataclass
 import itertools
@@ -9,9 +11,9 @@ from typing import (
     Iterator,
     Mapping,
     Set,
+    Union,
 )
-from boyleworkflow.graph import Node
-from boyleworkflow.tree import Tree
+from boyleworkflow.tree import Path, Tree
 
 
 def get_nodes_and_ancestors(nodes: Iterable[Node]) -> FrozenSet[Node]:
@@ -144,3 +146,58 @@ class GraphState:
             restorable=new_restorable,
             runnable=new_runnable,
         )._set_priority_work()
+
+
+def _run_virtual_node(node: VirtualNode, input_tree: Tree) -> Tree:
+    return node.run(input_tree)
+
+
+def _build_calcs(node: EnvNode, input_tree: Tree) -> Mapping[Path, Calc]:
+    return {
+        index: Calc(calc_inp, node.op, node.out)
+        for index, calc_inp in input_tree.iter_level(node.depth)
+    }
+
+
+def _run_env_node(node: EnvNode, input_tree: Tree, env: Env) -> Tree:
+    calcs = _build_calcs(node, input_tree)
+    calc_results = {
+        index: Tree.from_nested_items(run(calc, env)) for index, calc in calcs.items()
+    }
+    node_result = Tree.from_nested_items(calc_results)
+    return node_result
+
+
+def _run_node(node: Node, results: Mapping[Node, Tree], env: Env) -> Tree:
+    input_tree = Tree.merge(
+        results[parent].map_level(node.depth, Tree.nest, path)
+        for path, parent in node.inp.items()
+    )
+    if isinstance(node, VirtualNode):
+        return _run_virtual_node(node, input_tree)
+    elif isinstance(node, EnvNode):
+        return _run_env_node(node, input_tree, env)
+    else:
+        raise ValueError(f"unknown node type {type(node)}")
+
+
+def _run_priority_work(state: GraphState, env: Env) -> Mapping[Node, Tree]:
+    nodes = state.priority_work
+    return {node: _run_node(node, state.results, env) for node in nodes}
+
+
+def _advance_state(state: GraphState, env: Env) -> GraphState:
+    results = _run_priority_work(state, env)
+    return state.add_results(results).add_restorable(results)
+
+
+def make(requested: Union[Node, Iterable[Node]], env: Env):
+    if isinstance(requested, Node):
+        requested = {requested}
+    else:
+        requested = set(requested)
+    state = GraphState.from_requested(requested)
+    while state.priority_work:
+        state = _advance_state(state, env)
+    result_tree = Tree.merge(state.results[node] for node in requested)
+    env.deliver(result_tree)

@@ -143,24 +143,28 @@ class Tree(Mapping[Name, "Tree"]):
             }
         )
 
-    def _merge_one(self, other: Tree) -> Tree:
+    def _merge_one(self, other: Tree, path: Path) -> Tree:
         if self.data != other.data:
-            raise TreeCollision(f"data mismatch")
+            raise TreeCollision(f"data mismatch at {path}")
         name_collisions = set(self) & set(other)
         merged_trees: Mapping[Name, Tree] = {}
         for name in name_collisions:
             left = self[name]
             right = other[name]
-            merged_trees[name] = Tree.merge([left, right])
+            merged_trees[name] = Tree._merge([left, right], path / name)
 
         return Tree({**self, **other, **merged_trees}, self.data)
 
     @staticmethod
-    def merge(trees: Iterable[Tree]) -> Tree:
+    def _merge(trees: Iterable[Tree], path: Path):
         trees = tuple(trees)
         if not trees:
             return Tree({})
-        return reduce(Tree._merge_one, trees)
+        return reduce(lambda a, b: a._merge_one(b, path), trees)
+
+    @staticmethod
+    def merge(trees: Iterable[Tree]) -> Tree:
+        return Tree._merge(trees, Path())
 
     def __repr__(self):
         data_repr = "" if self.data is None else f", {repr(self.data)}"

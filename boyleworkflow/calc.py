@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Any, FrozenSet, Mapping, NewType, Protocol
+from typing import Any, FrozenSet, Hashable, Mapping, NewType, Protocol
 from boyleworkflow.tree import Path, Tree
 
 
@@ -30,7 +30,7 @@ class CalcOut:
     out: Path
 
 
-class Env(Protocol):
+class Env(Hashable, Protocol):
     def run_op(self, op: Op, sandbox: SandboxKey):
         ...
 

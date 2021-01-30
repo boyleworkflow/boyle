@@ -2,15 +2,32 @@ from dataclasses import dataclass
 from typing import Iterator, Mapping, Sequence
 import pytest
 from unittest.mock import Mock
-from boyleworkflow.graph import Node, PathLike
+from boyleworkflow.tree import Path
+from boyleworkflow.graph import Node
+from boyleworkflow.frozendict import FrozenDict
 from boyleworkflow.scheduling import (
     GraphState,
     get_nodes_and_ancestors,
     get_root_nodes,
 )
 
-ROOT_NODE = Node.create({}, "op", "out")
-DERIVED_NODE = Node.create({"inp": ROOT_NODE}, "op", "out")
+
+@dataclass(frozen=True)
+class NamedNode(Node):
+    # The name fills the dual purpose of helping debugging
+    # and making sure nodes have distinct hashes.
+    name: str
+
+
+def create_node(inp: Mapping[str, Node], name: str):
+    return NamedNode(
+        FrozenDict({Path.from_string(path): node for path, node in inp.items()}),
+        name,
+    )
+
+
+ROOT_NODE = create_node({}, "root")
+DERIVED_NODE = create_node({"inp": ROOT_NODE}, "derived")
 
 
 NetworkSpec = Mapping[str, Sequence[str]]
@@ -19,8 +36,8 @@ NetworkSpec = Mapping[str, Sequence[str]]
 def build_node_network(parents_by_name: NetworkSpec) -> Mapping[str, Node]:
     nodes = {}
     for name, parent_names in parents_by_name.items():
-        parents: Mapping[PathLike, Node] = {n: nodes[n] for n in parent_names}
-        nodes[name] = Node.create(parents, f"op_{name}", f"out_{name}")
+        parents = {parent_name: nodes[parent_name] for parent_name in parent_names}
+        nodes[name] = create_node(parents, name)
     return nodes
 
 
@@ -225,6 +242,7 @@ def test_invariants_along_permitted_paths(network_spec: RequestAndStatesSpec):
     start_state = GraphState.from_requested(network_spec.requested_nodes)
     count = 0
     for state in generate_allowed_states(start_state):
+        print(state)
         count += 1
         assert not get_failed_invariants(state)
     assert network_spec.number_of_states == count

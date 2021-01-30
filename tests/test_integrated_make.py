@@ -1,17 +1,18 @@
-from dataclasses import dataclass, field
-from typing import Dict, Mapping, Sequence, Union
+from boyleworkflow.graph import Node
+from dataclasses import dataclass
+from typing import Dict, List, Mapping, Optional, Sequence, Union
 import unittest.mock
 from boyleworkflow.frozendict import FrozenDict
 from boyleworkflow.tree import Name, Path, Tree
 from boyleworkflow.calc import SandboxKey
-from boyleworkflow.make import make
-from boyleworkflow.graph import Node, Task
+from boyleworkflow.scheduling import make
+import tests.util
 
 StringFormatOp = FrozenDict[str, str]
 
 
-def make_op(**definitions: str) -> StringFormatOp:
-    return FrozenDict(definitions)
+def create_env_node(inp: Mapping[str, Node], op: Mapping[str, str], out: List[str]):
+    return tests.util.create_env_node(inp, FrozenDict(op), out)
 
 
 NestedStrDictItem = Union["NestedStrDict", str]
@@ -69,7 +70,7 @@ def build_item_from_storage(
 
 @dataclass
 class StringFormatEnv:
-    output: NestedStrDict = field(default_factory=dict)
+    output: Optional[NestedStrDictItem] = None
 
     def __post_init__(self):
         self._sandboxes: Dict[SandboxKey, NestedStrDict] = {}
@@ -100,149 +101,189 @@ class StringFormatEnv:
             self._storage[subtree] = pick_nested(result, path)
         return tree
 
-    def _place_into(self, tree: Tree, destination: NestedStrDict):
+    def place(self, sandbox_key: SandboxKey, tree: Tree):
         item = build_item_from_storage(tree, self._storage)
         if not isinstance(item, dict):
-            raise ValueError(f"expected a dict but found {repr(item)}")
-        destination.update(item)
-
-    def place(self, sandbox_key: SandboxKey, tree: Tree):
-        self._place_into(tree, self._sandboxes[sandbox_key])
+            raise ValueError(f"cannot place non-dict item {item} in sandbox")
+        self._sandboxes[sandbox_key] = item
 
     def deliver(self, tree: Tree):
-        self._place_into(tree, self.output)
-
-
-HELLO_NODE = Node.create({}, make_op(out="Hello"), "out")
-HELLO_WORLD_NODE = Node.create(
-    dict(hello=HELLO_NODE), make_op(out="{hello} World"), "out"
-)
-SIBLING_NODES = Task({}, make_op(a="one", b="two"), ["a", "b"])
+        self.output = build_item_from_storage(tree, self._storage)
 
 
 def test_make_hello():
     env = StringFormatEnv()
-    make({Path.from_string("hello"): HELLO_NODE}, env)
-    assert env.output["hello"] == "Hello"
+    hello_node = create_env_node({}, {"hello": "Hello"}, ["hello"])
+    make({hello_node}, env)
+    assert env.output == {"hello": "Hello"}
 
 
 def test_make_hello_world():
     env = StringFormatEnv()
-    make({Path.from_string("hello_world"): HELLO_WORLD_NODE}, env)
-    assert env.output["hello_world"] == "Hello World"
+    hello_node = create_env_node({}, {"hello": "Hello"}, ["hello"])
+    hello_world_node = create_env_node(
+        {".": hello_node},
+        {"hello_world": "{hello} World"},
+        ["hello_world"],
+    )
+    make(hello_world_node, env)
+    assert env.output == {"hello_world": "Hello World"}
+
+
+def test_nest():
+    env = StringFormatEnv()
+    hello_node = create_env_node({}, {"hello": "Hello"}, ["hello"])
+    make({hello_node.nest("greeting")}, env)
+    assert env.output == {"greeting": {"hello": "Hello"}}
+
+
+def test_pick():
+    env = StringFormatEnv()
+    hello_node = create_env_node({}, {"hello": "Hello"}, ["hello"])
+    make(hello_node["hello"], env)
+    assert env.output == "Hello"
+
+
+def test_merge():
+    env = StringFormatEnv()
+    node_1 = create_env_node({}, {"first": "Robert"}, ["first"])
+    node_2 = create_env_node({}, {"last": "Boyle"}, ["last"])
+    merged = node_1.merge(node_2)
+    make(merged, env)
+    assert env.output == {"first": "Robert", "last": "Boyle"}
 
 
 def test_multi_output():
     env = StringFormatEnv()
-    make({n.out: n for n in SIBLING_NODES.nodes}, env)
-    assert env.output["a"] == "one"
-    assert env.output["b"] == "two"
+    multi_output_node = create_env_node({}, {"a": "one", "b": "two"}, ["a", "b"])
+    make(multi_output_node, env)
+    assert env.output == {"a": "one", "b": "two"}
 
 
-def test_multi_output_runs_once():
-    env = unittest.mock.Mock(wraps=StringFormatEnv())
-    make({n.out: n for n in SIBLING_NODES.nodes}, env)
+def test_separated_and_recombined_siblings_runs_only_once():
+    env = unittest.mock.Mock(wraps=StringFormatEnv())  # type: ignore
+    multi_output_node = create_env_node({}, {"a": "one", "b": "two"}, ["a", "b"])
+    a = multi_output_node["a"]
+    b = multi_output_node["b"]
+    combined = a.nest("A").merge(b.nest("B"))
+    make(combined, env)
     env.run_op.assert_called_once()  # type: ignore
 
 
-def test_can_make_one_of_siblings():
+def test_can_split():
     env = StringFormatEnv()
-    first, _ = SIBLING_NODES.nodes
-    make({first.out: first}, env)
-    assert env.output.keys() == {first.out.to_string()}
-
-
-def test_can_make_nested():
-    env = StringFormatEnv()
-    names = Node.create(
-        {},
-        make_op(
-            **{
+    names = (
+        create_env_node(
+            {},
+            {
                 "out/first": "Robert",
                 "out/last": "Boyle",
-            }
-        ),
-        "out",
+            },
+            ["out"],
+        )
+        .pick("out")
+        .split("name_level")
     )
-    greetings = Node.create(
-        {"name": names.descend("name_level")},
-        make_op(greeting="Hello {name}!"),
-        "greeting",
-    )
-    make({greetings.out: greetings}, env)
+    make(names, env)
     assert env.output == {
-        "greeting": {
-            "first": "Hello Robert!",
-            "last": "Hello Boyle!",
-        }
+        "first": "Robert",
+        "last": "Boyle",
     }
 
 
-def test_can_make_twice_nested():
+def test_can_map_on_nested_level_1():
     env = StringFormatEnv()
-    names = Node.create(
-        {},
-        make_op(
-            **{
+    names = (
+        create_env_node(
+            {},
+            {
                 "out/first": "Robert",
                 "out/last": "Boyle",
-            }
-        ),
-        "out",
+            },
+            ["out"],
+        )
+        .pick("out")
+        .split("name_level")
     )
-    greetings = Node.create(
-        {"name": names.descend("name_level")},
-        make_op(
-            **{
+
+    greetings = create_env_node(
+        {"name": names},
+        {"greeting": "Hello {name}!"},
+        ["greeting"],
+    )["greeting"]
+    make(greetings, env)
+    assert env.output == {
+        "first": "Hello Robert!",
+        "last": "Hello Boyle!",
+    }
+
+
+def test_can_map_on_nested_level_2():
+    env = StringFormatEnv()
+
+    names = (
+        create_env_node(
+            {},
+            {
+                "out/first": "Robert",
+                "out/last": "Boyle",
+            },
+            ["out"],
+        )
+        .pick("out")
+        .split("name part")
+    )
+
+    greetings = (
+        create_env_node(
+            {"name": names},
+            {
                 "greetings/English": "Hello {name}!",
                 "greetings/Swedish": "Hej {name}!",
-            }
-        ),
-        "greetings",
-    ).descend("language")
+            },
+            ["greetings"],
+        )
+        .pick("greetings")
+        .split("language")
+    )
 
-    make({greetings.out: greetings}, env)
+    make(greetings, env)
+
     assert env.output == {
-        "greetings": {
-            "first": {
-                "English": "Hello Robert!",
-                "Swedish": "Hej Robert!",
-            },
-            "last": {
-                "English": "Hello Boyle!",
-                "Swedish": "Hej Boyle!",
-            },
-        }
+        "first": {
+            "English": "Hello Robert!",
+            "Swedish": "Hej Robert!",
+        },
+        "last": {
+            "English": "Hello Boyle!",
+            "Swedish": "Hej Boyle!",
+        },
     }
 
 
 def test_can_nest_node_with_non_nestable_sibling():
     env = StringFormatEnv()
 
-    task_1 = Task(
+    root_node = create_env_node(
         {},
-        make_op(
-            **{
-                "to be nested/key 1": "value 1",
-                "to be nested/key 2": "value 2",
-                "not to be nested": "...",
-            }
-        ),
+        {
+            "to be nested/key 1": "1",
+            "to be nested/key 2": "2",
+            "not to be nested": "...",
+        },
         ["to be nested", "not to be nested"],
     )
 
-    parent_node = task_1["to be nested"].descend("nested level")
+    parent_node = root_node["to be nested"].split("level name")
 
-    derived_node = Node.create(
+    derived_node = create_env_node(
         {"parent": parent_node},
-        make_op(result="{parent.upper()}"),
-        "result",
-    )
+        {"result": "{parent} {parent}"},
+        ["result"],
+    ).pick("result")
 
-    make({derived_node.out: derived_node}, env)
+    make(derived_node, env)
     assert env.output == {
-        "result": {
-            "key 1": "VALUE 1",
-            "key 2": "VALUE 2",
-        }
+        "key 1": "1 1",
+        "key 2": "2 2",
     }

@@ -1,73 +1,44 @@
-from boyleworkflow.graph import Node
+import pytest
+from boyleworkflow.tree import Name
+from tests.util import create_env_node
+
+NODE_L0 = create_env_node({}, "op", ["out"])
+NODE_L2 = NODE_L0.split("level1")
+NODE_L3 = NODE_L2.split("level2")
 
 
-ROOT1 = Node.create({}, "op1", "loc1")
-ROOT2 = Node.create({}, "op2", "loc2")
-DERIVED = Node.create({"i1": ROOT1, "i2": ROOT2}, "op", "out")
-DERIVED_IDENTICAL = Node.create({"i2": ROOT2, "i1": ROOT1}, "op", "out")
+def test_env_node_without_parents_is_not_nested():
+    node = create_env_node({}, "op", ["out"])
+    assert node.out_levels == ()
 
 
-def test_input_path_affects_hash():
-    op = "op"
-    out = "out"
-    node_a = Node.create({"inp_a": ROOT1}, op, out)
-    node_b = Node.create({"inp_b": ROOT1}, op, out)
-    assert hash(node_a) != hash(node_b)
+def test_depth_equals_number_of_levels():
+    assert NODE_L0.depth == 0
+    assert NODE_L2.depth == 1
+    assert NODE_L3.depth == 2
 
 
-def test_input_node_affects_hash():
-    op = "op"
-    out = "out"
-    node_a = Node.create({"inp": ROOT1}, op, out)
-    node_b = Node.create({"inp": ROOT2}, op, out)
-    assert hash(node_a) != hash(node_b)
+def test_inherits_parent_levels():
+    parent_l1 = NODE_L2
+    derived_l1 = create_env_node({"inp": parent_l1}, "op", ["out"])
+    assert derived_l1.out_levels == parent_l1.out_levels
 
 
-def test_op_affects_hash():
-    out = "out"
-    node_a = Node.create({}, "op1", out)
-    node_b = Node.create({}, "op2", out)
-    assert hash(node_a) != hash(node_b)
+def test_split_creates_out_level():
+    assert NODE_L0.split("level1").out_levels == (Name("level1"),)
 
 
-def test_out_path_affects_hash():
-    op = "op"
-    node_a = Node.create({}, op, "out1")
-    node_b = Node.create({}, op, "out2")
-    assert hash(node_a) != hash(node_b)
+def test_split_twice_creates_two_levels():
+    assert NODE_L0.split("l1").split("l2").out_levels == (Name("l1"), Name("l2"))
 
 
-def test_equality_and_hash_insensitive_to_inp_order():
-    assert DERIVED == DERIVED_IDENTICAL
-    assert hash(DERIVED) == hash(DERIVED_IDENTICAL)
+def test_split_levels_must_be_unique():
+    with pytest.raises(ValueError):
+        NODE_L0.split("level1").split("level1")
 
 
-def test_root_has_no_parents():
-    assert not ROOT1.parents
-
-
-def test_derived_has_parents():
-    assert DERIVED.parents == {ROOT1, ROOT2}
-
-
-def test_descend():
-    node = Node.create({}, "op", "out")
-    task = node.task
-
-    nested_node = node.descend("level_name")
-    nested_task = task.descend("level_name")
-
-    assert nested_task["out"] == nested_node
-
-
-def test_ascend():
-    node = Node.create({}, "op", "out")
-    task = node.task
-
-    nested_node = node.descend("level_name")
-    nested_task = task.descend("level_name")
-
-    unnested_node = nested_node.ascend()
-    unnested_task = nested_task.ascend()
-
-    assert unnested_task["out"] == unnested_node
+def test_input_levels_must_match():
+    node_l0 = NODE_L0
+    node_l1 = NODE_L2
+    with pytest.raises(ValueError):
+        create_env_node({"inp1": node_l0, "inp2": node_l1}, "op", ["inp1", "inp2"])
