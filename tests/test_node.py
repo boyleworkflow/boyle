@@ -12,12 +12,6 @@ def test_env_node_without_parents_is_not_nested():
     assert node.out_levels == ()
 
 
-def test_depth_equals_number_of_levels():
-    assert NODE_L0.depth == 0
-    assert NODE_L2.depth == 1
-    assert NODE_L3.depth == 2
-
-
 def test_inherits_parent_levels():
     parent_l1 = NODE_L2
     derived_l1 = create_env_node({"inp": parent_l1}, "op", ["out"])

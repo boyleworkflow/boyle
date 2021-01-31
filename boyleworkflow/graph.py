@@ -88,7 +88,7 @@ class Node:
         return self.inp_levels
 
     @property
-    def depth(self) -> int:
+    def run_depth(self) -> int:
         return len(self.out_levels)
 
 
@@ -103,13 +103,26 @@ class PickNode(VirtualNode):
     pick_path: Path
 
     def run(self, input_tree: Tree) -> Tree:
-        return input_tree.map_level(self.depth, lambda tree: tree.pick(self.pick_path))
+        return input_tree.pick(self.pick_path)
 
 
 @dataclass(frozen=True)
-class RenameNode(VirtualNode):
+class NoOpNode(VirtualNode):
+    """
+    Base class for VirtualNode that does not alter the tree
+    """
+
+    @property
+    def run_depth(self):
+        return 0
+
     def run(self, input_tree: Tree) -> Tree:
         return input_tree
+
+
+@dataclass(frozen=True)
+class RenameNode(NoOpNode):
+    pass
 
 
 @dataclass(frozen=True)
@@ -119,7 +132,7 @@ class MergeNode(VirtualNode):
 
 
 @dataclass(frozen=True)
-class SplitNode(VirtualNode):
+class SplitNode(NoOpNode):
     level: Name
 
     def __post_init__(self):
@@ -127,9 +140,6 @@ class SplitNode(VirtualNode):
             raise ValueError(
                 f"trying to add duplicate level {self.level} to {self.inp_levels}"
             )
-
-    def run(self, input_tree: Tree) -> Tree:
-        return input_tree
 
     @property
     def out_levels(self):

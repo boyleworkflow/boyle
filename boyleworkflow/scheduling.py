@@ -1,4 +1,5 @@
 from __future__ import annotations
+from functools import partial
 from boyleworkflow.calc import Calc, Env, run
 from boyleworkflow.graph import Node, EnvNode, VirtualNode
 import dataclasses
@@ -148,37 +149,28 @@ class GraphState:
         )._set_priority_work()
 
 
-def _run_virtual_node(node: VirtualNode, input_tree: Tree) -> Tree:
-    return node.run(input_tree)
+def _run_env_node_subtree(node: EnvNode, env: Env, subtree: Tree) -> Tree:
+    calc = Calc(subtree, node.op, node.out)
+    return Tree.from_nested_items(run(calc, env))
 
 
-def _build_calcs(node: EnvNode, input_tree: Tree) -> Mapping[Path, Calc]:
-    return {
-        index: Calc(calc_inp, node.op, node.out)
-        for index, calc_inp in input_tree.iter_level(node.depth)
-    }
+def _get_subtree_runner(node: Node, env: Env):
+    if isinstance(node, VirtualNode):
+        return node.run
+    elif isinstance(node, EnvNode):
+        return partial(_run_env_node_subtree, node, env)
 
-
-def _run_env_node(node: EnvNode, input_tree: Tree, env: Env) -> Tree:
-    calcs = _build_calcs(node, input_tree)
-    calc_results = {
-        index: Tree.from_nested_items(run(calc, env)) for index, calc in calcs.items()
-    }
-    node_result = Tree.from_nested_items(calc_results)
-    return node_result
+    raise ValueError(f"unknown node type {type(node)}")
 
 
 def _run_node(node: Node, results: Mapping[Node, Tree], env: Env) -> Tree:
     input_tree = Tree.merge(
-        results[parent].map_level(node.depth, lambda tree: tree.nest(path))
+        results[parent].map_level(node.run_depth, lambda tree: tree.nest(path))
         for path, parent in node.inp.items()
     )
-    if isinstance(node, VirtualNode):
-        return _run_virtual_node(node, input_tree)
-    elif isinstance(node, EnvNode):
-        return _run_env_node(node, input_tree, env)
-    else:
-        raise ValueError(f"unknown node type {type(node)}")
+    run_subtree = _get_subtree_runner(node, env)
+    output_tree = input_tree.map_level(node.run_depth, run_subtree)
+    return output_tree
 
 
 def _run_priority_work(state: GraphState, env: Env) -> Mapping[Node, Tree]:
