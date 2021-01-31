@@ -62,7 +62,7 @@ def test_asks_env_to_stow_out_paths():
     ]
 
 
-def test_returns_mapping_with_results():
+def test_returns_stowed_results():
     expected_results = {path: Tree({}, f"digest:{path}") for path in CALC.out}
     env = Mock(stow=lambda sandbox, path: expected_results[path])  # type: ignore
     results = run(CALC, env)
