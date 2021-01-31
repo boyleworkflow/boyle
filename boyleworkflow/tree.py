@@ -132,13 +132,11 @@ class Tree(Mapping[Name, "Tree"]):
     def map_level(
         self,
         level: int,
-        func: Callable[[Tree, Any], Tree],
-        *args: Any,
-        **kwargs: Any,
+        func: Callable[[Tree], Tree],
     ) -> Tree:
         return Tree.from_nested_items(
             {
-                path: func(subtree, *args, **kwargs)
+                path: func(subtree)
                 for path, subtree in self.iter_level(level)
             }
         )

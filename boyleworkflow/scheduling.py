@@ -170,7 +170,7 @@ def _run_env_node(node: EnvNode, input_tree: Tree, env: Env) -> Tree:
 
 def _run_node(node: Node, results: Mapping[Node, Tree], env: Env) -> Tree:
     input_tree = Tree.merge(
-        results[parent].map_level(node.depth, Tree.nest, path)
+        results[parent].map_level(node.depth, lambda tree: tree.nest(path))
         for path, parent in node.inp.items()
     )
     if isinstance(node, VirtualNode):

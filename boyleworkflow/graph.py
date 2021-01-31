@@ -103,7 +103,7 @@ class PickNode(VirtualNode):
     pick_path: Path
 
     def run(self, input_tree: Tree) -> Tree:
-        return input_tree.map_level(self.depth, Tree.pick, self.pick_path)
+        return input_tree.map_level(self.depth, lambda tree: tree.pick(self.pick_path))
 
 
 @dataclass(frozen=True)
