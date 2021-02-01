@@ -8,6 +8,7 @@ from typing import (
     Iterable,
     Iterator,
     Mapping,
+    Optional,
     Protocol,
     Set,
 )
@@ -154,15 +155,26 @@ class RunSystem(Protocol):
     def run(self, node: Node, results: Mapping[Node, Result]) -> Result:
         ...
 
+    def recall(self, node: Node, results: Mapping[Node, Result]) -> Optional[Result]:
+        ...
 
-def _run_priority_work(state: GraphState, system: RunSystem) -> Mapping[Node, Result]:
-    nodes = state.priority_work
-    return {node: system.run(node, state.results) for node in nodes}
+    def can_restore(self, result: Result) -> bool:
+        ...
 
 
 def _advance_state(state: GraphState, system: RunSystem) -> GraphState:
-    results = _run_priority_work(state, system)
-    return state.add_results(results).add_restorable(results)
+    nodes = state.priority_work
+
+    new_results = {}
+    new_restorable = set()
+
+    for node in nodes:
+        result = system.recall(node, state.results) or system.run(node, state.results)
+        new_results[node] = result
+        if system.can_restore(result):
+            new_restorable.add(node)
+
+    return state.add_results(new_results).add_restorable(new_restorable)
 
 
 def make(requested: Iterable[Node], system: RunSystem) -> Mapping[Node, Result]:

@@ -114,6 +114,14 @@ class StringFormatEnv:
             raise ValueError(f"cannot place non-dict item {item} in sandbox")
         self._sandboxes[sandbox_key] = item
 
+    def can_restore(self, tree: Tree) -> bool:
+        try:
+            build_item_from_storage(tree, self._storage)
+            return True
+        except KeyError:
+            return False
+
+
     def deliver(self, tree: Tree):
         self.output = build_item_from_storage(tree, self._storage)
 
@@ -131,19 +139,19 @@ class StringFormatRunSystem(RunSystem):
         return self.env.output
 
 
-def create_run_system_without_cache():
-    return StringFormatRunSystem(StringFormatEnv())
+def create_run_system(log: Optional[Log] = None):
+    return StringFormatRunSystem(StringFormatEnv(), log)
 
 
 def test_make_hello():
-    system = create_run_system_without_cache()
+    system = create_run_system()
     hello_node = create_env_node({}, {"hello": "Hello"}, ["hello"])
     system.make(hello_node)
     assert system.output == {"hello": "Hello"}
 
 
 def test_make_hello_world():
-    system = create_run_system_without_cache()
+    system = create_run_system()
     hello_node = create_env_node({}, {"hello": "Hello"}, ["hello"])
     hello_world_node = create_env_node(
         {".": hello_node},
@@ -155,21 +163,21 @@ def test_make_hello_world():
 
 
 def test_nest():
-    system = create_run_system_without_cache()
+    system = create_run_system()
     hello_node = create_env_node({}, {"hello": "Hello"}, ["hello"])
     system.make(hello_node.nest("greeting"))
     assert system.output == {"greeting": {"hello": "Hello"}}
 
 
 def test_pick():
-    system = create_run_system_without_cache()
+    system = create_run_system()
     hello_node = create_env_node({}, {"hello": "Hello"}, ["hello"])
     system.make(hello_node["hello"])
     assert system.output == "Hello"
 
 
 def test_merge():
-    system = create_run_system_without_cache()
+    system = create_run_system()
     node_1 = create_env_node({}, {"first": "Robert"}, ["first"])
     node_2 = create_env_node({}, {"last": "Boyle"}, ["last"])
     merged = node_1.merge(node_2)
@@ -178,14 +186,14 @@ def test_merge():
 
 
 def test_multi_output():
-    system = create_run_system_without_cache()
+    system = create_run_system()
     multi_output_node = create_env_node({}, {"a": "one", "b": "two"}, ["a", "b"])
     system.make(multi_output_node)
     assert system.output == {"a": "one", "b": "two"}
 
 
 def test_separated_and_recombined_siblings_runs_only_once():
-    system = create_run_system_without_cache()
+    system = create_run_system()
     multi_output_node = create_env_node({}, {"a": "one", "b": "two"}, ["a", "b"])
     a = multi_output_node["a"]
     b = multi_output_node["b"]
@@ -195,7 +203,7 @@ def test_separated_and_recombined_siblings_runs_only_once():
 
 
 def test_can_split():
-    system = create_run_system_without_cache()
+    system = create_run_system()
     names = (
         create_env_node(
             {},
@@ -216,7 +224,7 @@ def test_can_split():
 
 
 def test_can_map_on_nested_level_1():
-    system = create_run_system_without_cache()
+    system = create_run_system()
     names = (
         create_env_node(
             {},
@@ -243,7 +251,7 @@ def test_can_map_on_nested_level_1():
 
 
 def test_can_map_on_nested_level_2():
-    system = create_run_system_without_cache()
+    system = create_run_system()
 
     names = (
         create_env_node(
@@ -285,7 +293,7 @@ def test_can_map_on_nested_level_2():
 
 
 def test_can_nest_node_with_non_nestable_sibling():
-    system = create_run_system_without_cache()
+    system = create_run_system()
 
     root_node = create_env_node(
         {},
@@ -310,3 +318,25 @@ def test_can_nest_node_with_non_nestable_sibling():
         "key 1": "1 1",
         "key 2": "2 2",
     }
+
+
+def test_make_twice_without_cache_runs_twice():
+    system = create_run_system()
+
+    node = create_env_node({}, {"out": "result"}, ["out"])
+
+    system.make(node)
+    system.make(node)
+
+    assert system.env.op_run_count == 2
+
+
+def test_make_twice_with_cache_runs_once():
+    system = create_run_system(log=Log())
+
+    node = create_env_node({}, {"out": "result"}, ["out"])
+
+    system.make(node)
+    system.make(node)
+
+    assert system.env.op_run_count == 1

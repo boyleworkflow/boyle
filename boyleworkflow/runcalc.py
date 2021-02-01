@@ -1,11 +1,11 @@
 from __future__ import annotations
 from functools import partial
-from boyleworkflow.tree import Tree
+from boyleworkflow.tree import Path, Tree
 from dataclasses import dataclass
 from typing import Mapping, Optional
-from boyleworkflow.calc import Calc, Env, run_calc
+from boyleworkflow.calc import Calc, CalcOut, Env, run_calc
 from boyleworkflow.graph import EnvNode, Node, VirtualNode
-from boyleworkflow.log import CacheLog
+from boyleworkflow.log import CacheLog, NotFound
 
 
 @dataclass
@@ -14,12 +14,29 @@ class RunSystem:
     log: Optional[CacheLog] = None
 
     def run(self, node: Node, results: Mapping[Node, Tree]) -> Tree:
-        input_tree = Tree.merge(
+        input_tree = self._build_input_tree(node, results)
+        subtree_runner = self._get_subtree_runner(node)
+        result = input_tree.map_level(node.run_depth, subtree_runner)
+        return result
+
+    def recall(self, node: Node, results: Mapping[Node, Tree]) -> Optional[Tree]:
+        if not self.log:
+            return None
+
+        if isinstance(node, EnvNode):
+            try:
+                return self._recall_env_node(node, results)
+            except NotFound:
+                return None
+
+    def can_restore(self, tree: Tree) -> bool:
+        return self.env.can_restore(tree)
+
+    def _build_input_tree(self, node: Node, results: Mapping[Node, Tree]):
+        return Tree.merge(
             results[parent].map_level(node.run_depth, lambda tree: tree.nest(path))
             for path, parent in node.inp.items()
         )
-        subtree_runner = self._get_subtree_runner(node)
-        return input_tree.map_level(node.run_depth, subtree_runner)
 
     def _get_subtree_runner(self, node: Node):
         if isinstance(node, VirtualNode):
@@ -31,4 +48,31 @@ class RunSystem:
 
     def _run_env_node_subtree(self, node: EnvNode, subtree: Tree) -> Tree:
         calc = Calc(subtree, node.op, node.out)
-        return Tree.from_nested_items(run_calc(calc, self.env))
+        results = run_calc(calc, self.env)
+        self._store_calc_results(calc, results)
+        return Tree.from_nested_items(results)
+
+    def _store_calc_results(self, calc: Calc, results: Mapping[Path, Tree]):
+        if not self.log:
+            return
+
+        for path, tree in results.items():
+            self.log.save_result(CalcOut(calc.inp, calc.op, path), tree)
+
+
+    def _recall_env_node(self, node: EnvNode, results: Mapping[Node, Tree]) -> Tree:
+        input_tree = self._build_input_tree(node, results)
+        recall_subtree = partial(self._recall_env_node_subtree, node)
+        return input_tree.map_level(node.run_depth, recall_subtree)
+
+    def _recall_env_node_subtree(self, node: EnvNode, subtree: Tree) -> Tree:
+        return Tree.from_nested_items(
+            {
+                path: self._recall_calc_out(CalcOut(subtree, node.op, path))
+                for path in node.out
+            }
+        )
+
+    def _recall_calc_out(self, calc_out: CalcOut) -> Tree:
+        assert self.log
+        return self.log.recall_result(calc_out)

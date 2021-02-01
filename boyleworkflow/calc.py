@@ -32,6 +32,9 @@ class Env(Protocol):
     def destroy_sandbox(self, sandbox: SandboxKey):
         ...
 
+    def can_restore(self, tree: Tree) -> bool:
+        ...
+
     def place(self, sandbox: SandboxKey, tree: Tree):
         ...
 
