@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Any, FrozenSet, Hashable, Mapping, NewType, Protocol
+from typing import Any, FrozenSet, Mapping, NewType, Protocol
 from boyleworkflow.tree import Path, Tree
 
 
@@ -22,7 +22,7 @@ class CalcOut:
     out: Path
 
 
-class Env(Hashable, Protocol):
+class Env(Protocol):
     def run_op(self, op: Op, sandbox: SandboxKey):
         ...
 
@@ -42,7 +42,7 @@ class Env(Hashable, Protocol):
         ...
 
 
-def run(calc: Calc, env: Env) -> Mapping[Path, Tree]:
+def run_calc(calc: Calc, env: Env) -> Mapping[Path, Tree]:
     sandbox = env.create_sandbox()
     try:
         env.place(sandbox, calc.inp)

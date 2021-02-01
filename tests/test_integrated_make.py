@@ -1,14 +1,19 @@
+from boyleworkflow.log import Log
 from boyleworkflow.graph import Node
 from dataclasses import dataclass
 from typing import Dict, List, Mapping, Optional, Sequence, Union
-import unittest.mock
 from boyleworkflow.frozendict import FrozenDict
 from boyleworkflow.tree import Name, Path, Tree
 from boyleworkflow.calc import SandboxKey
-from boyleworkflow.scheduling import make
+import boyleworkflow.scheduling
+from boyleworkflow.runcalc import RunSystem
 import tests.util
 
 StringFormatOp = FrozenDict[str, str]
+
+
+def create_log() -> Log:
+    return Log()
 
 
 def create_env_node(inp: Mapping[str, Node], op: Mapping[str, str], out: List[str]):
@@ -71,6 +76,7 @@ def build_item_from_storage(
 @dataclass
 class StringFormatEnv:
     output: Optional[NestedStrDictItem] = None
+    op_run_count: int = 0
 
     def __post_init__(self):
         self._sandboxes: Dict[SandboxKey, NestedStrDict] = {}
@@ -92,6 +98,7 @@ class StringFormatEnv:
         }
         for path, value in op_results.items():
             place_nested(sandbox, path, value)
+        self.op_run_count += 1
 
     def stow(self, sandbox_key: SandboxKey, path: Path):
         sandbox = self._sandboxes[sandbox_key]
@@ -111,67 +118,84 @@ class StringFormatEnv:
         self.output = build_item_from_storage(tree, self._storage)
 
 
+@dataclass
+class StringFormatRunSystem(RunSystem):
+    env: StringFormatEnv
+
+    def make(self, node: Node):
+        results = boyleworkflow.scheduling.make({node}, self)
+        self.env.deliver(results[node])
+
+    @property
+    def output(self):
+        return self.env.output
+
+
+def create_run_system_without_cache():
+    return StringFormatRunSystem(StringFormatEnv())
+
+
 def test_make_hello():
-    env = StringFormatEnv()
+    system = create_run_system_without_cache()
     hello_node = create_env_node({}, {"hello": "Hello"}, ["hello"])
-    make({hello_node}, env)
-    assert env.output == {"hello": "Hello"}
+    system.make(hello_node)
+    assert system.output == {"hello": "Hello"}
 
 
 def test_make_hello_world():
-    env = StringFormatEnv()
+    system = create_run_system_without_cache()
     hello_node = create_env_node({}, {"hello": "Hello"}, ["hello"])
     hello_world_node = create_env_node(
         {".": hello_node},
         {"hello_world": "{hello} World"},
         ["hello_world"],
     )
-    make(hello_world_node, env)
-    assert env.output == {"hello_world": "Hello World"}
+    system.make(hello_world_node)
+    assert system.output == {"hello_world": "Hello World"}
 
 
 def test_nest():
-    env = StringFormatEnv()
+    system = create_run_system_without_cache()
     hello_node = create_env_node({}, {"hello": "Hello"}, ["hello"])
-    make({hello_node.nest("greeting")}, env)
-    assert env.output == {"greeting": {"hello": "Hello"}}
+    system.make(hello_node.nest("greeting"))
+    assert system.output == {"greeting": {"hello": "Hello"}}
 
 
 def test_pick():
-    env = StringFormatEnv()
+    system = create_run_system_without_cache()
     hello_node = create_env_node({}, {"hello": "Hello"}, ["hello"])
-    make(hello_node["hello"], env)
-    assert env.output == "Hello"
+    system.make(hello_node["hello"])
+    assert system.output == "Hello"
 
 
 def test_merge():
-    env = StringFormatEnv()
+    system = create_run_system_without_cache()
     node_1 = create_env_node({}, {"first": "Robert"}, ["first"])
     node_2 = create_env_node({}, {"last": "Boyle"}, ["last"])
     merged = node_1.merge(node_2)
-    make(merged, env)
-    assert env.output == {"first": "Robert", "last": "Boyle"}
+    system.make(merged)
+    assert system.output == {"first": "Robert", "last": "Boyle"}
 
 
 def test_multi_output():
-    env = StringFormatEnv()
+    system = create_run_system_without_cache()
     multi_output_node = create_env_node({}, {"a": "one", "b": "two"}, ["a", "b"])
-    make(multi_output_node, env)
-    assert env.output == {"a": "one", "b": "two"}
+    system.make(multi_output_node)
+    assert system.output == {"a": "one", "b": "two"}
 
 
 def test_separated_and_recombined_siblings_runs_only_once():
-    env = unittest.mock.Mock(wraps=StringFormatEnv())  # type: ignore
+    system = create_run_system_without_cache()
     multi_output_node = create_env_node({}, {"a": "one", "b": "two"}, ["a", "b"])
     a = multi_output_node["a"]
     b = multi_output_node["b"]
     combined = a.nest("A").merge(b.nest("B"))
-    make(combined, env)
-    env.run_op.assert_called_once()  # type: ignore
+    system.make(combined)
+    assert system.env.op_run_count == 1
 
 
 def test_can_split():
-    env = StringFormatEnv()
+    system = create_run_system_without_cache()
     names = (
         create_env_node(
             {},
@@ -184,15 +208,15 @@ def test_can_split():
         .pick("out")
         .split("name_level")
     )
-    make(names, env)
-    assert env.output == {
+    system.make(names)
+    assert system.output == {
         "first": "Robert",
         "last": "Boyle",
     }
 
 
 def test_can_map_on_nested_level_1():
-    env = StringFormatEnv()
+    system = create_run_system_without_cache()
     names = (
         create_env_node(
             {},
@@ -211,15 +235,15 @@ def test_can_map_on_nested_level_1():
         {"greeting": "Hello {name}!"},
         ["greeting"],
     )["greeting"]
-    make(greetings, env)
-    assert env.output == {
+    system.make(greetings)
+    assert system.output == {
         "first": "Hello Robert!",
         "last": "Hello Boyle!",
     }
 
 
 def test_can_map_on_nested_level_2():
-    env = StringFormatEnv()
+    system = create_run_system_without_cache()
 
     names = (
         create_env_node(
@@ -247,9 +271,8 @@ def test_can_map_on_nested_level_2():
         .split("language")
     )
 
-    make(greetings, env)
-
-    assert env.output == {
+    system.make(greetings)
+    assert system.output == {
         "first": {
             "English": "Hello Robert!",
             "Swedish": "Hej Robert!",
@@ -262,7 +285,7 @@ def test_can_map_on_nested_level_2():
 
 
 def test_can_nest_node_with_non_nestable_sibling():
-    env = StringFormatEnv()
+    system = create_run_system_without_cache()
 
     root_node = create_env_node(
         {},
@@ -282,8 +305,8 @@ def test_can_nest_node_with_non_nestable_sibling():
         ["result"],
     ).pick("result")
 
-    make(derived_node, env)
-    assert env.output == {
+    system.make(derived_node)
+    assert system.output == {
         "key 1": "1 1",
         "key 2": "2 2",
     }

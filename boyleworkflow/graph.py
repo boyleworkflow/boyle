@@ -94,7 +94,7 @@ class Node:
 
 @dataclass(frozen=True)
 class VirtualNode(Node):
-    def run(self, input_tree: Tree) -> Tree:
+    def run_subtree(self, input_tree: Tree) -> Tree:
         raise NotImplemented
 
 
@@ -102,7 +102,7 @@ class VirtualNode(Node):
 class PickNode(VirtualNode):
     pick_path: Path
 
-    def run(self, input_tree: Tree) -> Tree:
+    def run_subtree(self, input_tree: Tree) -> Tree:
         return input_tree.pick(self.pick_path)
 
 
@@ -116,7 +116,7 @@ class NoOpNode(VirtualNode):
     def run_depth(self):
         return 0
 
-    def run(self, input_tree: Tree) -> Tree:
+    def run_subtree(self, input_tree: Tree) -> Tree:
         return input_tree
 
 
@@ -127,7 +127,7 @@ class RenameNode(NoOpNode):
 
 @dataclass(frozen=True)
 class MergeNode(VirtualNode):
-    def run(self, input_tree: Tree) -> Tree:
+    def run_subtree(self, input_tree: Tree) -> Tree:
         return Tree.merge(subtree for _, subtree in input_tree.iter_level(1))
 
 

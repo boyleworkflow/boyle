@@ -1,7 +1,4 @@
 from __future__ import annotations
-from functools import partial
-from boyleworkflow.calc import Calc, Env, run
-from boyleworkflow.graph import Node, EnvNode, VirtualNode
 import dataclasses
 from dataclasses import dataclass
 import itertools
@@ -11,10 +8,14 @@ from typing import (
     Iterable,
     Iterator,
     Mapping,
+    Protocol,
     Set,
-    Union,
 )
-from boyleworkflow.tree import Path, Tree
+import boyleworkflow.graph
+import boyleworkflow.tree
+
+Node = boyleworkflow.graph.Node
+Result = boyleworkflow.tree.Tree
 
 
 def get_nodes_and_ancestors(nodes: Iterable[Node]) -> FrozenSet[Node]:
@@ -39,7 +40,7 @@ class GraphState:
     runnable: FrozenSet[Node]
     restorable: FrozenSet[Node]
     priority_work: FrozenSet[Node]
-    results: Mapping[Node, Tree]
+    results: Mapping[Node, Result]
 
     @classmethod
     def from_requested(cls, requested: Iterable[Node]) -> GraphState:
@@ -96,7 +97,7 @@ class GraphState:
     def _set_priority_work(self):
         return self._update(priority_work=self._get_priority_work())
 
-    def _check_results_not_added_before_parents(self, results: Mapping[Node, Tree]):
+    def _check_results_not_added_before_parents(self, results: Mapping[Node, Result]):
         added_before_parents = set(results) - self.parents_known
         if added_before_parents:
             raise ValueError(
@@ -104,7 +105,7 @@ class GraphState:
                 f"because their parents are not known: {added_before_parents}"
             )
 
-    def _check_results_not_conflicting(self, results: Mapping[Node, Tree]):
+    def _check_results_not_conflicting(self, results: Mapping[Node, Result]):
         conflicting_nodes = {
             node: (self.results[node], new_result)
             for node, new_result in results.items()
@@ -116,7 +117,7 @@ class GraphState:
                 f"for the following nodes: {conflicting_nodes}"
             )
 
-    def add_results(self, results: Mapping[Node, Tree]):
+    def add_results(self, results: Mapping[Node, Result]):
         self._check_results_not_added_before_parents(results)
         self._check_results_not_conflicting(results)
 
@@ -149,47 +150,24 @@ class GraphState:
         )._set_priority_work()
 
 
-def _run_env_node_subtree(node: EnvNode, env: Env, subtree: Tree) -> Tree:
-    calc = Calc(subtree, node.op, node.out)
-    return Tree.from_nested_items(run(calc, env))
+class RunSystem(Protocol):
+    def run(self, node: Node, results: Mapping[Node, Result]) -> Result:
+        ...
 
 
-def _get_subtree_runner(node: Node, env: Env):
-    if isinstance(node, VirtualNode):
-        return node.run
-    elif isinstance(node, EnvNode):
-        return partial(_run_env_node_subtree, node, env)
-
-    raise ValueError(f"unknown node type {type(node)}")
-
-
-def _run_node(node: Node, results: Mapping[Node, Tree], env: Env) -> Tree:
-    input_tree = Tree.merge(
-        results[parent].map_level(node.run_depth, lambda tree: tree.nest(path))
-        for path, parent in node.inp.items()
-    )
-    run_subtree = _get_subtree_runner(node, env)
-    output_tree = input_tree.map_level(node.run_depth, run_subtree)
-    return output_tree
-
-
-def _run_priority_work(state: GraphState, env: Env) -> Mapping[Node, Tree]:
+def _run_priority_work(state: GraphState, system: RunSystem) -> Mapping[Node, Result]:
     nodes = state.priority_work
-    return {node: _run_node(node, state.results, env) for node in nodes}
+    return {node: system.run(node, state.results) for node in nodes}
 
 
-def _advance_state(state: GraphState, env: Env) -> GraphState:
-    results = _run_priority_work(state, env)
+def _advance_state(state: GraphState, system: RunSystem) -> GraphState:
+    results = _run_priority_work(state, system)
     return state.add_results(results).add_restorable(results)
 
 
-def make(requested: Union[Node, Iterable[Node]], env: Env):
-    if isinstance(requested, Node):
-        requested = {requested}
-    else:
-        requested = set(requested)
+def make(requested: Iterable[Node], system: RunSystem) -> Mapping[Node, Result]:
+    requested = set(requested)
     state = GraphState.from_requested(requested)
     while state.priority_work:
-        state = _advance_state(state, env)
-    result_tree = Tree.merge(state.results[node] for node in requested)
-    env.deliver(result_tree)
+        state = _advance_state(state, system)
+    return {node: state.results[node] for node in requested}

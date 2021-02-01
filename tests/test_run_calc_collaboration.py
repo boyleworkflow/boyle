@@ -1,7 +1,7 @@
 from boyleworkflow.tree import Tree, Path
 import pytest
 from unittest.mock import Mock, call
-from boyleworkflow.calc import run, Calc
+from boyleworkflow.calc import run_calc, Calc
 from tests.util import tree_from_dict
 
 CALC = Calc(
@@ -18,28 +18,28 @@ CALC = Calc(
 
 def test_creates_exactly_one_sandbox():
     env = Mock()
-    run(CALC, env)
+    run_calc(CALC, env)
     env.create_sandbox.assert_called_once()  # type: ignore
 
 
 def test_runs_op_in_sandbox():
     env = Mock()
     sandbox = env.create_sandbox()  # type: ignore
-    run(CALC, env)
+    run_calc(CALC, env)
     env.run_op.assert_called_with(CALC.op, sandbox)  # type: ignore
 
 
 def test_places_inputs_in_sandbox():
     env = Mock()
     sandbox = env.create_sandbox()  # type: ignore
-    run(CALC, env)
+    run_calc(CALC, env)
     env.place.assert_called_once_with(sandbox, CALC.inp)  # type: ignore
 
 
 def test_destroys_sandbox_after_finishing():
     env = Mock()
     sandbox = env.create_sandbox()  # type: ignore
-    run(CALC, env)
+    run_calc(CALC, env)
     env.destroy_sandbox.assert_called_once_with(sandbox)  # type: ignore
 
 
@@ -49,14 +49,14 @@ def test_destroys_sandbox_after_failed_run():
     )
     sandbox = env.create_sandbox()  # type: ignore
     with pytest.raises(Exception):
-        run(CALC, env)
+        run_calc(CALC, env)
     env.destroy_sandbox.assert_called_once_with(sandbox)  # type: ignore
 
 
 def test_asks_env_to_stow_out_paths():
     env = Mock()
     sandbox = env.create_sandbox()  # type: ignore
-    run(CALC, env)
+    run_calc(CALC, env)
     assert env.stow.call_args_list == [  # type:ignore
         call(sandbox, path) for path in CALC.out  # type:ignore
     ]
@@ -65,5 +65,5 @@ def test_asks_env_to_stow_out_paths():
 def test_returns_stowed_results():
     expected_results = {path: Tree({}, f"digest:{path}") for path in CALC.out}
     env = Mock(stow=lambda sandbox, path: expected_results[path])  # type: ignore
-    results = run(CALC, env)
+    results = run_calc(CALC, env)
     assert results == expected_results
