@@ -6,7 +6,7 @@ from tests.util import tree_from_dict
 
 CALC = Calc(
     tree_from_dict({name: f"result:{name}" for name in ["i1", "i2", "i3"]}),
-    Mock(),
+    "op",
     frozenset(
         [
             Path.from_string("o1"),

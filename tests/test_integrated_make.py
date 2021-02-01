@@ -1,10 +1,10 @@
 from boyleworkflow.log import Log
 from boyleworkflow.graph import Node
 from dataclasses import dataclass
-from typing import Dict, List, Mapping, Optional, Sequence, Union
+from typing import Dict, List, Mapping, Optional, Sequence, Union, cast
 from boyleworkflow.frozendict import FrozenDict
 from boyleworkflow.tree import Name, Path, Tree
-from boyleworkflow.calc import SandboxKey
+from boyleworkflow.calc import Op, SandboxKey
 import boyleworkflow.scheduling
 from boyleworkflow.runcalc import RunSystem
 import tests.util
@@ -90,7 +90,8 @@ class StringFormatEnv:
     def destroy_sandbox(self, sandbox_key: SandboxKey):
         del self._sandboxes[sandbox_key]
 
-    def run_op(self, op: StringFormatOp, sandbox_key: SandboxKey):
+    def run_op(self, op: Op, sandbox_key: SandboxKey):
+        op = cast(StringFormatOp, op)
         sandbox = self._sandboxes[sandbox_key]
         op_results = {
             Path.from_string(path): template.format(**sandbox)
@@ -120,7 +121,6 @@ class StringFormatEnv:
             return True
         except KeyError:
             return False
-
 
     def deliver(self, tree: Tree):
         self.output = build_item_from_storage(tree, self._storage)

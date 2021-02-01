@@ -1,10 +1,11 @@
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import Any, FrozenSet, Mapping, NewType, Protocol
+from dataclasses import dataclass, field
+from typing import FrozenSet, Mapping, NewType, Protocol
 from boyleworkflow.tree import Path, Tree
+from boyleworkflow.util import get_id_str, FrozenJSON
 
 
-Op = Any  # TODO replace this with something more specific
+Op = FrozenJSON
 SandboxKey = NewType("SandboxKey", str)
 
 
@@ -17,9 +18,24 @@ class Calc:
 
 @dataclass(frozen=True)
 class CalcOut:
+    calc_out_id: str = field(init=False)
     inp: Tree
     op: Op
     out: Path
+
+    def __post_init__(self):
+        object.__setattr__(
+            self,
+            "calc_out_id",
+            get_id_str(
+                type(self),
+                {
+                    "inp": self.inp.tree_id,
+                    "op": self.op,
+                    "out": self.out.to_string(),
+                },
+            ),
+        )
 
 
 class Env(Protocol):

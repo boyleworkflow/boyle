@@ -10,6 +10,7 @@ from typing import (
     Tuple,
 )
 from boyleworkflow.frozendict import FrozenDict
+from boyleworkflow.util import get_id_str
 
 _SEPARATOR = "/"
 _DOT = "."
@@ -62,15 +63,29 @@ class TreeCollision(ValueError):
 
 TreeData = Optional[str]
 
-
 @dataclass(frozen=True, init=False)
 class Tree(Mapping[Name, "Tree"]):
+    tree_id: str
     _children: FrozenDict[Name, Tree]
     data: TreeData
 
     def __init__(self, children: Mapping[Name, Tree], data: TreeData = None):
         object.__setattr__(self, "_children", FrozenDict(children))
         object.__setattr__(self, "data", data)
+        object.__setattr__(
+            self,
+            "tree_id",
+            get_id_str(
+                type(self),
+                {
+                    "children": {
+                        name.value: tree.tree_id
+                        for name, tree in self._children.items()
+                    },
+                    "data": self.data,
+                },
+            ),
+        )
 
     def __getitem__(self, key: Name) -> Tree:
         return self._children[key]
@@ -134,10 +149,7 @@ class Tree(Mapping[Name, "Tree"]):
         func: Callable[[Tree], Tree],
     ) -> Tree:
         return Tree.from_nested_items(
-            {
-                path: func(subtree)
-                for path, subtree in self.iter_level(level)
-            }
+            {path: func(subtree) for path, subtree in self.iter_level(level)}
         )
 
     def _merge_one(self, other: Tree, path: Path) -> Tree:

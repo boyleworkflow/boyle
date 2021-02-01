@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Iterator, Mapping, TypeVar
 
 KT = TypeVar("KT")
-VT = TypeVar("VT")
+VT = TypeVar("VT", covariant=True)
 
 
 @dataclass(init=False, frozen=True)
@@ -27,6 +27,6 @@ class FrozenDict(Mapping[KT, VT]):
 
     def __repr__(self) -> str:
         return f"FrozenDict({repr(self._data)})"
-    
+
     def __str__(self) -> str:
         return f"FrozenDict({str(self._data)})"
