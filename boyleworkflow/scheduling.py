@@ -62,38 +62,36 @@ class GraphState:
     def _update(self, **changes: Any):
         return dataclasses.replace(self, **changes)
 
-    def _generate_priority_suggestions(self) -> Iterator[FrozenSet[Node]]:
-        # TODO: think carefully about this. In first place we want to run
-        # nodes that are unknown. But if that is not possible, we need to run
-        # some known but not restorable node. This strategy is simple and
-        # should probably guarantee that it will finish. But are there
-        # more efficient ways to backtrace than to run everything runnable
-        # that is not restorable?
-
-        # If any node is unknown, then we cannot be done.
-        # So in first place, run runnable nodes that are unknown.
-        not_known = self.all_nodes - self.known
-        yield self.runnable & not_known
-
-        # Now there is a chance that all requested are restorable.
-        # If so, we are done.
-        not_restorable = self.all_nodes - self.restorable
-        requested_nonrestorable = self.requested & not_restorable
-        if not requested_nonrestorable:
-            return
-
-        # If not, those are prioritized
-        yield requested_nonrestorable & self.runnable
-
-        # Then take the rest
-        # TODO: Create a more optimal choice here
-        yield not_restorable & self.runnable
-
     def _get_priority_work(self):
-        for suggestion in self._generate_priority_suggestions():
-            if suggestion:
-                return suggestion
-        return frozenset()
+        # TODO: think carefully about this.
+        #
+        # First, we are done if and only if requested <= restorable.
+        #
+        # Otherwise:
+        #
+        # We want to avoid running nodes if possible.
+        # Therefore, in first place we return unknown nodes whose parents are known
+        # (i.e., the frontier of the set of known nodes). These can be recalled
+        # from cache if possible, and otherwise needs to be run.
+        #
+        # If there are no unknown with known parents, then all are known.
+        #
+        # In that case we are either
+        # (a) done, if requested <= restorable, or
+        # (b) there are some runnable but not restorable to run.
+        #
+        # In case (b), a simple and reasonable solution is to prioritize working
+        # on any requested & runnable, then all others. But probably this can lead
+        # to unnecessary runs. How to avoid that?
+
+        if self.requested <= self.restorable:
+            return frozenset()
+
+        return (
+            self.parents_known - self.known
+            or self.runnable & self.requested - self.restorable
+            or self.runnable - self.restorable  # more optimal choice here?
+        )
 
     def _set_priority_work(self):
         return self._update(priority_work=self._get_priority_work())

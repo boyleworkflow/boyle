@@ -18,6 +18,9 @@ class NamedNode(Node):
     # and making sure nodes have distinct hashes.
     name: str
 
+    def __repr__(self):
+        return self.name
+
 
 def create_node(inp: Mapping[str, Node], name: str):
     return NamedNode(
@@ -227,12 +230,20 @@ def test_invariants_along_simple_modifications():
 
 
 @pytest.mark.parametrize("network_spec", simple_networks)  # type: ignore
-def test_priority_work_leads_to_finish(network_spec: RequestAndStatesSpec):
+def test_minimal_priority_work_leads_to_finish(network_spec: RequestAndStatesSpec):
     state = GraphState.from_requested(network_spec.requested_nodes)
 
+    def do_minimal_work(state: GraphState):
+        for node in state.priority_work:
+            if node not in state.results:
+                return state.add_results({node: Mock()})
+            elif node not in state.restorable:
+                return state.add_restorable({node})
+
+        assert False  # this should not happen
+
     while state.priority_work:
-        state = state.add_results({node: Mock() for node in state.priority_work})
-        state = state.add_restorable(state.priority_work)
+        state = do_minimal_work(state)
 
     assert state.requested <= state.restorable
 
