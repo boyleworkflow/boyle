@@ -1,11 +1,12 @@
 from __future__ import annotations
+from boyleworkflow.frozendict import FrozenDict
 from functools import partial
 from boyleworkflow.tree import Path, Tree
 from dataclasses import dataclass
 from typing import Mapping, Optional
 from boyleworkflow.calc import Calc, CalcOut, Env, run_calc
 from boyleworkflow.graph import EnvNode, Node, VirtualNode
-from boyleworkflow.log import CacheLog, NotFound
+from boyleworkflow.log import CacheLog, NotFound, Run
 
 
 @dataclass
@@ -56,8 +57,8 @@ class RunSystem:
         if not self.log:
             return
 
-        for path, tree in results.items():
-            self.log.save_result(CalcOut(calc.inp, calc.op, path), tree)
+        run = Run(calc, FrozenDict(results))
+        self.log.save_run(run)
 
 
     def _recall_env_node(self, node: EnvNode, results: Mapping[Node, Tree]) -> Tree:
