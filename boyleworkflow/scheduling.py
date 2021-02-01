@@ -6,7 +6,6 @@ from typing import (
     Any,
     FrozenSet,
     Iterable,
-    Iterator,
     Mapping,
     Optional,
     Protocol,

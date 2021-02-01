@@ -2,7 +2,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import reduce
 from typing import (
-    Any,
     Callable,
     Iterable,
     Iterator,
