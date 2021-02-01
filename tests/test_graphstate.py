@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 from typing import Iterator, Mapping, Sequence
 import pytest
-from unittest.mock import Mock
-from boyleworkflow.tree import Path
+from boyleworkflow.tree import Name, Path, Tree
 from boyleworkflow.graph import Node
 from boyleworkflow.frozendict import FrozenDict
 from boyleworkflow.scheduling import (
@@ -22,7 +21,7 @@ class NamedNode(Node):
         return self.name
 
 
-def create_node(inp: Mapping[str, Node], name: str):
+def create_node(inp: Mapping[str, Node], name: str) -> Node:
     return NamedNode(
         FrozenDict({Path.from_string(path): node for path, node in inp.items()}),
         name,
@@ -59,7 +58,7 @@ class RequestAndStatesSpec:
 def _generate_allowed_steps(state: GraphState) -> Iterator[GraphState]:
     allowed_new_result_nodes = state.parents_known - state.known
     for node in allowed_new_result_nodes:
-        yield state.add_results({node: Mock()})
+        yield state.add_results({node: Tree({})})
 
     allowed_new_restorable_nodes = state.known - state.restorable
     for node in allowed_new_restorable_nodes:
@@ -172,22 +171,22 @@ def test_init_state():
 
 def test_can_add_results():
     state = GraphState.from_requested([ROOT_NODE])
-    results = {ROOT_NODE: Mock()}
+    results = {ROOT_NODE: Tree({})}
     updated = state.add_results(results)
     assert updated.results == results
 
 
 def test_can_add_same_results_twice():
     state = GraphState.from_requested([ROOT_NODE])
-    results = {ROOT_NODE: Mock()}
+    results = {ROOT_NODE: Tree({})}
     updated = state.add_results(results).add_results(results)
     assert updated.results == results
 
 
 def test_cannot_add_conflicting_results():
     state = GraphState.from_requested([ROOT_NODE])
-    results1 = {ROOT_NODE: Mock()}
-    results2 = {ROOT_NODE: Mock()}
+    results1 = {ROOT_NODE: Tree({Name("1"): Tree({})})}
+    results2 = {ROOT_NODE: Tree({Name("2"): Tree({})})}
     updated = state.add_results(results1)
     with pytest.raises(ValueError):
         updated.add_results(results2)
@@ -196,14 +195,14 @@ def test_cannot_add_conflicting_results():
 def test_only_allow_add_result_if_parents_known():
     state = GraphState.from_requested([DERIVED_NODE])
     assert DERIVED_NODE not in state.parents_known
-    results = {DERIVED_NODE: Mock()}
+    results = {DERIVED_NODE: Tree({})}
     with pytest.raises(ValueError):
         state.add_results(results)
 
 
 def test_can_add_restorable():
     state = GraphState.from_requested([ROOT_NODE])
-    results = {ROOT_NODE: Mock()}
+    results = {ROOT_NODE: Tree({})}
     updated = state.add_results(results).add_restorable({ROOT_NODE})
     assert set(updated.restorable) == {ROOT_NODE}
 
@@ -222,7 +221,7 @@ def test_invariants_on_init():
 def test_invariants_along_simple_modifications():
     state = GraphState.from_requested([DERIVED_NODE])
     assert not get_failed_invariants(state)
-    results = {ROOT_NODE: Mock()}
+    results = {ROOT_NODE: Tree({})}
     with_parent_known = state.add_results(results)
     assert not get_failed_invariants(with_parent_known)
     with_parent_restorable = with_parent_known.add_restorable(results)
@@ -236,7 +235,7 @@ def test_minimal_priority_work_leads_to_finish(network_spec: RequestAndStatesSpe
     def do_minimal_work(state: GraphState):
         for node in state.priority_work:
             if node not in state.results:
-                return state.add_results({node: Mock()})
+                return state.add_results({node: Tree({})})
             elif node not in state.restorable:
                 return state.add_restorable({node})
 
