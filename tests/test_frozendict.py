@@ -13,6 +13,14 @@ def test_hash_not_order_dependent():
     assert hash(fd1) == hash(fd2)
 
 
+def test_empty_is_falsy():
+    assert not bool(FrozenDict({}))
+
+
+def test_non_empty_is_truthy():
+    assert bool(FrozenDict({"a": 1}))
+
+
 def test_len_0():
     assert len(FrozenDict({})) == 0
 
