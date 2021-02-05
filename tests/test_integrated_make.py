@@ -95,7 +95,7 @@ class StringFormatEnv:
         op = cast(StringFormatOp, op)
         sandbox = self._sandboxes[sandbox_key]
         op_results = {
-            Loc.from_string(loc): template.format(**sandbox)
+            Loc(loc): template.format(**sandbox)
             for loc, template in op.items()
         }
         for loc, value in op_results.items():

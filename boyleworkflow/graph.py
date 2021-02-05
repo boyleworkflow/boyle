@@ -24,7 +24,7 @@ NameLikePlural = Union[Tuple[NameLike, ...], List[NameLike], AbstractSet[NameLik
 
 def _ensure_loc(value: LocLike) -> Loc:
     if isinstance(value, str):
-        return Loc.from_string(value)
+        return Loc(value)
     else:
         return value
 
@@ -73,7 +73,7 @@ class Node:
 
     def merge(self, *other: Node) -> Node:
         nodes = (self,) + other
-        inp = {Loc.from_string(str(i)): node for (i, node) in enumerate(nodes)}
+        inp = {Loc(str(i)): node for (i, node) in enumerate(nodes)}
         return MergeNode(FrozenDict(inp))
 
     def split(self, level: NameLike) -> Node:

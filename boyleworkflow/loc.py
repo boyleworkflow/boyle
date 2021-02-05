@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Sequence, Tuple
 
 _SEPARATOR = "/"
 _DOT = "."
@@ -19,29 +19,37 @@ class Name:
             raise ValueError(f"invalid Name with separator: {self.value}")
 
 
-@dataclass(frozen=True, order=True)
+@dataclass(frozen=True, order=True, init=False)
 class Loc:
     names: Tuple[Name, ...] = ()
 
-    @classmethod
-    def from_string(cls, value: str) -> Loc:
+    def __init__(self, value: str = _DOT):
         if value.endswith(_SEPARATOR):
             value = value[:-1]
-        loc_segments = (v for v in value.split(_SEPARATOR) if v != _DOT)
-        return Loc(tuple(map(Name, loc_segments)))
+        name_strs = (v for v in value.split(_SEPARATOR) if v != _DOT)
+        names = tuple(map(Name, name_strs))
+        object.__setattr__(self, "names", names)
 
-    def to_string(self) -> str:
-        if self.names:
-            return _SEPARATOR.join((n.value for n in self.names))
+    @staticmethod
+    def _str_from_names(names: Sequence[Name]) -> str:
+        if names:
+            return _SEPARATOR.join((n.value for n in names))
         else:
             return _DOT
 
+    @staticmethod
+    def from_names(names: Sequence[Name]) -> Loc:
+        return Loc(Loc._str_from_names(names))
+
+    def __str__(self) -> str:
+        return Loc._str_from_names(self.names)
+
     def __truediv__(self, name: Name) -> Loc:
-        return Loc(self.names + (name,))
+        return Loc.from_names(self.names + (name,))
 
     @property
     def parent(self):
-        return Loc(self.names[:-1])
+        return Loc.from_names(self.names[:-1])
 
     def __repr__(self):
-        return f"Path('{self.to_string()}')"
+        return f"Path('{str(self)}')"

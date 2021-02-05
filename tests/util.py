@@ -21,7 +21,7 @@ def tree_from_dict(d: StrTree) -> Tree:
 
 def create_env_node(inp: Mapping[str, Node], op: Any, out: List[str]):
     return EnvNode(
-        FrozenDict({Loc.from_string(loc): node for loc, node in inp.items()}),
+        FrozenDict({Loc(loc): node for loc, node in inp.items()}),
         op,
-        frozenset(map(Loc.from_string, out)),
+        frozenset(map(Loc, out)),
     )

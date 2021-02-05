@@ -24,7 +24,7 @@ class NamedNode(Node):
 
 def create_node(inp: Mapping[str, Node], name: str) -> Node:
     return NamedNode(
-        FrozenDict({Loc.from_string(loc): node for loc, node in inp.items()}),
+        FrozenDict({Loc(loc): node for loc, node in inp.items()}),
         name,
     )
 

@@ -83,7 +83,7 @@ class Tree(Mapping[Name, "Tree"]):
             yield from v._walk_prefixed(prefix / k)
 
     def walk(self) -> Iterable[Tuple[Loc, Tree]]:
-        yield from self._walk_prefixed(Loc(()))
+        yield from self._walk_prefixed(Loc())
 
     def _iter_level(self, level: int, prefix: Loc) -> Iterable[Tuple[Loc, Tree]]:
         if level == 0:
@@ -95,7 +95,7 @@ class Tree(Mapping[Name, "Tree"]):
                 yield from subtree._iter_level(level - 1, (prefix / name))
 
     def iter_level(self, level: int) -> Iterable[Tuple[Loc, Tree]]:
-        root = Loc(())
+        root = Loc()
         if level < 0:
             raise ValueError(f"negative level {level}")
         else:

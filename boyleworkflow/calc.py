@@ -33,7 +33,7 @@ class CalcOut:
                 {
                     "inp": self.inp.tree_id,
                     "op": self.op,
-                    "out": self.out.to_string(),
+                    "out": str(self.out),
                 },
             ),
         )

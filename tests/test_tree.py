@@ -17,7 +17,7 @@ def test_tree_hash_independent_of_order():
 
 
 def test_from_nested_item():
-    result = Tree.from_nested_items({Loc.from_string("a/b/c"): Tree({}, "x")})
+    result = Tree.from_nested_items({Loc("a/b/c"): Tree({}, "x")})
     expected_result = tree_from_dict(
         {
             "a": {
@@ -64,26 +64,26 @@ def tree_len():
 
 def test_tree_pick():
     tree = tree_from_dict({"a": {"b": "x"}})
-    loc = Loc.from_string("a/b")
+    loc = Loc("a/b")
     assert tree.pick(loc) == Tree({}, "x")
 
 
 def test_tree_pick_empty_loc():
     tree = tree_from_dict({"a": {"b": "x"}})
-    loc = Loc.from_string(".")
+    loc = Loc(".")
     assert tree.pick(loc) == tree
 
 
 def test_tree_no_picking_too_deep():
     tree = tree_from_dict({"a": {"b": "x"}})
-    loc = Loc.from_string("a/b/x/z")
+    loc = Loc("a/b/x/z")
     with pytest.raises(ValueError):
         tree.pick(loc)
 
 
 def test_tree_no_picking_unavailable():
     tree = tree_from_dict({"a": {"b": "x"}})
-    loc = Loc.from_string("a/c")
+    loc = Loc("a/c")
     with pytest.raises(ValueError):
         tree.pick(loc)
 
@@ -188,7 +188,7 @@ def test_walk():
             "c": "y",
         }
     )
-    all_locs = [Loc.from_string(s) for s in [".", "a", "a/b", "c"]]
+    all_locs = [Loc(s) for s in [".", "a", "a/b", "c"]]
     items = {loc: tree.pick(loc) for loc in all_locs}
 
     assert items == dict(tree.walk())
@@ -196,7 +196,7 @@ def test_walk():
 
 def test_iter_empty_tree_level_0():
     tree = tree_from_dict({})
-    expected_result = {Loc(()): tree}
+    expected_result = {Loc(): tree}
     result = dict(tree.iter_level(0))
     assert result == expected_result
 
@@ -208,7 +208,7 @@ def test_iter_non_empty_tree_level_0():
             "a2": {"b": "c"},
         }
     )
-    expected_result = {Loc(()): tree}
+    expected_result = {Loc(): tree}
     result = dict(tree.iter_level(0))
     assert result == expected_result
 
@@ -220,7 +220,7 @@ def test_iter_non_empty_tree_level_1():
             "a2": {"b": "c"},
         }
     )
-    level_1_locs = [Loc.from_string(s) for s in ["a1", "a2"]]
+    level_1_locs = [Loc(s) for s in ["a1", "a2"]]
     expected_result = {loc: tree.pick(loc) for loc in level_1_locs}
     result = dict(tree.iter_level(1))
     assert result == expected_result
@@ -250,7 +250,7 @@ def test_iter_tree_level_2():
         }
     )
 
-    level_2_locs = [Loc.from_string(s) for s in ["a1/b1", "a1/b2", "a2/b1", "a3/b1"]]
+    level_2_locs = [Loc(s) for s in ["a1/b1", "a1/b2", "a2/b1", "a3/b1"]]
     expected_result = {loc: tree.pick(loc) for loc in level_2_locs}
     result = dict(tree.iter_level(2))
     assert result == expected_result
@@ -271,12 +271,12 @@ def test_cannot_iter_trees_beyond_min_depth():
 
 def test_nest_at_root():
     tree = tree_from_dict({"a": "b"})
-    assert tree.nest(Loc(())) == tree
+    assert tree.nest(Loc()) == tree
 
 
 def test_nest_deep_below():
     tree = tree_from_dict({"c": "d"})
-    loc = Loc.from_string("a/b")
+    loc = Loc("a/b")
     assert tree.nest(loc).pick(loc) == tree
 
 

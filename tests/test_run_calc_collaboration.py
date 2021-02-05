@@ -10,8 +10,8 @@ CALC = Calc(
     "op",
     frozenset(
         [
-            Loc.from_string("o1"),
-            Loc.from_string("o2"),
+            Loc("o1"),
+            Loc("o2"),
         ]
     ),
 )

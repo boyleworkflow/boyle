@@ -47,7 +47,7 @@ def test_tree_id_does_not_depend_on_child_order():
 
 def test_calc_out_id_depends_on_inp():
     op = "op"
-    out = Loc.from_string("out")
+    out = Loc("out")
     objs = [
         CalcOut(tree_from_dict({}), op, out),
         CalcOut(tree_from_dict({"a": "b"}), op, out),
@@ -59,7 +59,7 @@ def test_calc_out_id_depends_on_inp():
 
 def test_calc_out_id_depends_on_op():
     inp = Tree({})
-    out = Loc.from_string("out")
+    out = Loc("out")
     objs = [
         CalcOut(inp, "op1", out),
         CalcOut(inp, "op2", out),
@@ -73,8 +73,8 @@ def test_calc_out_id_depends_on_out():
     inp = Tree({})
     op = "op"
     objs = [
-        CalcOut(inp, op, Loc.from_string("out1")),
-        CalcOut(inp, op, Loc.from_string("out2")),
+        CalcOut(inp, op, Loc("out1")),
+        CalcOut(inp, op, Loc("out2")),
     ]
 
     ids = {obj.calc_out_id for obj in objs}
