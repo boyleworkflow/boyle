@@ -137,7 +137,7 @@ class Log:
             "INSERT OR IGNORE INTO tree_child (parent_tree_id, name_, tree_id) "
             "VALUES (?, ?, ?)",
             [
-                (tree.tree_id, name.value, subtree.tree_id)
+                (tree.tree_id, str(name), subtree.tree_id)
                 for name, subtree in tree.items()
             ],
         )

@@ -282,7 +282,7 @@ def test_nest_deep_below():
 
 def _convert_to_upper_case(tree: Tree) -> Tree:
     return Tree(
-        {Name(name.value.upper()): subtree for name, subtree in tree.items()},
+        {Name(str(name).upper()): subtree for name, subtree in tree.items()},
         tree.data.upper() if isinstance(tree.data, str) else tree.data,
     )
 

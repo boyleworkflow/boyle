@@ -26,7 +26,7 @@ NestedStrDict = Dict[str, NestedStrDictItem]
 
 
 def place_nested(mapping: NestedStrDict, loc: Loc, value: NestedStrDictItem):
-    *descend_segments, final_segment = [name.value for name in loc.names]
+    *descend_segments, final_segment = map(str, loc.names)
     for segment in descend_segments:
         if segment not in mapping:
             mapping[segment] = {}
@@ -48,7 +48,7 @@ def _pick_nested(
     if not isinstance(item, dict):
         raise ValueError(f"cannot descend to {loc_segments} in {repr(item)}")
     first, *rest = loc_segments
-    return _pick_nested(item[first.value], rest)
+    return _pick_nested(item[str(first)], rest)
 
 
 def pick_nested(item: NestedStrDictItem, loc: Loc) -> NestedStrDictItem:
@@ -69,7 +69,7 @@ def build_item_from_storage(
         return storage[tree]
 
     return {
-        name.value: build_item_from_storage(subtree, storage)
+        str(name): build_item_from_storage(subtree, storage)
         for name, subtree in tree.items()
     }
 

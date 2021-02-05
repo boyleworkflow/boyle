@@ -18,3 +18,6 @@ def test_cannot_be_double_dot():
 def test_cannot_have_slash():
     with pytest.raises(ValueError):
         Name("a/b")
+
+def test_to_str():
+    assert str(Name("asdf 123")) == "asdf 123"

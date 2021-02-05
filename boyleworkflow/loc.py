@@ -10,13 +10,19 @@ _FORBIDDEN_NAMES = ["", _DOT, _DOUBLE_DOT]
 
 @dataclass(frozen=True, order=True)
 class Name:
-    value: str
+    _value: str
 
     def __post_init__(self):
-        if self.value in _FORBIDDEN_NAMES:
-            raise ValueError(f"invalid Name: {repr(self.value)}")
-        if _SEPARATOR in self.value:
-            raise ValueError(f"invalid Name with separator: {self.value}")
+        if self._value in _FORBIDDEN_NAMES:
+            raise ValueError(f"invalid Name: {repr(self._value)}")
+        if _SEPARATOR in self._value:
+            raise ValueError(f"invalid Name with separator: {self._value}")
+
+    def __str__(self):
+        return self._value
+
+    def __repr__(self):
+        return f"Name({self._value})"
 
 
 @dataclass(frozen=True, order=True, init=False)
@@ -33,7 +39,7 @@ class Loc:
     @staticmethod
     def _str_from_names(names: Sequence[Name]) -> str:
         if names:
-            return _SEPARATOR.join((n.value for n in names))
+            return _SEPARATOR.join(map(str, names))
         else:
             return _DOT
 

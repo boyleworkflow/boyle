@@ -36,7 +36,7 @@ class Tree(Mapping[Name, "Tree"]):
                 type(self),
                 {
                     "children": {
-                        name.value: tree.tree_id
+                        str(name): tree.tree_id
                         for name, tree in self._children.items()
                     },
                     "data": freeze(self.data),
