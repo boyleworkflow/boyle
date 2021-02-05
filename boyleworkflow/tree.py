@@ -6,11 +6,10 @@ from typing import (
     Iterable,
     Iterator,
     Mapping,
-    Optional,
     Tuple,
 )
 from boyleworkflow.frozendict import FrozenDict
-from boyleworkflow.util import get_id_str
+from boyleworkflow.util import get_id_str, FrozenJSON, JSONData, freeze
 from boyleworkflow.loc import Loc, Name
 
 
@@ -18,7 +17,7 @@ class TreeCollision(ValueError):
     pass
 
 
-TreeData = Optional[str]
+TreeData = FrozenJSON
 
 
 @dataclass(frozen=True, init=False)
@@ -27,7 +26,7 @@ class Tree(Mapping[Name, "Tree"]):
     _children: FrozenDict[Name, Tree]
     data: TreeData
 
-    def __init__(self, children: Mapping[Name, Tree], data: TreeData = None):
+    def __init__(self, children: Mapping[Name, Tree], data: JSONData = None):
         object.__setattr__(self, "_children", FrozenDict(children))
         object.__setattr__(self, "data", data)
         object.__setattr__(
@@ -40,7 +39,7 @@ class Tree(Mapping[Name, "Tree"]):
                         name.value: tree.tree_id
                         for name, tree in self._children.items()
                     },
-                    "data": self.data,
+                    "data": freeze(self.data),
                 },
             ),
         )
