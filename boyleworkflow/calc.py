@@ -1,7 +1,8 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import FrozenSet, Mapping, NewType, Protocol
-from boyleworkflow.tree import Loc, Tree
+from boyleworkflow.tree import Tree
+from boyleworkflow.loc import Loc
 from boyleworkflow.util import get_id_str, FrozenJSON
 
 

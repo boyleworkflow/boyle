@@ -1,5 +1,6 @@
 import pytest
-from boyleworkflow.tree import Name, Loc, Tree, TreeCollision
+from boyleworkflow.loc import Name, Loc
+from boyleworkflow.tree import Tree, TreeCollision
 from tests.util import tree_from_dict
 
 

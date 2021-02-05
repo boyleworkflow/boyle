@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from typing import Iterator, Mapping, Sequence
 import pytest
-from boyleworkflow.tree import Name, Loc, Tree
+from boyleworkflow.loc import Name, Loc
+from boyleworkflow.tree import Tree
 from boyleworkflow.graph import Node
 from boyleworkflow.frozendict import FrozenDict
 from boyleworkflow.scheduling import (

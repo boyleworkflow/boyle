@@ -3,7 +3,8 @@ from boyleworkflow.graph import Node
 from dataclasses import dataclass
 from typing import Dict, List, Mapping, Optional, Sequence, Union, cast
 from boyleworkflow.frozendict import FrozenDict
-from boyleworkflow.tree import Name, Loc, Tree
+from boyleworkflow.loc import Name, Loc
+from boyleworkflow.tree import Tree
 from boyleworkflow.calc import Op, SandboxKey
 import boyleworkflow.scheduling
 from boyleworkflow.runcalc import RunSystem

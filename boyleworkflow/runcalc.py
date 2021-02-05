@@ -1,7 +1,8 @@
 from __future__ import annotations
 from boyleworkflow.frozendict import FrozenDict
 from functools import partial
-from boyleworkflow.tree import Loc, Tree
+from boyleworkflow.loc import Loc
+from boyleworkflow.tree import Tree
 from dataclasses import dataclass
 from typing import Mapping, Optional
 from boyleworkflow.calc import Calc, CalcOut, Env, run_calc

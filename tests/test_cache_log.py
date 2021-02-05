@@ -1,7 +1,8 @@
 from boyleworkflow.frozendict import FrozenDict
 import pytest
 from boyleworkflow.calc import Calc, CalcOut
-from boyleworkflow.tree import Tree, Loc
+from boyleworkflow.loc import Loc
+from boyleworkflow.tree import Tree
 from boyleworkflow.log import Log, CacheLog, NotFound, Run
 from tests.util import tree_from_dict
 

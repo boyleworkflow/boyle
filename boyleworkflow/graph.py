@@ -9,7 +9,8 @@ from typing import (
     Tuple,
     Union,
 )
-from boyleworkflow.tree import Name, Loc, Tree
+from boyleworkflow.loc import Name, Loc
+from boyleworkflow.tree import Tree
 from boyleworkflow.calc import Op
 
 LocLike = Union[Loc, str]

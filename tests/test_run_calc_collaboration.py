@@ -1,4 +1,5 @@
-from boyleworkflow.tree import Tree, Loc
+from boyleworkflow.loc import Loc
+from boyleworkflow.tree import Tree
 import pytest
 from unittest.mock import Mock, call
 from boyleworkflow.calc import run_calc, Calc

@@ -1,4 +1,5 @@
-from boyleworkflow.tree import Loc, Tree
+from boyleworkflow.loc import Loc
+from boyleworkflow.tree import Tree
 from boyleworkflow.calc import CalcOut
 from boyleworkflow.frozendict import FrozenDict
 from tests.util import tree_from_dict

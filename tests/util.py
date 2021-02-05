@@ -1,5 +1,6 @@
 from typing import Any, List, Mapping, Union
-from boyleworkflow.tree import Tree, Name, Loc
+from boyleworkflow.loc import Name, Loc
+from boyleworkflow.tree import Tree
 from boyleworkflow.graph import Node, EnvNode
 from boyleworkflow.frozendict import FrozenDict
 

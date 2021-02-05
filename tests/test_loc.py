@@ -1,5 +1,5 @@
 import pytest
-from boyleworkflow.tree import Name, Loc
+from boyleworkflow.loc import Name, Loc
 
 EMPTY_PATH_STR = "."
 

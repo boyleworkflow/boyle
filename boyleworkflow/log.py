@@ -7,7 +7,8 @@ from pathlib import Path
 from boyleworkflow.frozendict import FrozenDict
 from typing import List, Mapping, NewType, Optional, Protocol
 from dataclasses import dataclass, field
-from boyleworkflow.tree import Name, Loc, Tree, TreeData
+from boyleworkflow.loc import Name, Loc
+from boyleworkflow.tree import Tree, TreeData
 from boyleworkflow.calc import Calc, CalcOut
 import boyleworkflow.resources
 
