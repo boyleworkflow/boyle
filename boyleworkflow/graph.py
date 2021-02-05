@@ -9,21 +9,21 @@ from typing import (
     Tuple,
     Union,
 )
-from boyleworkflow.tree import Name, Path, Tree
+from boyleworkflow.tree import Name, Loc, Tree
 from boyleworkflow.calc import Op
 
-PathLike = Union[Path, str]
+LocLike = Union[Loc, str]
 NameLike = Union[Name, str]
 
-# Allowing Collection[PathLike] is possible but opens for mistakes because
-# str is also a Collection[PathLike]. So 'abc' could be confused with ['a', 'b', 'c']
-PathLikePlural = Union[Tuple[PathLike, ...], List[PathLike], AbstractSet[PathLike]]
+# Allowing Collection[LocLike] is possible but opens for mistakes because
+# str is also a Collection[LocLike]. So 'abc' could be confused with ['a', 'b', 'c']
+LocLikePlural = Union[Tuple[LocLike, ...], List[LocLike], AbstractSet[LocLike]]
 NameLikePlural = Union[Tuple[NameLike, ...], List[NameLike], AbstractSet[NameLike]]
 
 
-def _ensure_path(value: PathLike) -> Path:
+def _ensure_loc(value: LocLike) -> Loc:
     if isinstance(value, str):
-        return Path.from_string(value)
+        return Loc.from_string(value)
     else:
         return value
 
@@ -50,7 +50,7 @@ def _get_out_levels(nodes: Collection[Node]) -> Tuple[Name, ...]:
 
 @dataclass(frozen=True)
 class Node:
-    inp: FrozenDict[Path, Node]
+    inp: FrozenDict[Loc, Node]
 
     def __post_init__(self):
         self.inp_levels  # to raise an error if input levels do not match
@@ -59,25 +59,25 @@ class Node:
     def parents(self) -> FrozenSet[Node]:
         return frozenset(self.inp.values())
 
-    def __getitem__(self, key: PathLike) -> Node:
+    def __getitem__(self, key: LocLike) -> Node:
         return self.pick(key)
 
-    def pick(self, path: PathLike) -> Node:
-        path = _ensure_path(path)
-        return PickNode(FrozenDict({Path(): self}), path)
+    def pick(self, loc: LocLike) -> Node:
+        loc = _ensure_loc(loc)
+        return PickNode(FrozenDict({Loc(): self}), loc)
 
-    def nest(self, path: PathLike) -> Node:
-        path = _ensure_path(path)
-        return RenameNode(FrozenDict({path: self}))
+    def nest(self, loc: LocLike) -> Node:
+        loc = _ensure_loc(loc)
+        return RenameNode(FrozenDict({loc: self}))
 
     def merge(self, *other: Node) -> Node:
         nodes = (self,) + other
-        inp = {Path.from_string(str(i)): node for (i, node) in enumerate(nodes)}
+        inp = {Loc.from_string(str(i)): node for (i, node) in enumerate(nodes)}
         return MergeNode(FrozenDict(inp))
 
     def split(self, level: NameLike) -> Node:
         level = _ensure_name(level)
-        return SplitNode(FrozenDict({Path(): self}), level)
+        return SplitNode(FrozenDict({Loc(): self}), level)
 
     @property
     def inp_levels(self) -> Tuple[Name, ...]:
@@ -100,10 +100,10 @@ class VirtualNode(Node):
 
 @dataclass(frozen=True)
 class PickNode(VirtualNode):
-    pick_path: Path
+    pick_loc: Loc
 
     def run_subtree(self, input_tree: Tree) -> Tree:
-        return input_tree.pick(self.pick_path)
+        return input_tree.pick(self.pick_loc)
 
 
 @dataclass(frozen=True)
@@ -149,4 +149,4 @@ class SplitNode(NoOpNode):
 @dataclass(frozen=True)
 class EnvNode(Node):
     op: Op
-    out: FrozenSet[Path]
+    out: FrozenSet[Loc]

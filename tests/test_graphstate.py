@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Iterator, Mapping, Sequence
 import pytest
-from boyleworkflow.tree import Name, Path, Tree
+from boyleworkflow.tree import Name, Loc, Tree
 from boyleworkflow.graph import Node
 from boyleworkflow.frozendict import FrozenDict
 from boyleworkflow.scheduling import (
@@ -23,7 +23,7 @@ class NamedNode(Node):
 
 def create_node(inp: Mapping[str, Node], name: str) -> Node:
     return NamedNode(
-        FrozenDict({Path.from_string(path): node for path, node in inp.items()}),
+        FrozenDict({Loc.from_string(loc): node for loc, node in inp.items()}),
         name,
     )
 
@@ -248,7 +248,7 @@ def test_minimal_priority_work_leads_to_finish(network_spec: RequestAndStatesSpe
 
 
 @pytest.mark.parametrize("network_spec", simple_networks)  # type: ignore
-def test_invariants_along_permitted_paths(network_spec: RequestAndStatesSpec):
+def test_invariants_along_permitted_locs(network_spec: RequestAndStatesSpec):
     start_state = GraphState.from_requested(network_spec.requested_nodes)
     count = 0
     for state in generate_allowed_states(start_state):

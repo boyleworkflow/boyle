@@ -3,11 +3,11 @@ from uuid import uuid4
 import datetime
 import sqlite3
 import importlib.resources as importlib_resources
-import pathlib
+from pathlib import Path
 from boyleworkflow.frozendict import FrozenDict
 from typing import List, Mapping, NewType, Optional, Protocol
 from dataclasses import dataclass, field
-from boyleworkflow.tree import Name, Path, Tree, TreeData
+from boyleworkflow.tree import Name, Loc, Tree, TreeData
 from boyleworkflow.calc import Calc, CalcOut
 import boyleworkflow.resources
 
@@ -41,7 +41,7 @@ def generate_run_id() -> RunId:
 class Run:
     run_id: str = field(init=False, default_factory=create_uuid_hex_str)
     calc: Calc
-    results: FrozenDict[Path, Tree]
+    results: FrozenDict[Loc, Tree]
 
 
 class CacheLog(Protocol):
@@ -53,7 +53,7 @@ class CacheLog(Protocol):
 
 
 class Log:
-    def __init__(self, path: Optional[pathlib.Path] = None):
+    def __init__(self, path: Optional[Path] = None):
         path_str = str(path) if path else _SQLITE_IN_MEMORY_PATH
         self.conn = sqlite3.connect(path_str)
         self.conn.execute("PRAGMA foreign_keys = ON;")
@@ -110,8 +110,8 @@ class Log:
 
     def _i_write_run_results(self, run: Run):
         results_by_calc_out = {
-            CalcOut(run.calc.inp, run.calc.op, out_path): tree
-            for out_path, tree in run.results.items()
+            CalcOut(run.calc.inp, run.calc.op, out_loc): tree
+            for out_loc, tree in run.results.items()
         }
         self.conn.executemany(
             "INSERT OR IGNORE INTO run_result (run_id, calc_out_id, tree_id) "

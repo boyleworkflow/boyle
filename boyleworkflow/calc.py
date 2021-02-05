@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import FrozenSet, Mapping, NewType, Protocol
-from boyleworkflow.tree import Path, Tree
+from boyleworkflow.tree import Loc, Tree
 from boyleworkflow.util import get_id_str, FrozenJSON
 
 
@@ -13,7 +13,7 @@ SandboxKey = NewType("SandboxKey", str)
 class Calc:
     inp: Tree
     op: Op
-    out: FrozenSet[Path]
+    out: FrozenSet[Loc]
 
 
 @dataclass(frozen=True)
@@ -21,7 +21,7 @@ class CalcOut:
     calc_out_id: str = field(init=False)
     inp: Tree
     op: Op
-    out: Path
+    out: Loc
 
     def __post_init__(self):
         object.__setattr__(
@@ -54,18 +54,18 @@ class Env(Protocol):
     def place(self, sandbox: SandboxKey, tree: Tree):
         ...
 
-    def stow(self, sandbox: SandboxKey, path: Path) -> Tree:
+    def stow(self, sandbox: SandboxKey, loc: Loc) -> Tree:
         ...
 
     def deliver(self, tree: Tree):
         ...
 
 
-def run_calc(calc: Calc, env: Env) -> Mapping[Path, Tree]:
+def run_calc(calc: Calc, env: Env) -> Mapping[Loc, Tree]:
     sandbox = env.create_sandbox()
     try:
         env.place(sandbox, calc.inp)
         env.run_op(calc.op, sandbox)
-        return {path: env.stow(sandbox, path) for path in calc.out}
+        return {loc: env.stow(sandbox, loc) for loc in calc.out}
     finally:
         env.destroy_sandbox(sandbox)

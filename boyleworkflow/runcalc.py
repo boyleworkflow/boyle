@@ -1,7 +1,7 @@
 from __future__ import annotations
 from boyleworkflow.frozendict import FrozenDict
 from functools import partial
-from boyleworkflow.tree import Path, Tree
+from boyleworkflow.tree import Loc, Tree
 from dataclasses import dataclass
 from typing import Mapping, Optional
 from boyleworkflow.calc import Calc, CalcOut, Env, run_calc
@@ -35,8 +35,8 @@ class RunSystem:
 
     def _build_input_tree(self, node: Node, results: Mapping[Node, Tree]):
         return Tree.merge(
-            results[parent].map_level(node.run_depth, lambda tree: tree.nest(path))
-            for path, parent in node.inp.items()
+            results[parent].map_level(node.run_depth, lambda tree: tree.nest(loc))
+            for loc, parent in node.inp.items()
         )
 
     def _get_subtree_runner(self, node: Node):
@@ -53,7 +53,7 @@ class RunSystem:
         self._store_calc_results(calc, results)
         return Tree.from_nested_items(results)
 
-    def _store_calc_results(self, calc: Calc, results: Mapping[Path, Tree]):
+    def _store_calc_results(self, calc: Calc, results: Mapping[Loc, Tree]):
         if not self.log:
             return
 
@@ -69,8 +69,8 @@ class RunSystem:
     def _recall_env_node_subtree(self, node: EnvNode, subtree: Tree) -> Tree:
         return Tree.from_nested_items(
             {
-                path: self._recall_calc_out(CalcOut(subtree, node.op, path))
-                for path in node.out
+                loc: self._recall_calc_out(CalcOut(subtree, node.op, loc))
+                for loc in node.out
             }
         )
 

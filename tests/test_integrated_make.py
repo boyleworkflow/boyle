@@ -3,7 +3,7 @@ from boyleworkflow.graph import Node
 from dataclasses import dataclass
 from typing import Dict, List, Mapping, Optional, Sequence, Union, cast
 from boyleworkflow.frozendict import FrozenDict
-from boyleworkflow.tree import Name, Path, Tree
+from boyleworkflow.tree import Name, Loc, Tree
 from boyleworkflow.calc import Op, SandboxKey
 import boyleworkflow.scheduling
 from boyleworkflow.runcalc import RunSystem
@@ -24,8 +24,8 @@ NestedStrDictItem = Union["NestedStrDict", str]
 NestedStrDict = Dict[str, NestedStrDictItem]
 
 
-def place_nested(mapping: NestedStrDict, path: Path, value: NestedStrDictItem):
-    *descend_segments, final_segment = [name.value for name in path.names]
+def place_nested(mapping: NestedStrDict, loc: Loc, value: NestedStrDictItem):
+    *descend_segments, final_segment = [name.value for name in loc.names]
     for segment in descend_segments:
         if segment not in mapping:
             mapping[segment] = {}
@@ -39,19 +39,19 @@ def place_nested(mapping: NestedStrDict, path: Path, value: NestedStrDictItem):
 
 
 def _pick_nested(
-    item: NestedStrDictItem, path_segments: Sequence[Name]
+    item: NestedStrDictItem, loc_segments: Sequence[Name]
 ) -> NestedStrDictItem:
-    if not path_segments:
+    if not loc_segments:
         return item
 
     if not isinstance(item, dict):
-        raise ValueError(f"cannot descend to {path_segments} in {repr(item)}")
-    first, *rest = path_segments
+        raise ValueError(f"cannot descend to {loc_segments} in {repr(item)}")
+    first, *rest = loc_segments
     return _pick_nested(item[first.value], rest)
 
 
-def pick_nested(item: NestedStrDictItem, path: Path) -> NestedStrDictItem:
-    return _pick_nested(item, path.names)
+def pick_nested(item: NestedStrDictItem, loc: Loc) -> NestedStrDictItem:
+    return _pick_nested(item, loc.names)
 
 
 def build_tree_description(item: NestedStrDictItem) -> Tree:
@@ -94,19 +94,19 @@ class StringFormatEnv:
         op = cast(StringFormatOp, op)
         sandbox = self._sandboxes[sandbox_key]
         op_results = {
-            Path.from_string(path): template.format(**sandbox)
-            for path, template in op.items()
+            Loc.from_string(loc): template.format(**sandbox)
+            for loc, template in op.items()
         }
-        for path, value in op_results.items():
-            place_nested(sandbox, path, value)
+        for loc, value in op_results.items():
+            place_nested(sandbox, loc, value)
         self.op_run_count += 1
 
-    def stow(self, sandbox_key: SandboxKey, path: Path):
+    def stow(self, sandbox_key: SandboxKey, loc: Loc):
         sandbox = self._sandboxes[sandbox_key]
-        result = pick_nested(sandbox, path)
+        result = pick_nested(sandbox, loc)
         tree = build_tree_description(result)
-        for path, subtree in tree.walk():
-            self._storage[subtree] = pick_nested(result, path)
+        for loc, subtree in tree.walk():
+            self._storage[subtree] = pick_nested(result, loc)
         return tree
 
     def place(self, sandbox_key: SandboxKey, tree: Tree):

@@ -1,5 +1,5 @@
 from typing import Any, List, Mapping, Union
-from boyleworkflow.tree import Tree, Name, Path
+from boyleworkflow.tree import Tree, Name, Loc
 from boyleworkflow.graph import Node, EnvNode
 from boyleworkflow.frozendict import FrozenDict
 
@@ -20,7 +20,7 @@ def tree_from_dict(d: StrTree) -> Tree:
 
 def create_env_node(inp: Mapping[str, Node], op: Any, out: List[str]):
     return EnvNode(
-        FrozenDict({Path.from_string(path): node for path, node in inp.items()}),
+        FrozenDict({Loc.from_string(loc): node for loc, node in inp.items()}),
         op,
-        frozenset(map(Path.from_string, out)),
+        frozenset(map(Loc.from_string, out)),
     )

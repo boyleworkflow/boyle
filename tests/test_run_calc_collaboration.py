@@ -1,4 +1,4 @@
-from boyleworkflow.tree import Tree, Path
+from boyleworkflow.tree import Tree, Loc
 import pytest
 from unittest.mock import Mock, call
 from boyleworkflow.calc import run_calc, Calc
@@ -9,8 +9,8 @@ CALC = Calc(
     "op",
     frozenset(
         [
-            Path.from_string("o1"),
-            Path.from_string("o2"),
+            Loc.from_string("o1"),
+            Loc.from_string("o2"),
         ]
     ),
 )
@@ -53,17 +53,17 @@ def test_destroys_sandbox_after_failed_run():
     env.destroy_sandbox.assert_called_once_with(sandbox)  # type: ignore
 
 
-def test_asks_env_to_stow_out_paths():
+def test_asks_env_to_stow_out_locs():
     env = Mock()
     sandbox = env.create_sandbox()  # type: ignore
     run_calc(CALC, env)
     assert env.stow.call_args_list == [  # type:ignore
-        call(sandbox, path) for path in CALC.out  # type:ignore
+        call(sandbox, loc) for loc in CALC.out  # type:ignore
     ]
 
 
 def test_returns_stowed_results():
-    expected_results = {path: Tree({}, f"digest:{path}") for path in CALC.out}
-    env = Mock(stow=lambda sandbox, path: expected_results[path])  # type: ignore
+    expected_results = {loc: Tree({}, f"digest:{loc}") for loc in CALC.out}
+    env = Mock(stow=lambda sandbox, loc: expected_results[loc])  # type: ignore
     results = run_calc(CALC, env)
     assert results == expected_results
