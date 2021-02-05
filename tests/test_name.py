@@ -6,6 +6,14 @@ def test_cannot_be_empty():
     with pytest.raises(ValueError):
         Name("")
 
+def test_cannot_be_dot():
+    with pytest.raises(ValueError):
+        Name(".")
+
+def test_cannot_be_double_dot():
+    with pytest.raises(ValueError):
+        Name("..")
+
 
 def test_cannot_have_slash():
     with pytest.raises(ValueError):
