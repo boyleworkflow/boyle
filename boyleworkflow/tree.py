@@ -66,7 +66,7 @@ class Tree(Mapping[Name, "Tree"]):
         if not loc.names:
             return self
         reversed_names = reversed(loc.names)
-        tree = Tree({next(reversed_names): self})
+        tree = self
         for name in reversed_names:
             tree = Tree({name: tree})
         return tree
