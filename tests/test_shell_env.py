@@ -39,6 +39,15 @@ def test_can_deliver(tmp_path: Path):
     assert describe(env.outdir) == tree
 
 
+def test_deliver_clears_contents(tmp_path: Path):
+    tree_1 = create_spec_tree({"an empty dir": {}})
+    tree_2 = create_spec_tree({"another empty dir": {}})
+    env = ShellEnv(tmp_path)
+    env.deliver(tree_1)
+    env.deliver(tree_2)
+    assert describe(env.outdir) == tree_2
+
+
 def test_can_run_shell_cmd_op(tmp_path: Path):
     op = create_shell_op("echo test > a_file.txt")
     env = ShellEnv(tmp_path)

@@ -72,6 +72,8 @@ class ShellEnv:
         return self.boyle_dir / "sandboxes" / sandbox
 
     def deliver(self, tree: Tree):
+        if self.outdir.exists():
+            shutil.rmtree(self.outdir)
         self.storage.restore(tree, self.outdir)
 
     def run_op(self, op: Op, sandbox: SandboxKey):
