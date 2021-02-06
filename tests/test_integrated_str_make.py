@@ -1,13 +1,13 @@
 from boyleworkflow.log import Log
 from boyleworkflow.graph import Node
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Mapping, Optional, Sequence, Union, cast
 from boyleworkflow.frozendict import FrozenDict
 from boyleworkflow.loc import Name, Loc
 from boyleworkflow.tree import Tree
 from boyleworkflow.calc import Op, SandboxKey
 import boyleworkflow.scheduling
-from boyleworkflow.runcalc import RunSystem
+from boyleworkflow.runcalc import NodeRunner
 from tests.util import create_env_node
 
 StringFormatOp = FrozenDict[str, str]
@@ -124,11 +124,16 @@ class StringFormatEnv:
 
 
 @dataclass
-class StringFormatRunSystem(RunSystem):
-    env: StringFormatEnv
+class StringFormatSystem:
+    log: Optional[Log] = None
+    env: StringFormatEnv = field(init=False, default_factory=StringFormatEnv)
+    _node_runner: NodeRunner = field(init=False)
+
+    def __post_init__(self):
+        self._node_runner = NodeRunner(self.env, self.log)
 
     def make(self, node: Node):
-        results = boyleworkflow.scheduling.make({node}, self)
+        results = boyleworkflow.scheduling.make({node}, self._node_runner)
         self.env.deliver(results[node])
 
     @property
@@ -137,7 +142,7 @@ class StringFormatRunSystem(RunSystem):
 
 
 def create_run_system(log: Optional[Log] = None):
-    return StringFormatRunSystem(StringFormatEnv(), log)
+    return StringFormatSystem(log)
 
 
 def test_make_hello():

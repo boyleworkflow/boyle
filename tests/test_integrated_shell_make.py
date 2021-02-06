@@ -2,10 +2,9 @@ from boyleworkflow.graph import Node
 from pathlib import Path
 from boyleworkflow.shell import (
     IMPORT_LOC,
-    ShellEnv,
     create_import_op,
     create_shell_op,
-    ShellRunSystem,
+    ShellSystem,
 )
 from tests.util import create_env_node
 
@@ -37,7 +36,7 @@ def test_make(tmp_path: Path):
         ["greeting_name"],
     )
 
-    system = ShellRunSystem(ShellEnv(tmp_path))
+    system = ShellSystem(tmp_path)
     system.make(result)
 
-    assert read_str(system.env.outdir / "greeting_name") == "Hello Boyle"
+    assert read_str(system.outdir / "greeting_name") == "Hello Boyle"

@@ -11,7 +11,7 @@ from boyleworkflow.log import CacheLog, NotFound, Run
 
 
 @dataclass
-class RunSystem:
+class NodeRunner:
     env: Env
     log: Optional[CacheLog] = None
 

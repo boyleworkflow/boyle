@@ -12,7 +12,7 @@ from boyleworkflow.storage import Storage, loc_to_rel_path, describe
 from boyleworkflow.frozendict import FrozenDict
 from boyleworkflow.graph import Node
 import boyleworkflow.scheduling
-from boyleworkflow.runcalc import RunSystem
+from boyleworkflow.runcalc import NodeRunner
 
 
 BOYLE_DIR = ".boyle"
@@ -37,7 +37,7 @@ class ShellEnv:
 
     def __post_init__(self):
         if not self.root_dir.is_absolute():
-            raise ValueError(f"expected absolute path but received {self.root_dir}")
+            raise ValueError(f"expected absolute path but received '{self.root_dir}'")
         if not self.root_dir.exists():
             raise ValueError(f"{self.root_dir} does not exist")
         if not self.root_dir.is_dir():
@@ -106,10 +106,20 @@ class ShellEnv:
                     raise ValueError(f"what kind of thing is that at {src_path}?")
 
 
-@dataclass
-class ShellRunSystem(RunSystem):
-    env: ShellEnv
+@dataclass(frozen=True)
+class ShellSystem:
+    root_dir: Path
+    _env: ShellEnv = field(init=False)
+    _node_runner: NodeRunner = field(init=False)
+
+    def __post_init__(self):
+        object.__setattr__(self, "_env", ShellEnv(self.root_dir))
+        object.__setattr__(self, "_node_runner", NodeRunner(self._env))
+
+    @property
+    def outdir(self):
+        return self._env.outdir
 
     def make(self, node: Node):
-        results = boyleworkflow.scheduling.make({node}, self)
-        self.env.deliver(results[node])
+        results = boyleworkflow.scheduling.make({node}, self._node_runner)
+        self._env.deliver(results[node])

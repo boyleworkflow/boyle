@@ -148,7 +148,7 @@ class GraphState:
         )._set_priority_work()
 
 
-class RunSystem(Protocol):
+class NodeRunner(Protocol):
     def run(self, node: Node, results: Mapping[Node, Result]) -> Result:
         ...
 
@@ -159,7 +159,7 @@ class RunSystem(Protocol):
         ...
 
 
-def _advance_state(state: GraphState, system: RunSystem) -> GraphState:
+def _advance_state(state: GraphState, system: NodeRunner) -> GraphState:
     nodes = state.priority_work
 
     new_results = {}
@@ -174,7 +174,7 @@ def _advance_state(state: GraphState, system: RunSystem) -> GraphState:
     return state.add_results(new_results).add_restorable(new_restorable)
 
 
-def make(requested: Iterable[Node], system: RunSystem) -> Mapping[Node, Result]:
+def make(requested: Iterable[Node], system: NodeRunner) -> Mapping[Node, Result]:
     requested = set(requested)
     state = GraphState.from_requested(requested)
     while state.priority_work:
