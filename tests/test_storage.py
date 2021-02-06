@@ -112,10 +112,35 @@ def test_store_can_restore_nested_dir(tmp_path: Path):
 
     storage = Storage(tmp_path / "storage")
     spec = storage.store(subdir_1)
-    print(spec)
 
     restore_path = tmp_path / "restore_path"
     storage.restore(spec, restore_path)
-    print(describe(restore_path))
 
     assert describe(subdir_1) == describe(restore_path)
+
+
+def test_store_can_restore_dir_having_stored_only_files(tmp_path: Path):
+    src_path = tmp_path / "src_file"
+    write_str(SOME_TEXT, src_path)
+
+    storage = Storage(tmp_path / "storage")
+    storage.store(src_path)
+
+    restore_tree = create_spec_tree({"this": {"works": {"OK": SOME_TEXT_SHA256}}})
+
+    restore_path = tmp_path / "restore_path"
+    storage.restore(restore_tree, restore_path)
+
+    assert describe(restore_path) == restore_tree
+
+
+def test_reports_dir_as_restorable_having_stored_only_files(tmp_path: Path):
+    src_path = tmp_path / "src_file"
+    write_str(SOME_TEXT, src_path)
+    storage = Storage(tmp_path / "storage")
+
+    nested_tree = create_spec_tree({"this": {"works": {"OK": SOME_TEXT_SHA256}}})
+    assert not storage.can_restore(nested_tree)
+
+    storage.store(src_path)
+    assert storage.can_restore(nested_tree)

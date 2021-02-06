@@ -108,3 +108,11 @@ class Storage:
             / hexdigest[:_STORAGE_PATH_SPLIT_LEN]
             / hexdigest[_STORAGE_PATH_SPLIT_LEN:]
         )
+
+    def can_restore(self, tree: Tree) -> bool:
+        for _, subtree in tree.walk():
+            if _represents_file(subtree):
+                if not self._get_storage_path(subtree).exists():
+                    return False
+
+        return True
