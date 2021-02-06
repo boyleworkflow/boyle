@@ -28,7 +28,7 @@ class Tree(Mapping[Name, "Tree"]):
 
     def __init__(self, children: Mapping[Name, Tree], data: JSONData = None):
         object.__setattr__(self, "_children", FrozenDict(children))
-        object.__setattr__(self, "data", data)
+        object.__setattr__(self, "data", freeze(data))
         object.__setattr__(
             self,
             "tree_id",
