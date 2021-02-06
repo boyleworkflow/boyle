@@ -7,7 +7,7 @@ from boyleworkflow.loc import Name, Loc
 from boyleworkflow.tree import Tree
 from boyleworkflow.calc import Op, SandboxKey
 import boyleworkflow.scheduling
-from boyleworkflow.runcalc import NodeRunner
+from boyleworkflow.noderunner import NodeRunner
 from tests.util import create_env_node
 
 StringFormatOp = FrozenDict[str, str]

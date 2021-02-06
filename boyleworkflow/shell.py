@@ -13,7 +13,7 @@ from boyleworkflow.storage import Storage, loc_to_rel_path, describe
 from boyleworkflow.frozendict import FrozenDict
 from boyleworkflow.graph import Node
 import boyleworkflow.scheduling
-from boyleworkflow.runcalc import NodeRunner
+from boyleworkflow.noderunner import NodeRunner
 
 
 BOYLE_DIR = ".boyle"
