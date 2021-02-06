@@ -1,4 +1,5 @@
 from __future__ import annotations
+from boyleworkflow.log import Log
 import subprocess
 import shutil
 from typing import Mapping, cast
@@ -111,10 +112,12 @@ class ShellSystem:
     root_dir: Path
     _env: ShellEnv = field(init=False)
     _node_runner: NodeRunner = field(init=False)
+    _log: Log = field(init=False)
 
     def __post_init__(self):
         object.__setattr__(self, "_env", ShellEnv(self.root_dir))
-        object.__setattr__(self, "_node_runner", NodeRunner(self._env))
+        log = Log()
+        object.__setattr__(self, "_node_runner", NodeRunner(self._env, log))
 
     @property
     def outdir(self):
