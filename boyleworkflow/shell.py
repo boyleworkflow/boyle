@@ -10,6 +10,9 @@ from boyleworkflow.tree import Tree
 from boyleworkflow.calc import Op, SandboxKey
 from boyleworkflow.storage import Storage, loc_to_rel_path, describe
 from boyleworkflow.frozendict import FrozenDict
+from boyleworkflow.graph import Node
+import boyleworkflow.scheduling
+from boyleworkflow.runcalc import RunSystem
 
 
 BOYLE_DIR = ".boyle"
@@ -21,8 +24,10 @@ _STORAGE_SUBDIR = "storage"
 def create_import_op(path: str) -> Op:
     return FrozenDict({"op_type": "import", "path": path})
 
+
 def create_shell_op(cmd: str) -> Op:
     return FrozenDict({"op_type": "shell", "cmd": cmd})
+
 
 @dataclass
 class ShellEnv:
@@ -83,16 +88,26 @@ class ShellEnv:
             src_path = self.root_dir / cast(str, op["path"])
             if not src_path.exists():
                 raise FileNotFoundError(src_path)
-            dst_path = self._get_sandbox_path(sandbox) / loc_to_rel_path(IMPORT_LOC)
 
             tree_to_import = describe(src_path)
 
             if self.storage.can_restore(tree_to_import):
-                self.place(sandbox, tree_to_import)
+                tree_to_place = Tree.from_nested_items({IMPORT_LOC: tree_to_import})
+                self.place(sandbox, tree_to_place)
             else:
+                dst_path = self._get_sandbox_path(sandbox) / loc_to_rel_path(IMPORT_LOC)
                 if src_path.is_file():
                     shutil.copy(src_path, dst_path)
                 elif src_path.is_dir():
                     shutil.copytree(src_path, dst_path)
                 else:
                     raise ValueError(f"what kind of thing is that at {src_path}?")
+
+
+@dataclass
+class ShellRunSystem(RunSystem):
+    env: ShellEnv
+
+    def make(self, node: Node):
+        results = boyleworkflow.scheduling.make({node}, self)
+        self.env.deliver(results[node])

@@ -8,17 +8,13 @@ from boyleworkflow.tree import Tree
 from boyleworkflow.calc import Op, SandboxKey
 import boyleworkflow.scheduling
 from boyleworkflow.runcalc import RunSystem
-import tests.util
+from tests.util import create_env_node
 
 StringFormatOp = FrozenDict[str, str]
 
 
 def create_log() -> Log:
     return Log()
-
-
-def create_env_node(inp: Mapping[str, Node], op: Mapping[str, str], out: List[str]):
-    return tests.util.create_env_node(inp, FrozenDict(op), out)
 
 
 NestedStrDictItem = Union["NestedStrDict", str]
