@@ -33,19 +33,21 @@ def _describe_dir(path: Path) -> Tree:
 
 
 def describe(path: Path) -> Tree:
+    if not path.exists():
+        raise FileNotFoundError(path)
     if path.is_dir():
         return _describe_dir(path)
     elif path.is_file():
         return _describe_file(path)
 
-    raise NotImplemented
+    raise NotImplementedError()
 
 
 def _represents_file(tree: Tree):
     return tree.data is not None
 
 
-def _loc_to_rel_path(loc: Loc):
+def loc_to_rel_path(loc: Loc):
     path = Path(str(loc))
     assert not path.is_absolute(), path
     return path
@@ -75,7 +77,7 @@ class Storage:
     def _store_tree(self, tree: Tree, start_path: Path):
         for loc, subtree in tree.walk():
             if _represents_file(subtree):
-                self._store_file(subtree, start_path / _loc_to_rel_path(loc))
+                self._store_file(subtree, start_path / loc_to_rel_path(loc))
 
     def _store_file(self, file_tree: Tree, src_path: Path):
         dst_path = self._get_storage_path(file_tree)
@@ -93,12 +95,11 @@ class Storage:
         os.link(src_path, dst_path)
 
     def _restore_dir(self, dir_tree: Tree, dst_path: Path):
-        dst_path.mkdir()
+        dst_path.mkdir(exist_ok=True)
 
         for name, subtree in dir_tree.items():
             child_path = dst_path / str(name)
             self.restore(subtree, child_path)
-
 
     def _get_storage_path(self, file_tree: Tree) -> Path:
         hexdigest: str = file_tree.data[HASH_NAME]  # type: ignore
