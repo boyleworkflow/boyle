@@ -22,7 +22,7 @@ class Name:
         return self._value
 
     def __repr__(self):
-        return f"Name({self._value})"
+        return f"Name('{self._value}')"
 
 
 @dataclass(frozen=True, order=True, init=False)
