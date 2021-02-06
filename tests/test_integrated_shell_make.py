@@ -43,7 +43,7 @@ def test_make(tmp_path: Path):
     assert read_str(system.outdir / "greeting_name") == "Hello Boyle"
 
 
-def test_make_uses_cache(tmp_path: Path):
+def test_make_persists_cache_on_disk(tmp_path: Path):
     # If this runs twice it will produce different outputs
     node = create_env_node(
         {},
@@ -51,9 +51,12 @@ def test_make_uses_cache(tmp_path: Path):
         ["outfile"],
     )
 
-    system = ShellSystem(tmp_path)
-    system.make(node)
-    result_1 = describe(system.outdir)
-    system.make(node)
-    result_2 = describe(system.outdir)
+    system_1 = ShellSystem(tmp_path)
+    system_1.make(node)
+    result_1 = describe(system_1.outdir)
+
+    system_2 = ShellSystem(tmp_path)
+    system_2.make(node)
+    result_2 = describe(system_2.outdir)
+
     assert result_1 == result_2

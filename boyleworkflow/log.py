@@ -57,10 +57,11 @@ class CacheLog(Protocol):
 class Log:
     def __init__(self, path: Optional[Path] = None):
         path_str = str(path) if path else _SQLITE_IN_MEMORY_PATH
+        needs_initialize = not (path and path.exists())
+
         self.conn = sqlite3.connect(path_str)
         self.conn.execute("PRAGMA foreign_keys = ON;")
 
-        needs_initialize = not (path and path.exists())
         if needs_initialize:
             self._initialize()
 

@@ -116,7 +116,9 @@ class ShellSystem:
 
     def __post_init__(self):
         object.__setattr__(self, "_env", ShellEnv(self.root_dir))
-        log = Log()
+        log_dir = self._env.boyle_dir / "log"
+        log_dir.mkdir(exist_ok=True, parents=True)
+        log = Log(log_dir / "log.sqlite")
         object.__setattr__(self, "_node_runner", NodeRunner(self._env, log))
 
     @property
