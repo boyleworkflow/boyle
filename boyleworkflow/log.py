@@ -1,4 +1,6 @@
 from __future__ import annotations
+from boyleworkflow.util import freeze, unfreeze
+import json
 from uuid import uuid4
 import datetime
 import sqlite3
@@ -17,7 +19,6 @@ sqlite3.register_adapter(datetime.datetime, lambda dt: dt.isoformat())
 SCHEMA_VERSION = "v0.2.0"
 _SCHEMA_FILENAME = f"schema-{SCHEMA_VERSION}.sql"
 _SQLITE_IN_MEMORY_PATH = ":memory:"
-
 
 class NotFound(Exception):
     pass
@@ -126,7 +127,7 @@ class Log:
     def _i_write_tree(self, tree: Tree):
         self.conn.execute(
             "INSERT OR IGNORE INTO tree (tree_id, data_) VALUES (?, ?)",
-            (tree.tree_id, tree.data),
+            (tree.tree_id, json.dumps(unfreeze(tree.data))),
         )
         if not len(tree):
             return
@@ -154,7 +155,8 @@ class Log:
 
     def _i_read_tree_data(self, tree_id: str) -> TreeData:
         cur = self.conn.execute("SELECT data_ FROM tree WHERE tree_id = ?", (tree_id,))
-        return next(cur)[0]
+        json_str = next(cur)[0]
+        return freeze(json.loads(json_str))
 
     def _i_read_tree_children(self, tree_id: str) -> Mapping[Name, str]:
         cur = self.conn.execute(
