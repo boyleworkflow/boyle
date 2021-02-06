@@ -1,7 +1,7 @@
 import pytest
 from boyleworkflow.loc import Loc
 from pathlib import Path
-from boyleworkflow.shell import ShellEnv
+from boyleworkflow.shell import ShellEnv, IMPORT_LOC, create_shell_op, create_import_op
 from boyleworkflow.storage import describe
 from tests.test_storage import create_spec_tree
 
@@ -39,8 +39,8 @@ def test_can_deliver(tmp_path: Path):
     assert describe(env.outdir) == tree
 
 
-def test_can_run_op(tmp_path: Path):
-    op = f"echo test > a_file.txt"
+def test_can_run_shell_cmd_op(tmp_path: Path):
+    op = create_shell_op("echo test > a_file.txt")
     env = ShellEnv(tmp_path)
     sandbox = env.create_sandbox()
     env.run_op(op, sandbox)
@@ -48,3 +48,32 @@ def test_can_run_op(tmp_path: Path):
     env.deliver(tree)
     with open(env.outdir / "a_file.txt", "r") as f:
         assert f.read() == "test\n"
+
+
+def test_can_run_import_op_on_file(tmp_path: Path):
+    input_path = tmp_path / "input_file.txt"
+    with open(input_path, "w") as f:
+        f.write("test")
+
+    op = create_import_op("input_file.txt")
+
+    env = ShellEnv(tmp_path)
+    sandbox = env.create_sandbox()
+    env.run_op(op, sandbox)
+    tree = env.stow(sandbox, IMPORT_LOC)
+    assert describe(input_path) == tree
+
+
+def test_can_run_import_op_on_dir(tmp_path: Path):
+    input_dir = tmp_path / "input_dir"
+    input_dir.mkdir()
+    with open(input_dir / "some_file", "w") as f:
+        f.write("test")
+
+    op = create_import_op("input_dir")
+
+    env = ShellEnv(tmp_path)
+    sandbox = env.create_sandbox()
+    env.run_op(op, sandbox)
+    tree = env.stow(sandbox, IMPORT_LOC)
+    assert describe(input_dir) == tree

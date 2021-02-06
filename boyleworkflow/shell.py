@@ -1,18 +1,28 @@
 from __future__ import annotations
 import subprocess
 import shutil
+from typing import Mapping, cast
 from uuid import uuid4
 from boyleworkflow.loc import Loc
 from dataclasses import dataclass, field
 from pathlib import Path
 from boyleworkflow.tree import Tree
 from boyleworkflow.calc import Op, SandboxKey
-from boyleworkflow.storage import Storage, loc_to_rel_path
+from boyleworkflow.storage import Storage, loc_to_rel_path, describe
+from boyleworkflow.frozendict import FrozenDict
 
 
 BOYLE_DIR = ".boyle"
 DEFAULT_OUTDIR = Path("output")
+IMPORT_LOC = Loc("imported")
 _STORAGE_SUBDIR = "storage"
+
+
+def create_import_op(path: str) -> Op:
+    return FrozenDict({"op_type": "import", "path": path})
+
+def create_shell_op(cmd: str) -> Op:
+    return FrozenDict({"op_type": "shell", "cmd": cmd})
 
 @dataclass
 class ShellEnv:
@@ -60,7 +70,29 @@ class ShellEnv:
         self.storage.restore(tree, self.outdir)
 
     def run_op(self, op: Op, sandbox: SandboxKey):
-        if not isinstance(op, str):
-            raise ValueError(f"expected string Op but received {op}")
-        work_dir = self._get_sandbox_path(sandbox)
-        subprocess.run(op, shell=True, cwd=work_dir)
+        if not isinstance(op, Mapping):
+            raise ValueError(f"expected Mapping but received {op}")
+        op_type = op["op_type"]
+        if op_type == "shell":
+            cmd = op["cmd"]
+            if not isinstance(cmd, str):
+                raise ValueError(f"expected str cmd but received {cmd}")
+            work_dir = self._get_sandbox_path(sandbox)
+            subprocess.run(cmd, shell=True, cwd=work_dir)
+        elif op_type == "import":
+            src_path = self.root_dir / cast(str, op["path"])
+            if not src_path.exists():
+                raise FileNotFoundError(src_path)
+            dst_path = self._get_sandbox_path(sandbox) / loc_to_rel_path(IMPORT_LOC)
+
+            tree_to_import = describe(src_path)
+
+            if self.storage.can_restore(tree_to_import):
+                self.place(sandbox, tree_to_import)
+            else:
+                if src_path.is_file():
+                    shutil.copy(src_path, dst_path)
+                elif src_path.is_dir():
+                    shutil.copytree(src_path, dst_path)
+                else:
+                    raise ValueError(f"what kind of thing is that at {src_path}?")
