@@ -42,6 +42,19 @@ def test_make(tmp_path: Path):
     assert read_str(system.outdir / "greeting_name") == "Hello Boyle"
 
 
+def test_make_file(tmp_path: Path):
+    result = define(
+        {},
+        create_shell_op("echo test > my_file"),
+        "my_file",
+    )
+
+    system = ShellSystem(tmp_path)
+    system.make(result)
+
+    assert read_str(system.outdir) == "test\n"
+
+
 def test_make_persists_cache_on_disk(tmp_path: Path):
     # If this runs twice it will produce different outputs
     node = define(

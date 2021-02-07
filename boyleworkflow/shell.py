@@ -18,7 +18,7 @@ from boyleworkflow.noderunner import NodeRunner
 
 
 BOYLE_DIR = ".boyle"
-DEFAULT_OUTDIR = Path("output")
+DEFAULT_OUT_PATH = Path("output")
 IMPORT_LOC = Loc("imported")
 _STORAGE_SUBDIR = "storage"
 
@@ -34,7 +34,7 @@ def create_shell_op(cmd: str) -> Op:
 @dataclass
 class ShellEnv:
     root_dir: Path
-    outdir: Path = DEFAULT_OUTDIR
+    out_path: Path = DEFAULT_OUT_PATH
     storage: Storage = field(init=False)
 
     def __post_init__(self):
@@ -45,7 +45,7 @@ class ShellEnv:
         if not self.root_dir.is_dir():
             raise ValueError(f"{self.root_dir} is not a directory")
         self.storage = Storage(self.boyle_dir / _STORAGE_SUBDIR)
-        self.outdir = self.root_dir / self.outdir
+        self.out_path = self.root_dir / self.out_path
 
     @property
     def boyle_dir(self) -> Path:
@@ -74,9 +74,9 @@ class ShellEnv:
         return self.boyle_dir / "sandboxes" / sandbox
 
     def deliver(self, tree: Tree):
-        if self.outdir.exists():
-            shutil.rmtree(self.outdir)
-        self.storage.restore(tree, self.outdir)
+        if self.out_path.exists():
+            shutil.rmtree(self.out_path)
+        self.storage.restore(tree, self.out_path)
 
     def run_op(self, op: Op, sandbox: SandboxKey):
         if not isinstance(op, Mapping):
@@ -124,7 +124,7 @@ class ShellSystem:
 
     @property
     def outdir(self):
-        return self._env.outdir
+        return self._env.out_path
 
     def make(self, target: Union[Node, NodeWrapper, MultiWrapper]):
         if isinstance(target, Node):
