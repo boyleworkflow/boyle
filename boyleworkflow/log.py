@@ -1,4 +1,5 @@
 from __future__ import annotations
+from boyleworkflow.calc import Calc, Op
 from boyleworkflow.util import freeze, unfreeze
 import json
 from uuid import uuid4
@@ -6,12 +7,11 @@ import datetime
 import sqlite3
 import importlib.resources as importlib_resources
 from pathlib import Path
-from boyleworkflow.frozendict import FrozenDict
 from typing import List, Mapping, NewType, Optional, Protocol
 from dataclasses import dataclass, field
 from boyleworkflow.loc import Name, Loc
 from boyleworkflow.tree import Tree, TreeData
-from boyleworkflow.calc import Calc, CalcOut
+from boyleworkflow.util import get_id_str
 import boyleworkflow.resources
 
 sqlite3.register_adapter(datetime.datetime, lambda dt: dt.isoformat())
@@ -19,6 +19,7 @@ sqlite3.register_adapter(datetime.datetime, lambda dt: dt.isoformat())
 SCHEMA_VERSION = "v0.2.0"
 _SCHEMA_FILENAME = f"schema-{SCHEMA_VERSION}.sql"
 _SQLITE_IN_MEMORY_PATH = ":memory:"
+
 
 class NotFound(Exception):
     pass
@@ -43,14 +44,36 @@ def generate_run_id() -> RunId:
 class Run:
     run_id: str = field(init=False, default_factory=create_uuid_hex_str)
     calc: Calc
-    results: FrozenDict[Loc, Tree]
+    result: Tree
+
+
+@dataclass(frozen=True)
+class CalcOut:
+    calc_out_id: str = field(init=False)
+    inp: Tree
+    spec: Op
+    out: Loc
+
+    def __post_init__(self):
+        object.__setattr__(
+            self,
+            "calc_out_id",
+            get_id_str(
+                type(self),
+                {
+                    "inp": self.inp.tree_id,
+                    "op": self.spec,
+                    "out": str(self.out),
+                },
+            ),
+        )
 
 
 class CacheLog(Protocol):
     def save_run(self, run: Run):
         ...
 
-    def recall_result(self, calc_out: CalcOut) -> Tree:
+    def recall_result(self, calc: Calc) -> Tree:
         ...
 
 
@@ -77,20 +100,25 @@ class Log:
         self.conn.close()
 
     def save_run(self, run: Run):
-        if set(run.results) != set(run.calc.out):
-            raise ValueError(f"mismatch {set(run.results)} and {set(run.calc.out)}")
-
         with self.conn:
             self._i_write_run(run)
 
-    def recall_result(self, calc_out: CalcOut):
+    def recall_result(self, calc: Calc) -> Tree:
+        return Tree.from_nested_items(
+            {
+                loc: self._recall_calc_out_result(CalcOut(calc.inp, calc.op, loc))
+                for loc in calc.out
+            }
+        )
+
+    def _recall_calc_out_result(self, calc_out: CalcOut):
         tree_ids = self._i_read_result_tree_ids(calc_out)
         if not tree_ids:
             raise NotFound(calc_out)
         if len(tree_ids) > 1:
             raise ConflictingResults(calc_out, tree_ids)
 
-        tree_id, = tree_ids
+        (tree_id,) = tree_ids
 
         return self._i_read_tree_by_id(tree_id)
 
@@ -108,13 +136,12 @@ class Log:
             (run.run_id,),
         )
         self._i_write_run_results(run)
-        for tree in run.results.values():
-            self._i_write_tree(tree)
+        self._i_write_tree(run.result)
 
     def _i_write_run_results(self, run: Run):
         results_by_calc_out = {
-            CalcOut(run.calc.inp, run.calc.op, out_loc): tree
-            for out_loc, tree in run.results.items()
+            CalcOut(run.calc.inp, run.calc.op, loc): run.result.pick(loc)
+            for loc in run.calc.out
         }
         self.conn.executemany(
             "INSERT OR IGNORE INTO run_result (run_id, calc_out_id, tree_id) "
@@ -143,7 +170,6 @@ class Log:
                 for name, subtree in tree.items()
             ],
         )
-
 
     def _i_read_tree_by_id(self, tree_id: str) -> Tree:
         data = self._i_read_tree_data(tree_id)

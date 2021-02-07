@@ -1,42 +1,15 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import FrozenSet, Mapping, NewType, Protocol
+from dataclasses import dataclass
+from typing import FrozenSet, NewType, Protocol
 from boyleworkflow.tree import Tree
 from boyleworkflow.loc import Loc
-from boyleworkflow.util import get_id_str, FrozenJSON
+from boyleworkflow.util import FrozenJSON
 
 
-Op = FrozenJSON
 SandboxKey = NewType("SandboxKey", str)
 
 
-@dataclass(frozen=True)
-class Calc:
-    inp: Tree
-    op: Op
-    out: FrozenSet[Loc]
-
-
-@dataclass(frozen=True)
-class CalcOut:
-    calc_out_id: str = field(init=False)
-    inp: Tree
-    op: Op
-    out: Loc
-
-    def __post_init__(self):
-        object.__setattr__(
-            self,
-            "calc_out_id",
-            get_id_str(
-                type(self),
-                {
-                    "inp": self.inp.tree_id,
-                    "op": self.op,
-                    "out": str(self.out),
-                },
-            ),
-        )
+Op = FrozenJSON
 
 
 class Env(Protocol):
@@ -62,11 +35,21 @@ class Env(Protocol):
         ...
 
 
-def run_calc(calc: Calc, env: Env) -> Mapping[Loc, Tree]:
+Op = FrozenJSON
+
+
+@dataclass(frozen=True)
+class Calc:
+    inp: Tree
+    op: Op
+    out: FrozenSet[Loc]
+
+
+def run_calc(calc: Calc, env: Env) -> Tree:
     sandbox = env.create_sandbox()
     try:
         env.place(sandbox, calc.inp)
         env.run_op(calc.op, sandbox)
-        return {loc: env.stow(sandbox, loc) for loc in calc.out}
+        return Tree.from_nested_items({loc: env.stow(sandbox, loc) for loc in calc.out})
     finally:
         env.destroy_sandbox(sandbox)

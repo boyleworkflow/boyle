@@ -1,14 +1,14 @@
 from boyleworkflow.log import Log
-from boyleworkflow.graph import Node
+from boyleworkflow.nodes import Node
 from dataclasses import dataclass, field
-from typing import Dict, List, Mapping, Optional, Sequence, Union, cast
+from typing import Dict, Mapping, Optional, Sequence, Union, cast
 from boyleworkflow.frozendict import FrozenDict
 from boyleworkflow.loc import Name, Loc
 from boyleworkflow.tree import Tree
 from boyleworkflow.calc import Op, SandboxKey
 import boyleworkflow.scheduling
 from boyleworkflow.noderunner import NodeRunner
-from tests.util import create_env_node
+from boyleworkflow.api import MultiWrapper, NodeWrapper, define, put
 
 StringFormatOp = FrozenDict[str, str]
 
@@ -91,8 +91,7 @@ class StringFormatEnv:
         op = cast(StringFormatOp, op)
         sandbox = self._sandboxes[sandbox_key]
         op_results = {
-            Loc(loc): template.format(**sandbox)
-            for loc, template in op.items()
+            Loc(loc): template.format(**sandbox) for loc, template in op.items()
         }
         for loc, value in op_results.items():
             place_nested(sandbox, loc, value)
@@ -125,14 +124,18 @@ class StringFormatEnv:
 
 @dataclass
 class StringFormatSystem:
-    log: Optional[Log] = None
+    log: Log
     env: StringFormatEnv = field(init=False, default_factory=StringFormatEnv)
     _node_runner: NodeRunner = field(init=False)
 
     def __post_init__(self):
         self._node_runner = NodeRunner(self.env, self.log)
 
-    def make(self, node: Node):
+    def make(self, target: Union[Node, NodeWrapper, MultiWrapper]):
+        if isinstance(target, Node):
+            node = target
+        else:
+            node = target.node
         results = boyleworkflow.scheduling.make({node}, self._node_runner)
         self.env.deliver(results[node])
 
@@ -141,21 +144,22 @@ class StringFormatSystem:
         return self.env.output
 
 
-def create_run_system(log: Optional[Log] = None):
+def create_run_system():
+    log = Log()
     return StringFormatSystem(log)
 
 
 def test_make_hello():
     system = create_run_system()
-    hello_node = create_env_node({}, {"hello": "Hello"}, ["hello"])
+    hello_node = define({}, {"hello": "Hello"}, ["hello"])
     system.make(hello_node)
     assert system.output == {"hello": "Hello"}
 
 
 def test_make_hello_world():
     system = create_run_system()
-    hello_node = create_env_node({}, {"hello": "Hello"}, ["hello"])
-    hello_world_node = create_env_node(
+    hello_node = define({}, {"hello": "Hello"}, ["hello"])
+    hello_world_node = define(
         {".": hello_node},
         {"hello_world": "{hello} World"},
         ["hello_world"],
@@ -164,50 +168,42 @@ def test_make_hello_world():
     assert system.output == {"hello_world": "Hello World"}
 
 
-def test_nest():
+def test_put():
     system = create_run_system()
-    hello_node = create_env_node({}, {"hello": "Hello"}, ["hello"])
-    system.make(hello_node.nest("greeting"))
+    hello_node = define({}, {"hello": "Hello"}, ["hello"])
+    system.make(put({"greeting": hello_node}))
     assert system.output == {"greeting": {"hello": "Hello"}}
 
 
 def test_pick():
     system = create_run_system()
-    hello_node = create_env_node({}, {"hello": "Hello"}, ["hello"])
+    hello_node = define({}, {"hello": "Hello"}, ["hello"])
     system.make(hello_node["hello"])
     assert system.output == "Hello"
 
 
-def test_merge():
-    system = create_run_system()
-    node_1 = create_env_node({}, {"first": "Robert"}, ["first"])
-    node_2 = create_env_node({}, {"last": "Boyle"}, ["last"])
-    merged = node_1.merge(node_2)
-    system.make(merged)
-    assert system.output == {"first": "Robert", "last": "Boyle"}
-
-
 def test_multi_output():
     system = create_run_system()
-    multi_output_node = create_env_node({}, {"a": "one", "b": "two"}, ["a", "b"])
+    multi_output_node = define({}, {"a": "one", "b": "two"}, ["a", "b"])
     system.make(multi_output_node)
     assert system.output == {"a": "one", "b": "two"}
 
 
 def test_separated_and_recombined_siblings_runs_only_once():
     system = create_run_system()
-    multi_output_node = create_env_node({}, {"a": "one", "b": "two"}, ["a", "b"])
+    multi_output_node = define({}, {"a": "one", "b": "two"}, ["a", "b"])
     a = multi_output_node["a"]
     b = multi_output_node["b"]
-    combined = a.nest("A").merge(b.nest("B"))
+    combined = put({"A": a, "B": b})
     system.make(combined)
+    assert system.output == {"A": "one", "B": "two"}
     assert system.env.op_run_count == 1
 
 
 def test_can_split():
     system = create_run_system()
     names = (
-        create_env_node(
+        define(
             {},
             {
                 "out/first": "Robert",
@@ -228,7 +224,7 @@ def test_can_split():
 def test_can_map_on_nested_level_1():
     system = create_run_system()
     names = (
-        create_env_node(
+        define(
             {},
             {
                 "out/first": "Robert",
@@ -240,7 +236,7 @@ def test_can_map_on_nested_level_1():
         .split("name_level")
     )
 
-    greetings = create_env_node(
+    greetings = define(
         {"name": names},
         {"greeting": "Hello {name}!"},
         ["greeting"],
@@ -256,7 +252,7 @@ def test_can_map_on_nested_level_2():
     system = create_run_system()
 
     names = (
-        create_env_node(
+        define(
             {},
             {
                 "out/first": "Robert",
@@ -269,7 +265,7 @@ def test_can_map_on_nested_level_2():
     )
 
     greetings = (
-        create_env_node(
+        define(
             {"name": names},
             {
                 "greetings/English": "Hello {name}!",
@@ -297,7 +293,7 @@ def test_can_map_on_nested_level_2():
 def test_can_nest_node_with_non_nestable_sibling():
     system = create_run_system()
 
-    root_node = create_env_node(
+    root_node = define(
         {},
         {
             "to be nested/key 1": "1",
@@ -309,7 +305,7 @@ def test_can_nest_node_with_non_nestable_sibling():
 
     parent_node = root_node["to be nested"].split("level name")
 
-    derived_node = create_env_node(
+    derived_node = define(
         {"parent": parent_node},
         {"result": "{parent} {parent}"},
         ["result"],
@@ -322,21 +318,10 @@ def test_can_nest_node_with_non_nestable_sibling():
     }
 
 
-def test_make_twice_without_cache_runs_twice():
+def test_make_twice_runs_once():
     system = create_run_system()
 
-    node = create_env_node({}, {"out": "result"}, ["out"])
-
-    system.make(node)
-    system.make(node)
-
-    assert system.env.op_run_count == 2
-
-
-def test_make_twice_with_cache_runs_once():
-    system = create_run_system(log=Log())
-
-    node = create_env_node({}, {"out": "result"}, ["out"])
+    node = define({}, {"out": "result"}, ["out"])
 
     system.make(node)
     system.make(node)

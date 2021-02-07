@@ -3,17 +3,17 @@ from typing import Iterator, Mapping, Sequence
 import pytest
 from boyleworkflow.loc import Name, Loc
 from boyleworkflow.tree import Tree
-from boyleworkflow.graph import Node
 from boyleworkflow.frozendict import FrozenDict
 from boyleworkflow.scheduling import (
     GraphState,
     get_nodes_and_ancestors,
     get_root_nodes,
 )
+from boyleworkflow.nodes import AbstractNode, VirtualNode, Node
 
 
 @dataclass(frozen=True)
-class NamedNode(Node):
+class NamedNode(VirtualNode, AbstractNode):
     # The name fills the dual purpose of helping debugging
     # and making sure nodes have distinct hashes.
     name: str
@@ -21,8 +21,7 @@ class NamedNode(Node):
     def __repr__(self):
         return self.name
 
-
-def create_node(inp: Mapping[str, Node], name: str) -> Node:
+def create_node(inp: Mapping[str, AbstractNode], name: str) -> AbstractNode:
     return NamedNode(
         FrozenDict({Loc(loc): node for loc, node in inp.items()}),
         name,

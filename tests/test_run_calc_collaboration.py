@@ -66,5 +66,5 @@ def test_asks_env_to_stow_out_locs():
 def test_returns_stowed_results():
     expected_results = {loc: Tree({}, f"digest:{loc}") for loc in CALC.out}
     env = Mock(stow=lambda sandbox, loc: expected_results[loc])  # type: ignore
-    results = run_calc(CALC, env)
-    assert results == expected_results
+    result = run_calc(CALC, env)
+    assert result == Tree.from_nested_items(expected_results)

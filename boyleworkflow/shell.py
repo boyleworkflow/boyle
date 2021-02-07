@@ -1,8 +1,9 @@
 from __future__ import annotations
+from boyleworkflow.api import MultiWrapper, NodeWrapper
 from boyleworkflow.log import Log
 import subprocess
 import shutil
-from typing import Mapping, cast
+from typing import Mapping, Union, cast
 from uuid import uuid4
 from boyleworkflow.loc import Loc
 from dataclasses import dataclass, field
@@ -11,7 +12,7 @@ from boyleworkflow.tree import Tree
 from boyleworkflow.calc import Op, SandboxKey
 from boyleworkflow.storage import Storage, loc_to_rel_path, describe
 from boyleworkflow.frozendict import FrozenDict
-from boyleworkflow.graph import Node
+from boyleworkflow.nodes import Node
 import boyleworkflow.scheduling
 from boyleworkflow.noderunner import NodeRunner
 
@@ -125,6 +126,10 @@ class ShellSystem:
     def outdir(self):
         return self._env.outdir
 
-    def make(self, node: Node):
+    def make(self, target: Union[Node, NodeWrapper, MultiWrapper]):
+        if isinstance(target, Node):
+            node = target
+        else:
+            node = target.node
         results = boyleworkflow.scheduling.make({node}, self._node_runner)
         self._env.deliver(results[node])

@@ -1,38 +1,37 @@
 import pytest
 from boyleworkflow.tree import Name
-from tests.util import create_env_node
-
-NODE_L0 = create_env_node({}, "op", ["out"])
-NODE_L2 = NODE_L0.split("level1")
-NODE_L3 = NODE_L2.split("level2")
+from boyleworkflow.api import define
 
 
-def test_env_node_without_parents_is_not_nested():
-    node = create_env_node({}, "op", ["out"])
+def test_node_without_parents_is_not_nested():
+    node = define({}, "op", ["out"]).node
+    assert not node.inp
     assert node.out_levels == ()
 
 
-def test_inherits_parent_levels():
-    parent_l1 = NODE_L2
-    derived_l1 = create_env_node({"inp": parent_l1}, "op", ["out"])
-    assert derived_l1.out_levels == parent_l1.out_levels
+def test_inherits_nested_parent_levels():
+    parent_l1 = define({}, "op", "out").split("test")
+    derived_l1 = define({"inp": parent_l1}, "op", "out")
+    assert len(parent_l1.node.out_levels) == 1
+    assert derived_l1.node.out_levels == parent_l1.node.out_levels
 
 
 def test_split_creates_out_level():
-    assert NODE_L0.split("level1").out_levels == (Name("level1"),)
+    assert define({}, "op", "out").split("level1").node.out_levels == (Name("level1"),)
 
 
 def test_split_twice_creates_two_levels():
-    assert NODE_L0.split("l1").split("l2").out_levels == (Name("l1"), Name("l2"))
+    node_l2 =  define({}, "op", "out").split("l1").split("l2").node
+    assert node_l2.out_levels == (Name("l1"), Name("l2"))
 
 
 def test_split_levels_must_be_unique():
     with pytest.raises(ValueError):
-        NODE_L0.split("level1").split("level1")
+        define({}, "op", "out").split("l1").split("l1")
 
 
 def test_input_levels_must_match():
-    node_l0 = NODE_L0
-    node_l1 = NODE_L2
+    node_l0 = define({}, "op", "out")
+    node_l1 = define({}, "op", "out").split("l1")
     with pytest.raises(ValueError):
-        create_env_node({"inp1": node_l0, "inp2": node_l1}, "op", ["inp1", "inp2"])
+        define({"inp1": node_l0, "inp2": node_l1}, "op", ".")

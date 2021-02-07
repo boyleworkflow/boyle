@@ -1,4 +1,7 @@
 from __future__ import annotations
+from boyleworkflow.nodes import AbstractNode as Node
+from boyleworkflow.noderunner import CannotRecall, NodeRunner
+from boyleworkflow.tree import Tree
 import dataclasses
 from dataclasses import dataclass
 import itertools
@@ -7,15 +10,12 @@ from typing import (
     FrozenSet,
     Iterable,
     Mapping,
-    Optional,
-    Protocol,
     Set,
 )
-import boyleworkflow.graph
-import boyleworkflow.tree
 
-Node = boyleworkflow.graph.Node
-Result = boyleworkflow.tree.Tree
+# In principle the scheduling does not care if results are Trees or anything else.
+# Also does not care what Node is really. It just has to have Node.parents.
+Result = Tree
 
 
 def get_nodes_and_ancestors(nodes: Iterable[Node]) -> FrozenSet[Node]:
@@ -23,7 +23,7 @@ def get_nodes_and_ancestors(nodes: Iterable[Node]) -> FrozenSet[Node]:
     new = set(nodes)
     while new:
         seen.update(new)
-        new = frozenset(itertools.chain(*(node.parents for node in new))) - seen
+        new = set(itertools.chain(*(node.parents for node in new))) - seen
     return frozenset(seen)
 
 
@@ -148,35 +148,30 @@ class GraphState:
         )._set_priority_work()
 
 
-class NodeRunner(Protocol):
-    def run(self, node: Node, results: Mapping[Node, Result]) -> Result:
-        ...
-
-    def recall(self, node: Node, results: Mapping[Node, Result]) -> Optional[Result]:
-        ...
-
-    def can_restore(self, result: Result) -> bool:
-        ...
-
-
-def _advance_state(state: GraphState, system: NodeRunner) -> GraphState:
+def _advance_state(state: GraphState, runner: NodeRunner) -> GraphState:
     nodes = state.priority_work
 
     new_results = {}
     new_restorable = set()
 
     for node in nodes:
-        result = system.recall(node, state.results) or system.run(node, state.results)
+        node_input = node.build_input(state.results)
+        try:
+            result = runner.recall(node, node_input)
+        except CannotRecall:
+            runner.ensure_restorable(node, node_input)
+            result = runner.recall(node, node_input)
+
         new_results[node] = result
-        if system.can_restore(result):
+        if runner.can_restore(result):
             new_restorable.add(node)
 
     return state.add_results(new_results).add_restorable(new_restorable)
 
 
-def make(requested: Iterable[Node], system: NodeRunner) -> Mapping[Node, Result]:
+def make(requested: Iterable[Node], runner: NodeRunner) -> Mapping[Node, Result]:
     requested = set(requested)
     state = GraphState.from_requested(requested)
     while state.priority_work:
-        state = _advance_state(state, system)
+        state = _advance_state(state, runner)
     return {node: state.results[node] for node in requested}

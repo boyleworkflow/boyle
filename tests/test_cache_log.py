@@ -1,9 +1,7 @@
-from boyleworkflow.frozendict import FrozenDict
 import pytest
-from boyleworkflow.calc import Calc, CalcOut
 from boyleworkflow.loc import Loc
 from boyleworkflow.tree import Tree
-from boyleworkflow.log import Log, CacheLog, NotFound, Run
+from boyleworkflow.log import Log, CacheLog, NotFound, Run, Calc
 from tests.util import tree_from_dict
 
 
@@ -12,30 +10,25 @@ def create_log() -> CacheLog:
 
 
 def test_can_retrieve_stored_result():
-    calc_out = CalcOut(Tree({}), "op", Loc("out"))
-    calc = Calc(calc_out.inp, calc_out.op, frozenset({calc_out.out}))
+    calc = Calc(Tree({}), "op", frozenset({Loc(".")}))
     result = Tree({})
-    results = FrozenDict({calc_out.out: result})
-    run = Run(calc, results)
+    run = Run(calc, result)
     log = create_log()
     log.save_run(run)
-    assert log.recall_result(calc_out) == result
+    assert log.recall_result(calc) == result
 
 
 def test_can_retrieve_stored_result_with_complicated_tree():
-    calc_out = CalcOut(Tree({}), "op", Loc("out"))
-    calc = Calc(calc_out.inp, calc_out.op, frozenset({calc_out.out}))
-    result = tree_from_dict({
-        "a": {"b1": "x", "b2": {"c": "y"}}
-    })
-    results = FrozenDict({calc_out.out: result})
-    run = Run(calc, results)
+    calc = Calc(Tree({}), "op", frozenset({Loc(".")}))
+    result = tree_from_dict({"a": {"b1": "x", "b2": {"c": "y"}}})
+    run = Run(calc, result)
     log = create_log()
     log.save_run(run)
-    assert log.recall_result(calc_out) == result
+    assert log.recall_result(calc) == result
+
 
 def test_raises_exception_if_not_found():
-    calc_out = CalcOut(Tree({}), "op", Loc("out"))
+    calc = Calc(Tree({}), "op", frozenset({Loc("out")}))
     log = create_log()
     with pytest.raises(NotFound):
-        log.recall_result(calc_out)
+        log.recall_result(calc)

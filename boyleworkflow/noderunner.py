@@ -1,86 +1,57 @@
 from __future__ import annotations
-from boyleworkflow.frozendict import FrozenDict
-from functools import partial
-from boyleworkflow.loc import Loc
+from boyleworkflow.calc import Env, run_calc
 from boyleworkflow.tree import Tree
 from dataclasses import dataclass
-from typing import Callable, Mapping, Optional
-from boyleworkflow.calc import Calc, CalcOut, Env, run_calc
-from boyleworkflow.graph import EnvNode, Node, VirtualNode
-from boyleworkflow.log import CacheLog, NotFound, Run
+from boyleworkflow.nodes import AbstractNode, AbstractCalcNode, AbstractVirtualNode
+from boyleworkflow.log import Log, NotFound, Run
+from boyleworkflow.calc import Calc, run_calc
 
 
-def _run_node(
-    node: Node, input_tree: Tree, run_subtree: Callable[[Tree], Tree]
-) -> Tree:
-    result = input_tree.map_level(node.run_depth, run_subtree)
-    return result
+class CannotRecall(Exception):
+    pass
 
 
-def _run_virtual_node(node: VirtualNode, input_tree: Tree):
-    return _run_node(node, input_tree, node.run_subtree)
-
-
-@dataclass
+@dataclass(frozen=True)
 class NodeRunner:
     env: Env
-    log: Optional[CacheLog] = None
+    log: Log
 
-    def run(self, node: Node, results: Mapping[Node, Tree]) -> Tree:
-        input_tree = self._build_input_tree(node, results)
-        if isinstance(node, VirtualNode):
-            return _run_virtual_node(node, input_tree)
-        elif isinstance(node, EnvNode):
-            run_subtree = partial(self._run_env_node_subtree, node)
-            return _run_node(node, input_tree, run_subtree)
+    def ensure_restorable(self, node: AbstractNode, node_input: Tree):
+        if isinstance(node, AbstractVirtualNode):
+            return  # because AbstractVirtualNode can be restored if its parents can
 
-        raise ValueError(f"unknown node type {type(node)}")
-
-    def recall(self, node: Node, results: Mapping[Node, Tree]) -> Optional[Tree]:
-        if not self.log:
-            return None
-
-        if isinstance(node, EnvNode):
-            try:
-                return self._recall_env_node(node, results)
-            except NotFound:
-                return None
-
-    def can_restore(self, tree: Tree) -> bool:
-        return self.env.can_restore(tree)
-
-    def _build_input_tree(self, node: Node, results: Mapping[Node, Tree]):
-        return Tree.merge(
-            results[parent].map_level(node.run_depth, lambda tree: tree.nest(loc))
-            for loc, parent in node.inp.items()
-        )
-
-    def _run_env_node_subtree(self, node: EnvNode, subtree: Tree) -> Tree:
-        calc = Calc(subtree, node.op, node.out)
-        results = run_calc(calc, self.env)
-        self._store_calc_results(calc, results)
-        return Tree.from_nested_items(results)
-
-    def _store_calc_results(self, calc: Calc, results: Mapping[Loc, Tree]):
-        if not self.log:
+        elif isinstance(node, AbstractCalcNode):
+            for _, calc in node.iter_calcs(node_input):
+                try:
+                    result = self.log.recall_result(calc)
+                    if self.can_restore(result):
+                        continue
+                except NotFound:
+                    self._run_calc(calc)
             return
 
-        run = Run(calc, FrozenDict(results))
+        raise ValueError(f"Unexpected type of node: '{type(node)}")
+
+    def _run_calc(self, calc: Calc):
+        result = run_calc(calc, self.env)
+        run = Run(calc, result)
         self.log.save_run(run)
 
-    def _recall_env_node(self, node: EnvNode, results: Mapping[Node, Tree]) -> Tree:
-        input_tree = self._build_input_tree(node, results)
-        recall_subtree = partial(self._recall_env_node_subtree, node)
-        return input_tree.map_level(node.run_depth, recall_subtree)
+    def recall(self, node: AbstractNode, node_input: Tree) -> Tree:
+        if isinstance(node, AbstractVirtualNode):
+            return node_input.map_level(node.run_depth, node.run_subtree)
 
-    def _recall_env_node_subtree(self, node: EnvNode, subtree: Tree) -> Tree:
-        return Tree.from_nested_items(
-            {
-                loc: self._recall_calc_out(CalcOut(subtree, node.op, loc))
-                for loc in node.out
-            }
-        )
+        elif isinstance(node, AbstractCalcNode):
+            try:
+                calc_results = {
+                    loc: self.log.recall_result(calc)
+                    for loc, calc in node.iter_calcs(node_input)
+                }
+                return Tree.from_nested_items(calc_results)
+            except NotFound as e:
+                raise CannotRecall from e
 
-    def _recall_calc_out(self, calc_out: CalcOut) -> Tree:
-        assert self.log
-        return self.log.recall_result(calc_out)
+        raise ValueError(f"Unexpected type of node: '{type(node)}")
+
+    def can_restore(self, result: Tree) -> bool:
+        return self.env.can_restore(result)

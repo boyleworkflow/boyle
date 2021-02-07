@@ -1,4 +1,3 @@
-from boyleworkflow.graph import Node
 from boyleworkflow.storage import describe
 from pathlib import Path
 from boyleworkflow.shell import (
@@ -7,7 +6,7 @@ from boyleworkflow.shell import (
     create_shell_op,
     ShellSystem,
 )
-from tests.util import create_env_node
+from boyleworkflow.api import NodeWrapper, define
 
 
 def read_str(path: Path) -> str:
@@ -20,8 +19,8 @@ def write_str(s: str, path: Path):
         return f.write(s)
 
 
-def create_import_node(path: str) -> Node:
-    return create_env_node({}, create_import_op(path), [IMPORT_LOC])[IMPORT_LOC]
+def create_import_node(path: str) -> NodeWrapper:
+    return define({}, create_import_op(path), [IMPORT_LOC]).pick(str(IMPORT_LOC))
 
 
 def test_make(tmp_path: Path):
@@ -31,7 +30,7 @@ def test_make(tmp_path: Path):
     hello = create_import_node("hello")
     boyle = create_import_node("boyle")
 
-    result = create_env_node(
+    result = define(
         {"greeting": hello, "name": boyle},
         create_shell_op("cat greeting name > greeting_name"),
         ["greeting_name"],
@@ -45,7 +44,7 @@ def test_make(tmp_path: Path):
 
 def test_make_persists_cache_on_disk(tmp_path: Path):
     # If this runs twice it will produce different outputs
-    node = create_env_node(
+    node = define(
         {},
         create_shell_op("""python -c "import uuid; print(uuid.uuid4())" > outfile"""),
         ["outfile"],
